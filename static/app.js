@@ -706,7 +706,11 @@ function renderCaja(){
       <div class="list-item">
         <div>
           <div style="font-weight:600;">${escapeHtml(m.concepto)}</div>
-          <div class="meta"><span class="tag">${m.categoria}</span> ${fmtDate(m.fecha)}</div>
+          <div class="meta">
+            <span class="tag">${m.categoria}</span>
+            ${fmtDate(m.fecha)}
+            <span class="tag ${m.socio_id ? 'ok' : 'warn'}">${m.socio_id ? `Socio: ${escapeHtml(socioNombre(m.socio_id))}` : 'Sin socio'}</span>
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${m.tipo==='ingreso'?'var(--sage)':'var(--rust)'};">${m.tipo==='ingreso'?'+':'−'} ${money(m.importe)}</span>

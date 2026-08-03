@@ -355,7 +355,7 @@ def state():
         reuniones.append(row)
 
     inventario = [dict(r) for r in db.execute("SELECT * FROM inventario ORDER BY categoria, nombre")]
-    movimientos = [dict(r) for r in db.execute("SELECT * FROM movimientos ORDER BY fecha DESC")]
+    movimientos = [dict(r) for r in db.execute("SELECT m.*, s.nombre AS socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha DESC")]
     bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
     bebidas_consumos = [dict(r) for r in db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha DESC LIMIT 80")]
     fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
