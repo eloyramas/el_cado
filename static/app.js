@@ -421,15 +421,17 @@ function renderResumen(){
   const proximasReuniones = state.reuniones.filter(r=>r.fecha >= todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const proxima = proximasReuniones[0];
   const proximasReservas = state.reservas.filter(r=>r.fecha >= todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,3);
-  const saldo = saldoTotal();
+  const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso();
+  const gastosTotales = totalGastosMov() + totalFiestasGasto();
+  const saldo = ingresosTotales - gastosTotales;
   const alertas = construirAlertas();
   const fiestasEvento = fiestasPorEvento();
 
   return `
   <div class="stat-grid">
     <div class="stat ${saldo<0?'rust':'sage'}"><div class="n">${money(saldo)}</div><div class="l">Saldo de la peña</div></div>
-    <div class="stat"><div class="n">${state.socios.filter(s=>s.activo).length}</div><div class="l">Socios</div></div>
-    <div class="stat ${miCuota && miCuota.pagado ? 'sage':'rust'}"><div class="n">${miCuota && miCuota.pagado ? 'Al día' : 'Pendiente'}</div><div class="l">Tu cuota de ${MESES[now.getMonth()]}</div></div>
+    <div class="stat"><div class="n">${money(ingresosTotales)}</div><div class="l">Ingresos totales</div></div>
+    <div class="stat"><div class="n">− ${money(gastosTotales)}</div><div class="l">Gastos totales</div></div>
   </div>
 
   ${alertas.length ? `
@@ -440,12 +442,16 @@ function renderResumen(){
 
   <div class="card-grid">
     <div class="card">
-      <h2><span class="pin"></span>Cuentas</h2>
+      <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><span class="pin"></span>Cuentas</span>
+        <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">⬇ Exportar a Excel</button>
+      </h2>
       <div class="menu-row"><span class="label">Cuotas cobradas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
       <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
       <div class="menu-row"><span class="label">Bebidas (recaudado)</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
       <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">− ${money(totalGastosMov())}</span></div>
       <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">− ${money(totalFiestasGasto())}</span></div>
+      <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo neto</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
     </div>
     <div class="card">
       <h2><span class="pin"></span>Próxima reunión</h2>
