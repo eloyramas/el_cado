@@ -42,7 +42,8 @@ except ImportError:
     PIL_OK = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "pena.db")
+DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "pena.db")))
+AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
 
 app = Flask(__name__)
 # En producción, define la variable de entorno SECRET_KEY con un valor propio.
@@ -498,7 +499,7 @@ def delete_socio(sid):
     db.execute("DELETE FROM socios WHERE id = ?", (sid,))
     db.commit()
 
-    avatar_path = os.path.join(BASE_DIR, "static", "avatars", f"{sid}.jpg")
+    avatar_path = os.path.join(AVATARS_DIR, f"{sid}.jpg")
     try:
         if os.path.exists(avatar_path):
             os.remove(avatar_path)
@@ -618,9 +619,8 @@ def upload_foto(sid):
         side = min(w, h)
         left, top = (w - side) // 2, (h - side) // 2
         im = im.crop((left, top, left + side, top + side)).resize((320, 320), Image.LANCZOS)
-        avatars_dir = os.path.join(BASE_DIR, "static", "avatars")
-        os.makedirs(avatars_dir, exist_ok=True)
-        im.save(os.path.join(avatars_dir, f"{sid}.jpg"), "JPEG", quality=85)
+        os.makedirs(AVATARS_DIR, exist_ok=True)
+        im.save(os.path.join(AVATARS_DIR, f"{sid}.jpg"), "JPEG", quality=85)
     except Exception as e:
         return err(f"No se pudo procesar la imagen: {e}", 400)
 

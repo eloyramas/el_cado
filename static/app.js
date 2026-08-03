@@ -57,21 +57,6 @@ async function loadBackgroundImages(){
   BG_IMAGES = DEFAULT_BG_IMAGES;
 }
 
-function loadBackgroundImages(){ 
-  const container = document.body;
-  const backgrounds = [];
-  for(let i=1;;i++){
-    const path = `/static/backgrounds/bg-${i}.jpg`;
-    const img = new Image();
-    img.src = path;
-    img.onload = () => {};
-    img.onerror = () => { if(backgrounds.length < i-1) return; };
-    backgrounds.push(path);
-    if(i >= 12) break;
-  }
-  return backgrounds;
-}
-
 let loginDragState = {
   active: false,
   startX: 0,
