@@ -312,6 +312,36 @@ textarea{resize:vertical; min-height:60px;}
   }
 }
 
+@media(max-width:720px){
+  .login-content-full{
+    align-items:flex-start;
+    gap:10px;
+  }
+  .login-left-sidebar,.login-right-sidebar{
+    flex-wrap:wrap;
+    justify-content:center;
+    padding:8px 0;
+  }
+  .login-left-sidebar .user-chip-photo,
+  .login-right-sidebar .user-chip-photo{
+    width:calc(50% - 8px);
+    min-width:130px;
+    padding:12px 10px;
+    white-space:normal;
+  }
+  .login-left-sidebar .user-chip-photo span,
+  .login-right-sidebar .user-chip-photo span{
+    font-size:0.92rem;
+  }
+  .login-center{
+    padding:12px;
+  }
+  .login-panel-single{
+    max-width:100%;
+    margin:0 12px;
+  }
+}
+
 /* cuotas grid */
 .cuotas-table{width:100%; border-collapse:collapse; font-size:0.82rem;}
 .cuotas-table th,.cuotas-table td{padding:6px; text-align:center; border-bottom:1px solid var(--line);}
