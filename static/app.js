@@ -8,11 +8,12 @@ const CAT_MOV = ['Alquiler','Luz','Agua','Gas','Mantenimiento','Otros'];
 const CAT_INV = ['Cocina','Mobiliario','Electrónica','Otros'];
 const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
 const DIA_LIMITE_CUOTA = 5; // a partir de qué día del mes se avisa de cuota pendiente
-const BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg'];
+let BG_IMAGES = [];
+const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg','/static/backgrounds/bg-6.jpg'];
 const PEÑA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
 let avatarVersion = Date.now();
 
-(function initBackgroundSlideshow(){
+function initBackgroundSlideshow(){
   const layerA = document.getElementById('bg-layer-a');
   const layerB = document.getElementById('bg-layer-b');
   if(!layerA || !layerB || BG_IMAGES.length===0) return;
@@ -35,11 +36,40 @@ let avatarVersion = Date.now();
     hideLayer.style.opacity = '0';
     active = active==='a' ? 'b' : 'a';
   }, 11000);
-})();
+}
 
 function updateBackgroundVisibility(){
   const loggedIn = state && state.current_user;
   document.body.classList.toggle('bg-hidden', !!loggedIn);
+}
+
+async function loadBackgroundImages(){
+  try{
+    const res = await fetch('/api/backgrounds');
+    if(res.ok){
+      const json = await res.json();
+      if(Array.isArray(json.backgrounds) && json.backgrounds.length>0){
+        BG_IMAGES = json.backgrounds;
+        return;
+      }
+    }
+  }catch(e){/* fallback */}
+  BG_IMAGES = DEFAULT_BG_IMAGES;
+}
+
+function loadBackgroundImages(){ 
+  const container = document.body;
+  const backgrounds = [];
+  for(let i=1;;i++){
+    const path = `/static/backgrounds/bg-${i}.jpg`;
+    const img = new Image();
+    img.src = path;
+    img.onload = () => {};
+    img.onerror = () => { if(backgrounds.length < i-1) return; };
+    backgrounds.push(path);
+    if(i >= 12) break;
+  }
+  return backgrounds;
 }
 
 let loginDragState = {
@@ -672,6 +702,10 @@ function renderCaja(){
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row">
+        <div><label class="f">Socio</label><select name="socio_id">
+          <option value="">(sin socio)</option>
+          ${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}
+        </select></div>
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Factura de la luz - julio"></div>
         <div><label class="f">Importe (€)</label><input type="number" name="importe" step="0.01" min="0" required></div>
       </div>
@@ -1120,6 +1154,8 @@ setInterval(async ()=>{
 /* ============ INIT ============ */
 (async function init(){
   render();
+  await loadBackgroundImages();
+  initBackgroundSlideshow();
   await loadState();
   render();
 })();

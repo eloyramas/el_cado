@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS movimientos (
     categoria TEXT NOT NULL,
     concepto TEXT NOT NULL,
     importe REAL NOT NULL,
-    fecha TEXT NOT NULL
+    fecha TEXT NOT NULL,
+    socio_id TEXT
 );
 CREATE TABLE IF NOT EXISTS bebidas_precios (
     id TEXT PRIMARY KEY,
@@ -186,6 +187,10 @@ def init_db():
             pass  # ya existía (base de datos creada con una versión anterior)
         try:
             db.execute("ALTER TABLE socios ADD COLUMN must_change_pin INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE movimientos ADD COLUMN socio_id TEXT")
         except sqlite3.OperationalError:
             pass
         # Migración: actualizar tabla reuniones si existe con estructura antigua
@@ -738,9 +743,13 @@ def add_movimiento():
         return err("Solo el administrador puede añadir gastos o ingresos.")
     data = request.get_json(force=True)
     db = get_db()
+    socio_id = data.get("socio_id") or None
+    if socio_id:
+        if not db.execute("SELECT 1 FROM socios WHERE id = ?", (socio_id,)).fetchone():
+            return err("Socio no encontrado", 404)
     mid = new_id()
     db.execute(
-        "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha, socio_id) VALUES (?,?,?,?,?,?,?)",
         (
             mid,
             data.get("tipo", "gasto"),
@@ -748,6 +757,7 @@ def add_movimiento():
             (data.get("concepto") or "").strip(),
             float(data.get("importe") or 0),
             data.get("fecha"),
+            socio_id,
         ),
     )
     db.commit()
@@ -960,11 +970,13 @@ def _build_excel():
 
     ws1 = wb.active
     ws1.title = "Movimientos"
-    movs = db.execute("SELECT * FROM movimientos ORDER BY fecha").fetchall()
+    movs = db.execute(
+        "SELECT m.*, s.nombre as socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha"
+    ).fetchall()
     write_sheet(
         ws1,
-        ["Fecha", "Tipo", "Categoría", "Concepto", "Importe (€)"],
-        [[m["fecha"], m["tipo"], m["categoria"], m["concepto"], m["importe"]] for m in movs],
+        ["Fecha", "Tipo", "Categoría", "Socio", "Concepto", "Importe (€)"],
+        [[m["fecha"], m["tipo"], m["categoria"], m["socio_nombre"] or "", m["concepto"], m["importe"]] for m in movs],
     )
 
     ws2 = wb.create_sheet("Cuotas")
