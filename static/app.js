@@ -10,7 +10,7 @@ const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
 const DIA_LIMITE_CUOTA = 5; // a partir de qu� d�a del mes se avisa de cuota pendiente
 let BG_IMAGES = [];
 const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg','/static/backgrounds/bg-6.jpg'];
-const PE�A_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
+const PENA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
 let avatarVersion = Date.now();
 
 function initBackgroundSlideshow(){
@@ -383,7 +383,7 @@ function renderApp(){
     <div class="header-panel">
       <div class="masthead">
         
-        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PE�A_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">?? Ver ubicaci�n</a></div></div>
+        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">?? Ver ubicaci�n</a></div></div>
         
         ${isAdmin() ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
         
