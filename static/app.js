@@ -1,16 +1,16 @@
 /* El Cado - frontend
-   Habla con el backend Flask (app.py) vía fetch(). El estado siempre
+   Habla con el backend Flask (app.py) v�a fetch(). El estado siempre
    vive en el servidor (SQLite) para que todos los socios vean lo mismo
    en tiempo real (se refresca solo cada 8s). */
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const CAT_MOV = ['Alquiler','Luz','Agua','Gas','Mantenimiento','Otros'];
-const CAT_INV = ['Cocina','Mobiliario','Electrónica','Otros'];
+const CAT_INV = ['Cocina','Mobiliario','Electr�nica','Otros'];
 const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
-const DIA_LIMITE_CUOTA = 5; // a partir de qué día del mes se avisa de cuota pendiente
+const DIA_LIMITE_CUOTA = 5; // a partir de qu� d�a del mes se avisa de cuota pendiente
 let BG_IMAGES = [];
 const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg','/static/backgrounds/bg-6.jpg'];
-const PEÑA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
+const PE�A_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
 let avatarVersion = Date.now();
 
 function initBackgroundSlideshow(){
@@ -49,7 +49,9 @@ async function loadBackgroundImages(){
     if(res.ok){
       const json = await res.json();
       if(Array.isArray(json.backgrounds) && json.backgrounds.length>0){
+        
         BG_IMAGES = json.backgrounds;
+        
         return;
       }
     }
@@ -151,19 +153,28 @@ async function loadState(){
   try{
     state = await apiGet('/api/state');
     loaded = true;
-    // Si hay usuario favorito guardado y está activo, pre-seleccionarlo
+    // Si hay usuario favorito guardado y est� activo, pre-seleccionarlo
     if(!pendingLoginId){
       const favId = getFavoriteUser();
       if(favId && state.socios.some(s=>s.id===favId && s.activo)){
+        
         pendingLoginId = favId;
       }
     }
   }catch(e){ console.error('No se pudo cargar el estado', e); }
 }
 
-function isAdmin(){ return !!(state && state.is_admin); }
+function can(permission){ return !!(state && (state.permissions || []).includes(permission)); }
+function isAdmin(){ return can("manage_roles"); }
+function roleNames(socio){
+  const roles = state && state.roles ? state.roles : [];
+  return (socio.roles || ["socio"]).map(id=>{
+    const role = roles.find(r=>r.id===id);
+    return role ? role.nombre : id;
+  });
+}
 function uid(){ return Math.random().toString(36).slice(2,10); }
-function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
+function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' �'; }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(iso){
   if(!iso) return '';
@@ -171,11 +182,11 @@ function fmtDate(iso){
   return `${d}/${m}/${y}`;
 }
 function fmtHoras(r){
-  if(!r.hora_inicio && !r.hora_fin) return 'Todo el día';
-  if(r.hora_inicio && r.hora_fin) return `${r.hora_inicio} – ${r.hora_fin}`;
+  if(!r.hora_inicio && !r.hora_fin) return 'Todo el d�a';
+  if(r.hora_inicio && r.hora_fin) return `${r.hora_inicio} � ${r.hora_fin}`;
   return r.hora_inicio ? `desde las ${r.hora_inicio}` : `hasta las ${r.hora_fin}`;
 }
-function socioNombre(id){ const s = state.socios.find(s=>s.id===id); return s ? s.nombre : '—'; }
+function socioNombre(id){ const s = state.socios.find(s=>s.id===id); return s ? s.nombre : '�'; }
 function initials(name){
   return (name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
 }
@@ -206,14 +217,14 @@ function timeAgoEs(iso){
   const days = Math.floor(diffMs/86400000);
   if(days<=0) return 'hoy';
   if(days===1) return 'ayer';
-  return `hace ${days} días`;
+  return `hace ${days} d�as`;
 }
 
 /* ============ RENDER ROOT ============ */
 function render(){
   updateBackgroundVisibility();
   const app = document.getElementById('app');
-  if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la peña…</div>`; return; }
+  if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la pe�a�</div>`; return; }
   if(!state.current_user){
     app.innerHTML = renderLogin();
     if(!loginDragInitialized){
@@ -236,11 +247,13 @@ function renderForcePin(me){
     <div style="margin-top:14px;">${avatarHtml(me,'lg')}</div>
     <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(me.nombre)}. Por seguridad, tienes que crear tu propio PIN antes de continuar.</p>
     <form data-form="force-pin" style="margin-top:16px; max-width:260px; margin-left:auto; margin-right:auto; text-align:left;">
-      <label class="f">Nuevo PIN (4 dígitos, el que tú quieras)</label>
-      <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="····" autofocus
+      <label class="f">Nuevo PIN (4 d�gitos, el que t� quieras)</label>
+      <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="����" autofocus
+        
         style="text-align:center; font-size:1.4rem; letter-spacing:0.5rem; margin-bottom:10px;">
       <label class="f">Repite el PIN</label>
-      <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="····"
+      <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="����"
+        
         style="text-align:center; font-size:1.4rem; letter-spacing:0.5rem; margin-bottom:14px;">
       <button class="btn" type="submit" style="width:100%;">Guardar mi PIN y entrar</button>
     </form>
@@ -261,21 +274,38 @@ function renderLogin(){
     if(s){
       return `
       <div class="login-wrap">
+        
         <div class="login-panel-single">
+        
           <div class="login-header-single">
+        
             ${logoBadge()}
+        
             <h1>${escapeHtml(state.config.nombre)}</h1>
+        
           </div>
+        
           <div class="login-content-single">
+        
             <div style="margin-top:14px;">${avatarHtml(s,'lg')}</div>
-            <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(s.nombre)}. ${s.tiene_pin ? 'Introduce tu PIN' : 'Todavía no tienes PIN configurado, puedes entrar directamente'}</p>
+        
+            <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(s.nombre)}. ${s.tiene_pin ? 'Introduce tu PIN' : 'Todav�a no tienes PIN configurado, puedes entrar directamente'}</p>
+        
             <form data-form="pin-login" style="margin-top:16px; max-width:300px; margin-left:auto; margin-right:auto;">
-              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" name="pin" placeholder="····" autofocus
-                style="text-align:center; font-size:1.8rem; letter-spacing:0.8rem; padding:14px; border-radius:8px; border:1px solid var(--line); background:rgba(15,26,21,0.72); color:var(--chalk);">
+        
+              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" name="pin" placeholder="����" autofocus
+        
+                
+        style="text-align:center; font-size:1.8rem; letter-spacing:0.8rem; padding:14px; border-radius:8px; border:1px solid var(--line); background:rgba(15,26,21,0.72); color:var(--chalk);">
+        
               <button class="btn" type="submit" style="width:100%; margin-top:16px;">${s.tiene_pin ? 'Entrar' : 'Entrar y crear mi PIN luego'}</button>
+        
             </form>
-            <button class="btn ghost small" data-action="cancel-pin-login" style="margin-top:16px;">← Elegir otro socio</button>
+        
+            <button class="btn ghost small" data-action="cancel-pin-login" style="margin-top:16px;">? Elegir otro socio</button>
+        
           </div>
+        
         </div>
       </div>`;
     }
@@ -286,32 +316,60 @@ function renderLogin(){
   <div class="login-wrap">
     <div class="login-header">
       <div class="login-header-content">
+        
         ${logoBadge()}
+        
         <h1>${escapeHtml(state.config.nombre)}</h1>
       </div>
     </div>
     <div class="login-panel">
       <div class="login-content-full">
+        
         <div class="login-left-sidebar">
+        
           ${socios.slice(0, Math.ceil(socios.length / 2)).map(s=>`<button class="user-chip-photo" data-action="select-user" data-id="${s.id}">${avatarHtml(s,'md')}<span>${escapeHtml(s.nombre)}</span></button>`).join('')}
+        
         </div>
+        
         <div class="login-center">
+        
           ${sinSocios ? `
+        
           <div class="login-panel-center">
+        
             <div class="login-content">
+        
               <form data-form="bootstrap-admin" style="margin-top:24px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">
-                <label class="f">Tu nombre</label>
-                <input type="text" name="nombre" required placeholder="Nombre y apellido" style="margin-bottom:10px;">
-                <label class="f">Elige un PIN de 4 dígitos</label>
-                <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="····" style="margin-bottom:10px;">
-                <button class="btn" type="submit" style="width:100%;">Crear peña y entrar como administrador</button>
+        
+                
+        <label class="f">Tu nombre</label>
+        
+                
+        <input type="text" name="nombre" required placeholder="Nombre y apellido" style="margin-bottom:10px;">
+        
+                
+        <label class="f">Elige un PIN de 4 d�gitos</label>
+        
+                
+        <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="����" style="margin-bottom:10px;">
+        
+                
+        <button class="btn" type="submit" style="width:100%;">Crear pe�a y entrar como administrador</button>
+        
               </form>
+        
             </div>
+        
           </div>
+        
           ` : ``}
+        
         </div>
+        
         <div class="login-right-sidebar">
+        
           ${socios.slice(Math.ceil(socios.length / 2)).map(s=>`<button class="user-chip-photo" data-action="select-user" data-id="${s.id}">${avatarHtml(s,'md')}<span>${escapeHtml(s.nombre)}</span></button>`).join('')}
+        
         </div>
       </div>
     </div>
@@ -324,23 +382,40 @@ function renderApp(){
   <div class="container">
     <div class="header-panel">
       <div class="masthead">
-        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PEÑA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">📍 Ver ubicación</a></div></div>
+        
+        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PE�A_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">?? Ver ubicaci�n</a></div></div>
+        
         ${isAdmin() ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="edit-name-btn" data-action="edit-club-name">✎ renombrar peña</button>
-          <button class="edit-name-btn" data-action="edit-cuota">✎ cambiar cuota</button>
+        
+          <button class="edit-name-btn" data-action="edit-club-name">? renombrar pe�a</button>
+        
+          <button class="edit-name-btn" data-action="edit-cuota">? cambiar cuota</button>
+        
         </div>` : ''}
-        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} · <button data-action="logout">cambiar usuario</button></div>
+        
+        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} � <button data-action="logout">cambiar usuario</button></div>
       </div>
       <div class="tabs">
+        
         ${tabBtn('resumen','Resumen')}
+        
         ${tabBtn('socios','Socios')}
+        
         ${tabBtn('cuotas','Cuotas')}
+        
         ${tabBtn('reservas','Reservas')}
+        
         ${tabBtn('reuniones','Reuniones')}
+        
         ${tabBtn('inventario','Inventario')}
+        
         ${tabBtn('caja','Gastos e ingresos')}
+        
         ${tabBtn('bebidas','Bebidas')}
+        
         ${tabBtn('encargados','Tareas')}
+        
+        ${isAdmin() ? tabBtn('roles','Roles') : ''}
         ${tabBtn('perfil','Mi perfil')}
       </div>
     </div>
@@ -361,12 +436,36 @@ function renderTab(){
     case 'caja': return renderCaja();
     case 'bebidas': return renderBebidas();
     case 'encargados': return renderEncargados();
+    case 'roles': return renderRoles();
     case 'perfil': return renderPerfil();
     default: return '';
   }
 }
 
-/* ============ cálculos ============ */
+function renderRoles(){
+  if(!isAdmin()) return '<p class="readonly-note">No tienes permiso para gestionar roles.</p>';
+  const roles = state.roles || [];
+  return `
+  <div class="card">
+    <h2><span class="pin"></span>Roles y permisos</h2>
+    <p class="readonly-note">Un socio puede tener varios roles. Los cambios se aplican al momento y el servidor los comprueba en cada accion.</p>
+    ${state.socios.map(s=>`
+      <div class="list-item" style="align-items:flex-start;">
+        <div style="flex:1;">
+          <div style="font-weight:600; margin-bottom:8px;">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}</div>
+          <div class="role-options">
+            ${roles.map(role=>`<label class="role-option"><input type="checkbox" data-role-option="${s.id}" value="${role.id}" ${(s.roles||[]).includes(role.id)?'checked':''}> ${escapeHtml(role.nombre)}</label>`).join('')}
+          </div>
+        </div>
+        <button class="btn ghost small" data-action="save-roles" data-id="${s.id}">Guardar roles</button>
+      </div>`).join('')}
+  </div>
+  <div class="card">
+    <h2><span class="pin"></span>Permisos incluidos</h2>
+    ${roles.map(role=>`<div class="menu-row"><span class="label">${escapeHtml(role.nombre)}<small>${(role.permisos||[]).map(p=>escapeHtml((state.permission_labels||{})[p]||p)).join(' · ') || 'Sin permisos especiales'}</small></span></div>`).join('')}
+  </div>`;
+}
+/* ============ c�lculos ============ */
 function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+Number(m.importe||0),0); }
@@ -396,17 +495,18 @@ function construirAlertas(){
     activos.forEach(s=>{
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===now.getFullYear() && c.month===now.getMonth()+1);
       if(!c || !c.pagado){
-        alertas.push({tipo:'warn', texto:`${s.nombre} todavía no ha pagado la cuota de ${MESES[now.getMonth()]}`});
+        
+        alertas.push({tipo:'warn', texto:`${s.nombre} todav�a no ha pagado la cuota de ${MESES[now.getMonth()]}`});
       }
     });
   }
 
   const recientes = [];
   state.reservas.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservó la peña para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reserv� la pe�a para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`});
   });
   state.reuniones.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convocó una reunión para el ${fmtDate(r.fecha)}: ${escapeHtml(r.titulo)}`});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoc� una reuni�n para el ${fmtDate(r.fecha)}: ${escapeHtml(r.titulo)}`});
   });
   recientes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
   recientes.slice(0,5).forEach(r=>alertas.push({tipo:'info', texto:r.texto, meta:timeAgoEs(r.fecha)}));
@@ -429,46 +529,54 @@ function renderResumen(){
 
   return `
   <div class="stat-grid">
-    <div class="stat ${saldo<0?'rust':'sage'}"><div class="n">${money(saldo)}</div><div class="l">Saldo de la peña</div></div>
+    <div class="stat ${saldo<0?'rust':'sage'}"><div class="n">${money(saldo)}</div><div class="l">Saldo de la pe�a</div></div>
     <div class="stat"><div class="n">${money(ingresosTotales)}</div><div class="l">Ingresos totales</div></div>
-    <div class="stat"><div class="n">− ${money(gastosTotales)}</div><div class="l">Gastos totales</div></div>
+    <div class="stat"><div class="n">- ${money(gastosTotales)}</div><div class="l">Gastos totales</div></div>
   </div>
 
   ${alertas.length ? `
   <div class="card">
     <h2><span class="pin"></span>Avisos</h2>
-    ${alertas.map(a=>`<div class="alert-item"><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">· ${a.meta}</span>`:''}</div></div>`).join('')}
+    ${alertas.map(a=>`<div class="alert-item"><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">� ${a.meta}</span>`:''}</div></div>`).join('')}
   </div>` : ''}
 
   <div class="card-grid">
     <div class="card">
       <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        
         <span><span class="pin"></span>Cuentas</span>
-        <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">⬇ Exportar a Excel</button>
+        
+        <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
       </h2>
       <div class="menu-row"><span class="label">Cuotas cobradas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
       <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
       <div class="menu-row"><span class="label">Bebidas (recaudado)</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
-      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">− ${money(totalGastosMov())}</span></div>
-      <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">− ${money(totalFiestasGasto())}</span></div>
+      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov())}</span></div>
+      <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto())}</span></div>
       <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo neto</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
     </div>
     <div class="card">
-      <h2><span class="pin"></span>Próxima reunión</h2>
+      <h2><span class="pin"></span>Pr�xima reuni�n</h2>
       ${proxima ? `
+        
         <p style="margin:0 0 4px; font-weight:600;">${escapeHtml(proxima.titulo)}</p>
+        
         <p class="meta" style="margin:0;">${fmtDate(proxima.fecha)}</p>
+        
         <p style="margin-top:10px; font-size:0.86rem; color:var(--chalk-dim);">${escapeHtml(proxima.notas||'')}</p>
       ` : `<p class="empty">No hay reuniones programadas.</p>`}
     </div>
   </div>
 
   <div class="card">
-    <h2><span class="pin"></span>La peña está reservada...</h2>
-    ${proximasReservas.length===0 ? '<p class="empty">No hay reservas próximas. La peña está libre.</p>' : proximasReservas.map(r=>`
+    <h2><span class="pin"></span>La pe�a est� reservada...</h2>
+    ${proximasReservas.length===0 ? '<p class="empty">No hay reservas pr�ximas. La pe�a est� libre.</p>' : proximasReservas.map(r=>`
       <div class="menu-row">
-        <span class="label">${escapeHtml(r.evento)}<small>${socioNombre(r.socio_id)} · ${fmtHoras(r)}</small></span>
+        
+        <span class="label">${escapeHtml(r.evento)}<small>${socioNombre(r.socio_id)} � ${fmtHoras(r)}</small></span>
+        
         <span class="dots"></span>
+        
         <span class="value">${fmtDate(r.fecha)}</span>
       </div>`).join('')}
   </div>
@@ -488,34 +596,49 @@ function renderSocios(){
   return `
   ${isAdmin() ? `
   <div class="card">
-    <h2><span class="pin"></span>Añadir socio</h2>
+    <h2><span class="pin"></span>A�adir socio</h2>
     <form data-form="add-socio" class="form-row" style="align-items:flex-end;">
       <div><label class="f">Nombre del nuevo socio</label><input type="text" name="nombre" required placeholder="Nombre y apellido"></div>
-      <div><label class="f">PIN (opcional)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" placeholder="en blanco = automático"></div>
+      <div><label class="f">PIN (opcional)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" placeholder="en blanco = autom�tico"></div>
       <div><label class="f">Foto (opcional)</label><input type="file" name="foto" accept="image/*"></div>
-      <div style="flex:none;"><button class="btn" type="submit">Añadir socio</button></div>
+      <div style="flex:none;"><button class="btn" type="submit">A�adir socio</button></div>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: el administrador es quien añade o da de baja socios.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: el administrador es quien a�ade o da de baja socios.</p>`}
   <div class="card">
-    ${state.socios.length===0 ? '<p class="empty">Todavía no hay socios.</p>' : state.socios.map(s=>{
+    ${state.socios.length===0 ? '<p class="empty">Todav�a no hay socios.</p>' : state.socios.map(s=>{
       const perfil = state.perfiles[s.id] || {};
       const familia = perfil.familia || [];
       const puedeCambiarFoto = isAdmin() || s.id===state.current_user;
       return `<div class="list-item">
+        
         <div class="socio-row-avatar">
+        
           ${avatarHtml(s,'sm')}
+        
           <div>
-            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tú</span>':''}${s.is_admin?'<span class="admin-badge">Admin</span>':''}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
-            <div class="meta">${perfil.telefono ? '📞 '+escapeHtml(perfil.telefono) : 'Sin teléfono'} ${familia.length? '· '+familia.length+' familiar(es)':''}</div>
+        
+            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">t�</span>':''}${s.is_admin?'<span class="admin-badge">Admin</span>':''}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
+        
+            <div class="meta">${perfil.telefono ? '?? '+escapeHtml(perfil.telefono) : 'Sin tel�fono'} ${familia.length? '� '+familia.length+' familiar(es)':''}</div>
+        
           </div>
+        
         </div>
+        
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        
           ${puedeCambiarFoto ? `<label class="btn ghost small" style="cursor:pointer;">Foto<input type="file" accept="image/*" data-autoupload-foto="${s.id}" style="display:none;"></label>` : ''}
+        
           ${isAdmin() ? `<button class="btn ghost small" data-action="reset-pin" data-id="${s.id}">Restablecer PIN</button>` : ''}
+        
           ${isAdmin() && s.id!==state.current_user ? (s.activo
+        
             ? `<button class="btn danger small" data-action="toggle-activo" data-activo="1" data-id="${s.id}">Dar de baja</button>`
+        
             : `<button class="btn ghost small" data-action="toggle-activo" data-activo="0" data-id="${s.id}">Reactivar</button><button class="btn danger small" data-action="delete-socio" data-id="${s.id}">Eliminar</button>`
+        
           ) : ''}
+        
         </div>
       </div>`;
     }).join('')}
@@ -533,9 +656,10 @@ function renderCuotas(){
       const puedeEditar = admin || s.id===state.current_user;
       const mine = s.id===state.current_user ? 'mine' : '';
       if(!puedeEditar){
+        
         return `<td><button class="cuota-cell ${paid?'paid':''}" disabled title="Solo ${s.nombre} o el administrador pueden marcar esto"></button></td>`;
       }
-      return `<td><button class="cuota-cell ${paid?'paid':''} ${mine}" data-action="toggle-cuota" data-socio="${s.id}" data-year="${cuotasYear}" data-month="${month}" title="${m} ${cuotasYear}">${paid?'✓':''}</button></td>`;
+      return `<td><button class="cuota-cell ${paid?'paid':''} ${mine}" data-action="toggle-cuota" data-socio="${s.id}" data-year="${cuotasYear}" data-month="${month}" title="${m} ${cuotasYear}">${paid?'?':''}</button></td>`;
     }).join('');
     return `<tr><td>${escapeHtml(s.nombre)}</td>${cells}</tr>`;
   }).join('');
@@ -544,11 +668,11 @@ function renderCuotas(){
     <h2><span class="pin"></span>Cuotas mensuales <span style="font-size:0.9rem; color:var(--chalk-dim); font-family:'Work Sans';">(${money(state.config.cuota_mensual)}/mes)</span></h2>
     <p class="readonly-note">${admin ? 'Como administrador puedes marcar la cuota de cualquier socio.' : 'Solo puedes marcar tu propia cuota (columna resaltada en tu fila).'}</p>
     <div class="year-nav">
-      <button data-action="cuota-year" data-dir="-1">← ${cuotasYear-1}</button>
+      <button data-action="cuota-year" data-dir="-1">? ${cuotasYear-1}</button>
       <b>${cuotasYear}</b>
-      <button data-action="cuota-year" data-dir="1">${cuotasYear+1} →</button>
+      <button data-action="cuota-year" data-dir="1">${cuotasYear+1} ?</button>
     </div>
-    ${state.socios.length===0 ? '<p class="empty">Añade socios primero en la pestaña Socios.</p>' : `
+    ${state.socios.length===0 ? '<p class="empty">A�ade socios primero en la pesta�a Socios.</p>' : `
     <div style="overflow-x:auto;">
     <table class="cuotas-table">
       <thead><tr><th>Socio</th>${MESES.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
@@ -565,36 +689,45 @@ function renderReservas(){
   const pasadas = state.reservas.filter(r=>r.fecha < todayISO()).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10);
   return `
   <div class="card">
-    <h2><span class="pin"></span>Reservar la peña</h2>
+    <h2><span class="pin"></span>Reservar la pe�a</h2>
     <form data-form="add-reserva">
       <div class="form-row">
+        
         <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
-        <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleaños, comida familiar..."></div>
+        
+        <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumplea�os, comida familiar..."></div>
       </div>
       <div class="form-row">
+        
         <div><label class="f">Desde las (opcional)</label><input type="time" name="hora_inicio"></div>
+        
         <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin"></div>
       </div>
-      <p class="meta" style="margin:-4px 0 10px;">Deja las horas en blanco si la reserva es para todo el día.</p>
+      <p class="meta" style="margin:-4px 0 10px;">Deja las horas en blanco si la reserva es para todo el d�a.</p>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <button class="btn" type="submit">Reservar a mi nombre</button>
     </form>
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Próximas reservas</h2>
-    ${proximas.length===0 ? '<p class="empty">La peña está libre por ahora.</p>' : proximas.map(r=>`
+    <h2><span class="pin"></span>Pr�ximas reservas</h2>
+    ${proximas.length===0 ? '<p class="empty">La pe�a est� libre por ahora.</p>' : proximas.map(r=>`
       <div class="list-item">
+        
         <div>
-          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">· ${fmtDate(r.fecha)} · ${fmtHoras(r)}</span></div>
-          <div class="meta">Reservado por ${escapeHtml(socioNombre(r.socio_id))} ${r.notas?'· '+escapeHtml(r.notas):''}</div>
+        
+          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">� ${fmtDate(r.fecha)} � ${fmtHoras(r)}</span></div>
+        
+          <div class="meta">Reservado por ${escapeHtml(socioNombre(r.socio_id))} ${r.notas?'� '+escapeHtml(r.notas):''}</div>
+        
         </div>
+        
         ${(r.socio_id===state.current_user || isAdmin()) ? `<button class="btn danger small" data-action="delete-reserva" data-id="${r.id}">Cancelar</button>` : ''}
       </div>
     `).join('')}
   </div>
   ${pasadas.length ? `<div class="card">
     <h2><span class="pin"></span>Historial reciente</h2>
-    ${pasadas.map(r=>`<div class="list-item"><div><div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">· ${fmtDate(r.fecha)} · ${fmtHoras(r)}</span></div><div class="meta">${escapeHtml(socioNombre(r.socio_id))}</div></div></div>`).join('')}
+    ${pasadas.map(r=>`<div class="list-item"><div><div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">� ${fmtDate(r.fecha)} � ${fmtHoras(r)}</span></div><div class="meta">${escapeHtml(socioNombre(r.socio_id))}</div></div></div>`).join('')}
   </div>` : ''}
   `;
 }
@@ -604,32 +737,44 @@ function renderReuniones(){
   const ordenadas = [...state.reuniones].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
   <div class="card">
-    <h2><span class="pin"></span>Convocar reunión</h2>
+    <h2><span class="pin"></span>Convocar reuni�n</h2>
     <form data-form="add-reunion">
       <div class="form-row">
+        
         <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+        
         <div><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
       </div>
       <div class="form-row">
+        
         <div><label class="f">Desde las (opcional)</label><input type="time" name="hora_inicio"></div>
+        
         <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin"></div>
       </div>
-      <div class="form-row"><div><label class="f">Notas / orden del día</label><textarea name="notas" placeholder="De qué se va a hablar..."></textarea></div></div>
-      <button class="btn" type="submit">Añadir reunión</button>
+      <div class="form-row"><div><label class="f">Notas / orden del d�a</label><textarea name="notas" placeholder="De qu� se va a hablar..."></textarea></div></div>
+      <button class="btn" type="submit">A�adir reuni�n</button>
     </form>
   </div>
   <div class="card">
     <h2><span class="pin"></span>Historial</h2>
-    ${ordenadas.length===0 ? '<p class="empty">Aún no hay reuniones.</p>' : ordenadas.map(r=>{
+    ${ordenadas.length===0 ? '<p class="empty">A�n no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
+        
         <div style="flex:1;">
-          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">· ${fmtDate(r.fecha)}</span></div>
+        
+          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">� ${fmtDate(r.fecha)}</span></div>
+        
           ${r.notas ? `<div class="meta" style="margin-top:2px;">${escapeHtml(r.notas)}</div>` : ''}
+        
           <div style="margin-top:8px;">
-            ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'✓ ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
+        
+            ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'? ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
+        
           </div>
+        
         </div>
+        
         <button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>
       </div>`;
     }).join('')}
@@ -644,20 +789,25 @@ function renderInventario(){
   return `
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Añadir material</span>
-      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">⬇ Exportar a Excel</button>
+      <span><span class="pin"></span>A�adir material</span>
+      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
     </h2>
     <form data-form="add-inventario">
       <div class="form-row">
+        
         <div><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: Nevera, plancha, mesas..."></div>
-        <div><label class="f">Categoría</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        
+        <div><label class="f">Categor�a</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
+        
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="0"></div>
-        <div><label class="f">Estado</label><select name="estado"><option>Bien</option><option>Necesita revisión</option><option>Hay que comprar</option></select></div>
+        
+        <div><label class="f">Estado</label><select name="estado"><option>Bien</option><option>Necesita revisi�n</option><option>Hay que comprar</option></select></div>
+        
         <div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div>
       </div>
-      <button class="btn" type="submit">Añadir al inventario</button>
+      <button class="btn" type="submit">A�adir al inventario</button>
     </form>
   </div>
   ${CAT_INV.map(cat=>{
@@ -666,15 +816,20 @@ function renderInventario(){
     return `<div class="card">
       <h2><span class="pin"></span>${cat}</h2>
       ${items.map(i=>`<div class="list-item">
+        
         <div>
-          <div style="font-weight:600;">${escapeHtml(i.nombre)} <span class="meta">× ${i.cantidad}</span></div>
-          <div class="meta">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revisión'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
+        
+          <div style="font-weight:600;">${escapeHtml(i.nombre)} <span class="meta">� ${i.cantidad}</span></div>
+        
+          <div class="meta">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revisi�n'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
+        
         </div>
+        
         <button class="btn danger small" data-action="delete-inventario" data-id="${i.id}">Borrar</button>
       </div>`).join('')}
     </div>`;
   }).join('')}
-  ${state.inventario.length===0 ? '<div class="card"><p class="empty">Todavía no hay material registrado.</p></div>' : ''}
+  ${state.inventario.length===0 ? '<div class="card"><p class="empty">Todav�a no hay material registrado.</p></div>' : ''}
   `;
 }
 
@@ -688,17 +843,26 @@ function renderCaja(){
     <h2><span class="pin"></span>Registrar movimiento</h2>
     <form data-form="add-movimiento">
       <div class="form-row">
+        
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
-        <div><label class="f">Categoría</label><select name="categoria">${CAT_MOV.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        
+        <div><label class="f">Categor�a</label><select name="categoria">${CAT_MOV.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row">
+        
         <div><label class="f">Socio</label><select name="socio_id">
+        
           <option value="">(sin socio)</option>
+        
           ${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}
+        
         </select></div>
+        
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Factura de la luz - julio"></div>
-        <div><label class="f">Importe (€)</label><input type="number" name="importe" step="0.01" min="0" required></div>
+        
+        <div><label class="f">Importe (�)</label><input type="number" name="importe" step="0.01" min="0" required></div>
       </div>
       <button class="btn" type="submit">Guardar movimiento</button>
     </form>
@@ -706,21 +870,33 @@ function renderCaja(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
-      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">⬇ Exportar a Excel</button>
+      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
     </h2>
     ${ordenados.length===0 ? '<p class="empty">Sin movimientos registrados.</p>' : ordenados.map(m=>`
       <div class="list-item">
+        
         <div>
+        
           <div style="font-weight:600;">${escapeHtml(m.concepto)}</div>
+        
           <div class="meta">
+        
             <span class="tag">${m.categoria}</span>
+        
             ${fmtDate(m.fecha)}
+        
             <span class="tag ${m.socio_id ? 'ok' : 'warn'}">${m.socio_id ? `Socio: ${escapeHtml(socioNombre(m.socio_id))}` : 'Sin socio'}</span>
+        
           </div>
+        
         </div>
+        
         <div style="display:flex; align-items:center; gap:10px;">
-          <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${m.tipo==='ingreso'?'var(--sage)':'var(--rust)'};">${m.tipo==='ingreso'?'+':'−'} ${money(m.importe)}</span>
+        
+          <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${m.tipo==='ingreso'?'var(--sage)':'var(--rust)'};">${m.tipo==='ingreso'?'+':'-'} ${money(m.importe)}</span>
+        
           ${admin ? `<button class="btn danger small" data-action="delete-movimiento" data-id="${m.id}">Borrar</button>` : ''}
+        
         </div>
       </div>
     `).join('')}
@@ -732,10 +908,10 @@ function renderBebidas(){
   return `
   <div class="subtabs" style="justify-content:space-between; flex-wrap:wrap;">
     <div style="display:flex; gap:6px;">
-      <button class="subtab-btn ${bebidasSubtab==='consumo'?'active':''}" data-action="bebidas-subtab" data-sub="consumo">Consumo del día a día</button>
+      <button class="subtab-btn ${bebidasSubtab==='consumo'?'active':''}" data-action="bebidas-subtab" data-sub="consumo">Consumo del d�a a d�a</button>
       <button class="subtab-btn ${bebidasSubtab==='fiestas'?'active':''}" data-action="bebidas-subtab" data-sub="fiestas">Fiestas / eventos</button>
     </div>
-    <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">⬇ Exportar a Excel</button>
+    <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
   </div>
   ${bebidasSubtab==='consumo' ? renderBebidasConsumo() : renderBebidasFiestas()}
   `;
@@ -749,40 +925,59 @@ function renderBebidasConsumo(){
     <h2><span class="pin"></span>Precios (se paga en el momento)</h2>
     <form data-form="add-bebida-precio">
       <div class="form-row">
-        <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Caña, agua, refresco"></div>
-        <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botellín" required></div>
+        
+        <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Ca�a, agua, refresco"></div>
+        
+        <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botell�n" required></div>
       </div>
       <div class="form-row">
-        <div><label class="f">Precio socio (€)</label><input type="number" step="0.01" min="0" name="precio_socio" required></div>
-        <div><label class="f">Precio no socio (€)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required></div>
+        
+        <div><label class="f">Precio socio (�)</label><input type="number" step="0.01" min="0" name="precio_socio" required></div>
+        
+        <div><label class="f">Precio no socio (�)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required></div>
       </div>
-      <button class="btn" type="submit">Añadir precio</button>
+      <button class="btn" type="submit">A�adir precio</button>
     </form>
     ${precios.length ? precios.map(p=>`
       <div class="menu-row">
-        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} · socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</small></span>
+        
+        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} � socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</small></span>
+        
         <span class="dots"></span>
+        
         <button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>
-      </div>`).join('') : '<p class="empty">Añade al menos una bebida con precio.</p>'}
+      </div>`).join('') : '<p class="empty">A�ade al menos una bebida con precio.</p>'}
   </div>
   <div class="card">
     <h2><span class="pin"></span>Registrar consumo</h2>
-    ${precios.length===0 ? '<p class="empty">Primero añade precios de bebidas arriba.</p>' : `
+    ${precios.length===0 ? '<p class="empty">Primero a�ade precios de bebidas arriba.</p>' : `
     <form data-form="add-consumo">
       <div class="form-row">
-        <div><label class="f">Quién consume</label>
+        
+        <div><label class="f">Qui�n consume</label>
+        
           <select name="consumidorTipo">
+        
             <option value="socio">Socio</option>
+        
             <option value="invitado">Invitado / no socio</option>
+        
           </select>
+        
         </div>
+        
         <div><label class="f">Nombre</label>
+        
           <select name="socio_id">${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select>
+        
           <input type="text" name="nombre_invitado" placeholder="Nombre del invitado" style="display:none; margin-top:6px;">
+        
         </div>
       </div>
       <div class="form-row">
+        
         <div><label class="f">Bebida</label><select name="bebida_id">${precios.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
+        
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
       <button class="btn" type="submit">Registrar (pagado al momento)</button>
@@ -790,17 +985,25 @@ function renderBebidasConsumo(){
     `}
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Últimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">· recaudado total: ${money(totalBebidasIngreso())}</span></h2>
-    ${consumos.length===0 ? '<p class="empty">Sin consumos todavía.</p>' : consumos.slice(0,40).map(c=>{
+    <h2><span class="pin"></span>�ltimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� recaudado total: ${money(totalBebidasIngreso())}</span></h2>
+    ${consumos.length===0 ? '<p class="empty">Sin consumos todav�a.</p>' : consumos.slice(0,40).map(c=>{
       const bebida = precios.find(p=>p.id===c.bebida_id);
       return `<div class="list-item">
+        
         <div>
+        
           <div style="font-weight:600;">${escapeHtml(c.consumidor)} ${c.es_socio?'':'<span class="tag">invitado</span>'}</div>
-          <div class="meta">${c.cantidad} × ${bebida?escapeHtml(bebida.nombre):'—'} · ${fmtDate(c.fecha)}</div>
+        
+          <div class="meta">${c.cantidad} � ${bebida?escapeHtml(bebida.nombre):'�'} � ${fmtDate(c.fecha)}</div>
+        
         </div>
+        
         <div style="display:flex; align-items:center; gap:10px;">
+        
           <span style="font-family:'JetBrains Mono',monospace; color:var(--sage); font-weight:600;">+ ${money(c.importe)}</span>
+        
           <button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>
+        
         </div>
       </div>`;
     }).join('')}
@@ -814,27 +1017,39 @@ function renderBebidasFiestas(){
     <h2><span class="pin"></span>Gasto en bebida para una fiesta</h2>
     <form data-form="add-fiesta-gasto">
       <div class="form-row">
+        
         <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Fiestas del pueblo, San Juan..."></div>
+        
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row">
+        
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Barril de cerveza 30L, agua, refrescos..."></div>
-        <div><label class="f">Importe (€)</label><input type="number" step="0.01" min="0" name="importe" required></div>
+        
+        <div><label class="f">Importe (�)</label><input type="number" step="0.01" min="0" name="importe" required></div>
       </div>
-      <button class="btn" type="submit">Añadir gasto</button>
+      <button class="btn" type="submit">A�adir gasto</button>
     </form>
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">· total: ${money(totalFiestasGasto())}</span></h2>
-    ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todavía.</p>' : gastos.map(g=>`
+    <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� total: ${money(totalFiestasGasto())}</span></h2>
+    ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todav�a.</p>' : gastos.map(g=>`
       <div class="list-item">
+        
         <div>
+        
           <div style="font-weight:600;">${escapeHtml(g.concepto)}</div>
+        
           <div class="meta"><span class="tag">${escapeHtml(g.evento)}</span> ${fmtDate(g.fecha)}</div>
+        
         </div>
+        
         <div style="display:flex; align-items:center; gap:10px;">
-          <span style="font-family:'JetBrains Mono',monospace; color:var(--rust); font-weight:600;">− ${money(g.importe)}</span>
+        
+          <span style="font-family:'JetBrains Mono',monospace; color:var(--rust); font-weight:600;">- ${money(g.importe)}</span>
+        
           <button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>
+        
         </div>
       </div>
     `).join('')}
@@ -846,7 +1061,7 @@ function renderEncargados(){
   const admin = isAdmin();
   return `
   <div class="card">
-    <p class="readonly-note">Apúntate a las tareas de las que quieras encargarte. ${admin ? 'Como administrador puedes añadir o quitar a cualquier socio.' : ''}</p>
+    <p class="readonly-note">Ap�ntate a las tareas de las que quieras encargarte. ${admin ? 'Como administrador puedes a�adir o quitar a cualquier socio.' : ''}</p>
   </div>
   ${state.tareas_fijas.map(tarea=>{
     const asignados = state.responsables[tarea] || [];
@@ -854,20 +1069,32 @@ function renderEncargados(){
     return `<div class="card tarea-card">
       <h2><span class="pin"></span>${tarea}</h2>
       <div class="chip-row">
-        ${asignados.length===0 ? '<span class="empty">Nadie encargado todavía.</span>' : asignados.map(sid=>`
+        
+        ${asignados.length===0 ? '<span class="empty">Nadie encargado todav�a.</span>' : asignados.map(sid=>`
+        
           <span class="tarea-chip">${escapeHtml(socioNombre(sid))}
-            ${(sid===state.current_user || admin) ? `<button data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${sid}" title="Quitar">×</button>` : ''}
+        
+            ${(sid===state.current_user || admin) ? `<button data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${sid}" title="Quitar">�</button>` : ''}
+        
           </span>
+        
         `).join('')}
       </div>
       ${admin ? `
       <div class="task-admin-list" style="margin-top:14px;">
+        
         ${state.socios.map(s=>{
+        
           const assigned = asignados.includes(s.id);
+        
           return `<div class="list-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.06);">
+        
             <div>${escapeHtml(s.nombre)}${assigned ? ' <span class="tag ok">asignado</span>' : ''}</div>
-            <div>${assigned ? `<button class="btn danger small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">Quitar</button>` : `<button class="btn ghost small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">+ Añadir</button>`}</div>
+        
+            <div>${assigned ? `<button class="btn danger small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">Quitar</button>` : `<button class="btn ghost small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">+ A�adir</button>`}</div>
+        
           </div>`;
+        
         }).join('')}
       </div>` : `
       ${!yaApuntado ? `<button class="btn ghost small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${state.current_user}">+ Apuntarme</button>` : ''}`}
@@ -887,42 +1114,51 @@ function renderPerfil(){
     <div class="foto-upload-row">
       ${avatarHtml(me,'lg')}
       <div>
+        
         <label class="btn ghost small" style="cursor:pointer;">Cambiar foto<input type="file" accept="image/*" data-autoupload-foto="${state.current_user}" style="display:none;"></label>
-        <p class="meta" style="margin-top:6px;">Se recorta en cuadrado automáticamente.</p>
+        
+        <p class="meta" style="margin-top:6px;">Se recorta en cuadrado autom�ticamente.</p>
       </div>
     </div>
     <form data-form="save-perfil">
       <div class="form-row">
+        
         <div><label class="f">Mi nombre</label><input type="text" name="nombre" value="${escapeHtml(me.nombre||'')}" required></div>
-        <div><label class="f">Teléfono</label><input type="tel" name="telefono" value="${escapeHtml(perfil.telefono||'')}" placeholder="600 000 000"></div>
+        
+        <div><label class="f">Tel�fono</label><input type="tel" name="telefono" value="${escapeHtml(perfil.telefono||'')}" placeholder="600 000 000"></div>
       </div>
-      <div class="form-row"><div><label class="f">Notas (alergias, preferencias, lo que quieras)</label><textarea name="notas" placeholder="Ej: alérgico a los frutos secos">${escapeHtml(perfil.notas||'')}</textarea></div></div>
+      <div class="form-row"><div><label class="f">Notas (alergias, preferencias, lo que quieras)</label><textarea name="notas" placeholder="Ej: al�rgico a los frutos secos">${escapeHtml(perfil.notas||'')}</textarea></div></div>
       <button class="btn" type="submit">Guardar mis datos</button>
     </form>
   </div>
   <div class="card">
     <h2><span class="pin"></span>Seguridad</h2>
     <form data-form="change-pin" class="form-row" style="align-items:flex-end;">
-      <div><label class="f">Nuevo PIN (4 dígitos)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="····"></div>
-      <div><label class="f">Repite el PIN</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="····"></div>
+      <div><label class="f">Nuevo PIN (4 d�gitos)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="����"></div>
+      <div><label class="f">Repite el PIN</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="����"></div>
       <div style="flex:none;"><button class="btn ghost" type="submit">Cambiar mi PIN</button></div>
     </form>
   </div>
   <div class="card">
     <h2><span class="pin"></span>Mi familia</h2>
-    ${familia.length===0 ? '<p class="empty">Aún no has añadido a nadie.</p>' : familia.map(f=>`
+    ${familia.length===0 ? '<p class="empty">A�n no has a�adido a nadie.</p>' : familia.map(f=>`
       <div class="familia-item">
-        <span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'· '+escapeHtml(String(f.edad))+' años':''}</span>
+        
+        <span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'� '+escapeHtml(String(f.edad))+' a�os':''}</span>
+        
         <button class="btn danger small" data-action="delete-familiar" data-id="${f.id}">Borrar</button>
       </div>
     `).join('')}
     <form data-form="add-familiar" style="margin-top:14px;">
       <div class="form-row">
+        
         <div><label class="f">Nombre</label><input type="text" name="nombre" required></div>
-        <div><label class="f">Relación</label><select name="tipo">${TIPO_FAMILIA.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        
+        <div><label class="f">Relaci�n</label><select name="tipo">${TIPO_FAMILIA.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        
         <div><label class="f">Edad</label><input type="number" name="edad" min="0"></div>
       </div>
-      <button class="btn ghost" type="submit">+ Añadir familiar</button>
+      <button class="btn ghost" type="submit">+ A�adir familiar</button>
     </form>
   </div>
   <div class="card">
@@ -931,10 +1167,12 @@ function renderPerfil(){
       const p = state.perfiles[s.id]||{};
       const fam = p.familia||[];
       return `<div class="list-item"><div>
+        
         <div style="font-weight:600;">${escapeHtml(s.nombre)}</div>
-        <div class="meta">${p.telefono?'📞 '+escapeHtml(p.telefono):'Sin teléfono'} ${fam.length?'· '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
+        
+        <div class="meta">${p.telefono?'?? '+escapeHtml(p.telefono):'Sin tel�fono'} ${fam.length?'� '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
       </div></div>`;
-    }).join('') || '<p class="empty">No hay más socios.</p>'}
+    }).join('') || '<p class="empty">No hay m�s socios.</p>'}
   </div>
   `;
 }
@@ -957,20 +1195,28 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; await loadState(); render(); }
     else if(action==='edit-club-name'){
-      const nombre = prompt('Nombre de la peña:', state.config.nombre);
+      const nombre = prompt('Nombre de la pe�a:', state.config.nombre);
       if(nombre && nombre.trim()){
+        
         await apiPost('/api/config', {nombre: nombre.trim(), cuota_mensual: state.config.cuota_mensual ?? 45});
+        
         await loadState(); render();
       }
     }
     else if(action==='edit-cuota'){
-      const cuotaInput = prompt('Cuota mensual (€):', String(state.config.cuota_mensual ?? 45));
+      const cuotaInput = prompt('Cuota mensual (�):', String(state.config.cuota_mensual ?? 45));
       if(cuotaInput !== null){
+        
         const cuotaValue = Number(cuotaInput);
+        
         await apiPost('/api/config', {
+        
           nombre: state.config.nombre,
+        
           cuota_mensual: Number.isFinite(cuotaValue) ? cuotaValue : (state.config.cuota_mensual ?? 45)
+        
         });
+        
         await loadState(); render();
       }
     }
@@ -984,21 +1230,22 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='toggle-activo'){
       if(btn.dataset.activo === '1'){
-        if(!confirm('¿Estás seguro de que quieres dar de baja a este socio?')) return;
+        
+        if(!confirm('�Est�s seguro de que quieres dar de baja a este socio?')) return;
       }
       await apiPost(`/api/socios/${btn.dataset.id}/activo`);
       await loadState(); render();
     }
     else if(action==='delete-socio'){
-      if(!confirm('¿Eliminar este socio definitivamente? Se perderán sus datos relacionados.')) return;
+      if(!confirm('�Eliminar este socio definitivamente? Se perder�n sus datos relacionados.')) return;
       await apiDelete(`/api/socios/${btn.dataset.id}`);
       await loadState(); render();
     }
     else if(action==='reset-pin'){
-      if(!confirm('¿Restablecer el PIN de este socio? Se generará uno nuevo y tendrá que cambiarlo al entrar.')) return;
+      if(!confirm('�Restablecer el PIN de este socio? Se generar� uno nuevo y tendr� que cambiarlo al entrar.')) return;
       const r = await apiPost(`/api/socios/${btn.dataset.id}/reset-pin`);
       await loadState(); render();
-      alert(`Nuevo PIN temporal: ${r.pin}\n\nPáselo al socio — tendrá que cambiarlo la próxima vez que entre.`);
+      alert(`Nuevo PIN temporal: ${r.pin}\n\nP�selo al socio � tendr� que cambiarlo la pr�xima vez que entre.`);
     }
     else if(action==='toggle-asistencia'){
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
@@ -1009,47 +1256,61 @@ document.addEventListener('click', async (e)=>{
       await loadState(); render();
     }
     else if(action==='delete-reunion'){
-      if(confirm('¿Borrar esta reunión?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar esta reuni�n?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-inventario'){
-      if(confirm('¿Borrar este material?')){ await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar este material?')){ await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-movimiento'){
-      if(confirm('¿Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-bebida-precio'){
-      if(confirm('¿Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-consumo'){
-      if(confirm('¿Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-fiesta-gasto'){
-      if(confirm('¿Borrar este gasto?')){ await apiDelete(`/api/fiestas/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Borrar este gasto?')){ await apiDelete(`/api/fiestas/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-reserva'){
-      if(confirm('¿Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('�Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-familiar'){
       await apiDelete(`/api/familiares/${btn.dataset.id}`); await loadState(); render();
     }
     else if(action==='export-excel'){
       const original = btn.textContent;
-      btn.textContent = 'Generando…'; btn.disabled = true;
+      btn.textContent = 'Generando�'; btn.disabled = true;
       try{
+        
         const res = await fetch('/api/export.xlsx');
+        
         if(!res.ok){
+        
           let msg = 'No se pudo exportar el Excel.';
+        
           try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+        
           throw new Error(msg);
+        
         }
+        
         const blob = await res.blob();
+        
         const url = URL.createObjectURL(blob);
+        
         const a = document.createElement('a');
+        
         a.href = url;
+        
         a.download = `el_cado_cuentas_${todayISO()}.xlsx`;
+        
         document.body.appendChild(a); a.click(); a.remove();
+        
         URL.revokeObjectURL(url);
       }finally{
+        
         btn.textContent = original; btn.disabled = false;
       }
     }
@@ -1093,7 +1354,7 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='force-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }
-      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 dígitos.'); return; }
+      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 d�gitos.'); return; }
       await apiPost('/api/perfil/pin', {pin: data.pin});
       await loadState(); activeTab='resumen'; render();
       return;
@@ -1103,11 +1364,14 @@ document.addEventListener('submit', async (e)=>{
       const file = fileInput && fileInput.files[0];
       const r = await apiPost('/api/socios', {nombre: data.nombre, pin: data.pin || ''});
       if(file){
+        
         try{ await uploadFoto(r.id, file); }
-        catch(fe){ alert('El socio se creó, pero la foto no se pudo subir: '+fe.message); }
+        
+        catch(fe){ alert('El socio se cre�, pero la foto no se pudo subir: '+fe.message); }
       }
       if(r.pin_generado){
-        alert(`Socio creado. Su PIN de acceso es: ${r.pin_generado}\n\nApúntalo y pásaselo — podrá cambiarlo luego desde "Mi perfil".`);
+        
+        alert(`Socio creado. Su PIN de acceso es: ${r.pin_generado}\n\nAp�ntalo y p�saselo � podr� cambiarlo luego desde "Mi perfil".`);
       }
     }
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
@@ -1123,7 +1387,7 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='save-perfil'){ await apiPost('/api/perfil', data); }
     else if(type==='change-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }
-      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 dígitos.'); return; }
+      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 d�gitos.'); return; }
       await apiPost('/api/perfil/pin', {pin: data.pin});
       form.reset();
       alert('PIN actualizado.');
@@ -1135,7 +1399,7 @@ document.addEventListener('submit', async (e)=>{
   }catch(err){ alert(err.message || 'Ha ocurrido un error'); }
 });
 
-/* ============ actualización en segundo plano (casi tiempo real) ============ */
+/* ============ actualizaci�n en segundo plano (casi tiempo real) ============ */
 function isTyping(){
   const el = document.activeElement;
   return el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT');
@@ -1154,3 +1418,16 @@ setInterval(async ()=>{
   await loadState();
   render();
 })();
+
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-action="save-roles"]');
+  if(!btn) return;
+  const sid = btn.dataset.id;
+  const roles = [...document.querySelectorAll(`input[data-role-option="${sid}"]:checked`)].map(input=>input.value);
+  if(!roles.length){ alert('Selecciona al menos un rol.'); return; }
+  try{
+    await apiPost(`/api/socios/${sid}/roles`, {roles});
+    await loadState();
+    render();
+  }catch(err){ alert(err.message || 'No se pudieron guardar los roles.'); }
+});

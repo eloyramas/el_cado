@@ -1,16 +1,16 @@
 """
-El Cado - gestor de la peña
+El Cado - gestor de la peÃ±a
 ----------------------------
 Backend Flask + SQLite.
 
 Roles:
-- El primer socio que se crea (cuando la base de datos está vacía) se
-  convierte automáticamente en administrador.
-- Solo el administrador puede: añadir socios, dar de baja/reactivar
-  socios, renombrar la peña, y añadir/borrar movimientos de caja
+- El primer socio que se crea (cuando la base de datos estÃ¡ vacÃ­a) se
+  convierte automÃ¡ticamente en administrador.
+- Solo el administrador puede: aÃ±adir socios, dar de baja/reactivar
+  socios, renombrar la peÃ±a, y aÃ±adir/borrar movimientos de caja
   (gastos e ingresos).
 - Cualquier socio puede: marcar SU PROPIA cuota (el admin puede marcar
-  cualquiera), reservar la peña, apuntarse a tareas, editar su propio
+  cualquiera), reservar la peÃ±a, apuntarse a tareas, editar su propio
   perfil (incluido su nombre), y ver todo en modo lectura.
 
 Para arrancar en local:
@@ -21,6 +21,7 @@ import os
 import random
 import sqlite3
 import uuid
+import json
 from contextlib import closing
 from datetime import date, datetime
 from io import BytesIO
@@ -46,11 +47,33 @@ DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR,
 AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
 
 app = Flask(__name__)
-# En producción, define la variable de entorno SECRET_KEY con un valor propio.
+# En producciÃ³n, define la variable de entorno SECRET_KEY con un valor propio.
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
 
-TAREAS_FIJAS = ["Compras", "Limpieza", "Tesorería", "Carrozas", "Concursos", "Comidas", "Otros"]
+TAREAS_FIJAS = ["Compras", "Limpieza", "TesorerÃ­a", "Carrozas", "Concursos", "Comidas", "Otros"]
 
+PERMISSIONS = {
+    "manage_roles": "Manage roles and permissions",
+    "manage_socios": "Manage members",
+    "manage_config": "Manage club configuration",
+    "view_finances": "View finances",
+    "manage_finances": "Manage income and expenses",
+    "manage_cuotas": "Manage all fees",
+    "manage_bebidas": "Manage drinks and prices",
+    "manage_inventory": "Manage inventory",
+    "manage_events": "Manage meetings and reservations",
+    "manage_tasks": "Assign tasks",
+    "export_data": "Export data",
+}
+ALL_PERMISSIONS = list(PERMISSIONS)
+DEFAULT_ROLES = [
+    ("administrador", "Administrador", ALL_PERMISSIONS, 1),
+    ("presidente", "Presidente", ["manage_config", "manage_socios", "view_finances", "manage_events", "manage_tasks", "export_data"], 1),
+    ("vicepresidente", "Vicepresidente", ["view_finances", "manage_events", "manage_tasks", "export_data"], 1),
+    ("tesorero", "Tesorero", ["view_finances", "manage_finances", "manage_cuotas", "manage_bebidas", "export_data"], 1),
+    ("socio", "Socio", [], 1),
+    ("otro", "Otro", [], 1),
+]
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -160,6 +183,19 @@ CREATE TABLE IF NOT EXISTS tareas_asignadas (
     socio_id TEXT NOT NULL,
     UNIQUE(tarea, socio_id)
 );
+CREATE TABLE IF NOT EXISTS roles (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    permisos TEXT NOT NULL DEFAULT '[]',
+    es_sistema INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS socio_roles (
+    socio_id TEXT NOT NULL,
+    rol_id TEXT NOT NULL,
+    PRIMARY KEY (socio_id, rol_id),
+    FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE CASCADE,
+    FOREIGN KEY (rol_id) REFERENCES roles(id) ON DELETE CASCADE
+);
 """
 
 
@@ -185,7 +221,7 @@ def init_db():
         try:
             db.execute("ALTER TABLE socios ADD COLUMN pin_hash TEXT")
         except sqlite3.OperationalError:
-            pass  # ya existía (base de datos creada con una versión anterior)
+            pass  # ya existÃ­a (base de datos creada con una versiÃ³n anterior)
         try:
             db.execute("ALTER TABLE socios ADD COLUMN must_change_pin INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
@@ -194,7 +230,7 @@ def init_db():
             db.execute("ALTER TABLE movimientos ADD COLUMN socio_id TEXT")
         except sqlite3.OperationalError:
             pass
-        # Migración: actualizar tabla reuniones si existe con estructura antigua
+        # MigraciÃ³n: actualizar tabla reuniones si existe con estructura antigua
         try:
             cur = db.execute("PRAGMA table_info(reuniones)")
             columns = [row[1] for row in cur.fetchall()]
@@ -226,6 +262,18 @@ def init_db():
             row = db.execute("SELECT cuota_mensual FROM config WHERE id = 1").fetchone()
             if row and (row["cuota_mensual"] in (None, "", 20, 20.0)):
                 db.execute("UPDATE config SET cuota_mensual = ? WHERE id = 1", (45,))
+        for role_id, nombre, permisos, es_sistema in DEFAULT_ROLES:
+            db.execute(
+                "INSERT OR IGNORE INTO roles (id, nombre, permisos, es_sistema) VALUES (?, ?, ?, ?)",
+                (role_id, nombre, json.dumps(permisos), es_sistema),
+            )
+        # Las instalaciones previas solo tenían is_admin. Se traduce a un rol asignado.
+        for socio in db.execute("SELECT id, is_admin FROM socios"):
+            default_role = "administrador" if socio["is_admin"] else "socio"
+            db.execute(
+                "INSERT OR IGNORE INTO socio_roles (socio_id, rol_id) VALUES (?, ?)",
+                (socio["id"], default_role),
+            )
         db.commit()
 
 
@@ -242,7 +290,7 @@ def current_socio_id():
 
 
 def require_login():
-    """Devuelve el id del socio en sesión, o None. Limpia la sesión si el socio ya no existe."""
+    """Devuelve el id del socio en sesiÃ³n, o None. Limpia la sesiÃ³n si el socio ya no existe."""
     sid = current_socio_id()
     if not sid:
         return None
@@ -255,11 +303,33 @@ def require_login():
 
 
 def is_admin_user(sid):
+    return has_permission(sid, "manage_roles")
+
+
+def permissions_for_user(sid):
     if not sid:
-        return False
+        return set()
     db = get_db()
-    row = db.execute("SELECT is_admin FROM socios WHERE id = ?", (sid,)).fetchone()
-    return bool(row and row["is_admin"])
+    rows = db.execute(
+        "SELECT r.permisos FROM roles r JOIN socio_roles sr ON sr.rol_id = r.id WHERE sr.socio_id = ?",
+        (sid,),
+    ).fetchall()
+    permisos = set()
+    for row in rows:
+        try:
+            permisos.update(json.loads(row["permisos"]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return permisos
+
+
+def has_permission(sid, permission):
+    return permission in permissions_for_user(sid)
+
+
+def require_permission(permission):
+    sid = require_login()
+    return sid if has_permission(sid, permission) else None
 
 
 def require_admin():
@@ -271,7 +341,7 @@ def err(msg, code=403):
     return jsonify({"error": msg}), code
 
 
-# ---------------------------------------------------------------- páginas --
+# ---------------------------------------------------------------- pÃ¡ginas --
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -290,7 +360,7 @@ def random_pin():
     return f"{random.randint(0, 9999):04d}"
 
 
-# ---------------------------------------------------------------- sesión --
+# ---------------------------------------------------------------- sesiÃ³n --
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json(force=True)
@@ -301,11 +371,11 @@ def login():
     if not row:
         return err("Socio no encontrado", 404)
     if not row["activo"]:
-        return err("Este socio está dado de baja", 403)
+        return err("Este socio estÃ¡ dado de baja", 403)
     if row["pin_hash"]:
         if not pin or not check_password_hash(row["pin_hash"], pin):
             return err("PIN incorrecto.", 403)
-    # Si el socio todavía no tiene PIN configurado (cuentas antiguas), se deja
+    # Si el socio todavÃ­a no tiene PIN configurado (cuentas antiguas), se deja
     # entrar sin comprobarlo; se le anima a crear uno desde "Mi perfil".
     session["socio_id"] = socio_id
     return jsonify({"ok": True})
@@ -326,11 +396,24 @@ def state():
     config = dict(db.execute("SELECT * FROM config WHERE id = 1").fetchone())
 
     socios_rows = db.execute("SELECT * FROM socios ORDER BY nombre").fetchall()
+    roles = []
+    for r in db.execute("SELECT * FROM roles ORDER BY nombre"):
+        role = dict(r)
+        try:
+            role["permisos"] = json.loads(role["permisos"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            role["permisos"] = []
+        roles.append(role)
+    roles_por_socio = {}
+    for r in db.execute("SELECT socio_id, rol_id FROM socio_roles"):
+        roles_por_socio.setdefault(r["socio_id"], []).append(r["rol_id"])
+
     socios = []
     for r in socios_rows:
         d = dict(r)
         d["tiene_pin"] = bool(d.pop("pin_hash", None))
         d["must_change_pin"] = bool(d.get("must_change_pin", 0))
+        d["roles"] = roles_por_socio.get(d["id"], ["socio"])
         socios.append(d)
 
     perfiles = {}
@@ -342,7 +425,14 @@ def state():
             {"id": r["id"], "nombre": r["nombre"], "tipo": r["tipo"], "edad": r["edad"]}
         )
 
-    cuotas = [dict(r) for r in db.execute("SELECT * FROM cuotas")]
+    can_view_finances = has_permission(sid, "view_finances")
+    can_manage_cuotas = has_permission(sid, "manage_cuotas")
+    if can_view_finances or can_manage_cuotas:
+        cuotas = [dict(r) for r in db.execute("SELECT * FROM cuotas")]
+    elif sid:
+        cuotas = [dict(r) for r in db.execute("SELECT * FROM cuotas WHERE socio_id = ?", (sid,))]
+    else:
+        cuotas = []
 
     reuniones = []
     for r in db.execute("SELECT * FROM reuniones ORDER BY fecha DESC"):
@@ -355,10 +445,13 @@ def state():
         reuniones.append(row)
 
     inventario = [dict(r) for r in db.execute("SELECT * FROM inventario ORDER BY categoria, nombre")]
-    movimientos = [dict(r) for r in db.execute("SELECT m.*, s.nombre AS socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha DESC")]
-    bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
-    bebidas_consumos = [dict(r) for r in db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha DESC LIMIT 80")]
-    fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
+    if can_view_finances or has_permission(sid, "manage_finances"):
+        movimientos = [dict(r) for r in db.execute("SELECT m.*, s.nombre AS socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha DESC")]
+        bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
+        bebidas_consumos = [dict(r) for r in db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha DESC LIMIT 80")]
+        fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
+    else:
+        movimientos, bebidas_precios, bebidas_consumos, fiestas_gastos = [], [], [], []
     reservas = [dict(r) for r in db.execute("SELECT * FROM reservas ORDER BY fecha")]
 
     responsables = {t: [] for t in TAREAS_FIJAS}
@@ -368,6 +461,9 @@ def state():
     return jsonify(
         {
             "config": config,
+            "roles": roles,
+            "permission_labels": PERMISSIONS,
+            "permissions": sorted(permissions_for_user(sid)),
             "socios": socios,
             "perfiles": perfiles,
             "cuotas": cuotas,
@@ -389,8 +485,8 @@ def state():
 # -------------------------------------------------------------- config (solo admin) --
 @app.route("/api/config", methods=["POST"])
 def update_config():
-    if not require_admin():
-        return err("Solo el administrador puede renombrar la peña o cambiar la cuota.")
+    if not require_permission("manage_config"):
+        return err("Solo el administrador puede renombrar la peÃ±a o cambiar la cuota.")
     data = request.get_json(force=True)
     db = get_db()
     try:
@@ -420,18 +516,18 @@ def add_socio():
     if total == 0:
         # Bootstrap: el primer socio que se crea es el administrador y DEBE fijar un PIN.
         if not valid_pin(pin):
-            return err("El PIN debe tener 4 dígitos.", 400)
+            return err("El PIN debe tener 4 dÃ­gitos.", 400)
         is_admin = 1
         pin_generado = None
         must_change = 0  # el propio admin ha elegido su PIN, no hace falta forzar cambio
     else:
-        if not require_admin():
-            return err("Solo el administrador puede añadir socios nuevos.")
+        if not require_permission("manage_socios"):
+            return err("Solo el administrador puede aÃ±adir socios nuevos.")
         is_admin = 0
-        must_change = 1  # el PIN lo ha puesto el administrador: se le obligará a cambiarlo
+        must_change = 1  # el PIN lo ha puesto el administrador: se le obligarÃ¡ a cambiarlo
         if pin:
             if not valid_pin(pin):
-                return err("El PIN debe tener 4 dígitos.", 400)
+                return err("El PIN debe tener 4 dÃ­gitos.", 400)
             pin_generado = None
         else:
             pin = random_pin()
@@ -443,17 +539,18 @@ def add_socio():
         (sid, nombre, is_admin, generate_password_hash(pin), must_change),
     )
     db.execute("INSERT INTO perfiles (socio_id, telefono, notas) VALUES (?, '', '')", (sid,))
+    db.execute("INSERT INTO socio_roles (socio_id, rol_id) VALUES (?, ?)", (sid, 'administrador' if is_admin else 'socio'))
     db.commit()
 
     if total == 0:
-        session["socio_id"] = sid  # login automático del primer administrador
+        session["socio_id"] = sid  # login automÃ¡tico del primer administrador
 
     return jsonify({"ok": True, "id": sid, "is_admin": bool(is_admin), "pin_generado": pin_generado})
 
 
 @app.route("/api/socios/<sid>/reset-pin", methods=["POST"])
 def reset_pin(sid):
-    if not require_admin():
+    if not require_permission("manage_socios"):
         return err("Solo el administrador puede restablecer un PIN.")
     db = get_db()
     if not db.execute("SELECT 1 FROM socios WHERE id = ?", (sid,)).fetchone():
@@ -469,7 +566,7 @@ def reset_pin(sid):
 
 @app.route("/api/socios/<sid>/activo", methods=["POST"])
 def toggle_activo(sid):
-    if not require_admin():
+    if not require_permission("manage_socios"):
         return err("Solo el administrador puede dar de alta o de baja a un socio.")
     db = get_db()
     row = db.execute("SELECT activo FROM socios WHERE id = ?", (sid,)).fetchone()
@@ -483,7 +580,7 @@ def toggle_activo(sid):
 
 @app.route("/api/socios/<sid>", methods=["DELETE"])
 def delete_socio(sid):
-    if not require_admin():
+    if not require_permission("manage_socios"):
         return err("Solo el administrador puede eliminar un socio.")
     db = get_db()
     row = db.execute("SELECT id, is_admin FROM socios WHERE id = ?", (sid,)).fetchone()
@@ -509,12 +606,79 @@ def delete_socio(sid):
     return jsonify({"ok": True})
 
 
+# -------------------------------------------------------------- roles y permisos --
+@app.route("/api/socios/<sid>/roles", methods=["POST"])
+def update_socio_roles(sid):
+    if not require_permission("manage_roles"):
+        return err("No tienes permiso para gestionar roles.")
+    data = request.get_json(force=True)
+    role_ids = data.get("roles") or []
+    if not isinstance(role_ids, list) or not role_ids:
+        return err("Cada socio debe tener al menos un rol.", 400)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM socios WHERE id = ?", (sid,)).fetchone():
+        return err("Socio no encontrado", 404)
+    valid_ids = {r["id"] for r in db.execute("SELECT id FROM roles")}
+    if any(role_id not in valid_ids for role_id in role_ids):
+        return err("Uno de los roles no existe.", 400)
+    # Evita que alguien se quite a s� mismo el �ltimo rol con permiso para administrar roles.
+    if sid == current_socio_id():
+        permitted = set()
+        for role in db.execute("SELECT permisos FROM roles WHERE id IN ({})".format(",".join("?" for _ in role_ids)), role_ids):
+            permitted.update(json.loads(role["permisos"]))
+        if "manage_roles" not in permitted:
+            return err("No puedes quitarte a ti mismo el permiso de gestionar roles.", 400)
+    db.execute("DELETE FROM socio_roles WHERE socio_id = ?", (sid,))
+    db.executemany("INSERT INTO socio_roles (socio_id, rol_id) VALUES (?, ?)", [(sid, role_id) for role_id in role_ids])
+    db.execute("UPDATE socios SET is_admin = ? WHERE id = ?", (int("administrador" in role_ids), sid))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/roles", methods=["POST"])
+def create_role():
+    if not require_permission("manage_roles"):
+        return err("No tienes permiso para gestionar roles.")
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    permisos = data.get("permisos") or []
+    if not nombre:
+        return err("El nombre del rol es obligatorio.", 400)
+    if not isinstance(permisos, list) or any(p not in PERMISSIONS for p in permisos):
+        return err("La lista de permisos no es v�lida.", 400)
+    db = get_db()
+    role_id = new_id()
+    try:
+        db.execute("INSERT INTO roles (id, nombre, permisos) VALUES (?, ?, ?)", (role_id, nombre, json.dumps(permisos)))
+        db.commit()
+    except sqlite3.IntegrityError:
+        return err("Ya existe un rol con ese nombre.", 400)
+    return jsonify({"ok": True, "id": role_id})
+
+
+@app.route("/api/roles/<role_id>", methods=["POST"])
+def update_role(role_id):
+    if not require_permission("manage_roles"):
+        return err("No tienes permiso para gestionar roles.")
+    data = request.get_json(force=True)
+    permisos = data.get("permisos") or []
+    if not isinstance(permisos, list) or any(p not in PERMISSIONS for p in permisos):
+        return err("La lista de permisos no es v�lida.", 400)
+    if role_id == "administrador" and "manage_roles" not in permisos:
+        return err("El rol Administrador debe conservar la gesti�n de roles.", 400)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM roles WHERE id = ?", (role_id,)).fetchone():
+        return err("Rol no encontrado", 404)
+    db.execute("UPDATE roles SET permisos = ? WHERE id = ?", (json.dumps(permisos), role_id))
+    db.commit()
+    return jsonify({"ok": True})
+
 # -------------------------------------------------------------- perfil (solo el propio) --
 @app.route("/api/perfil", methods=["POST"])
 def update_perfil():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     db = get_db()
 
@@ -525,7 +689,7 @@ def update_perfil():
     pin = (data.get("pin") or "").strip()
     if pin:
         if not valid_pin(pin):
-            return err("El PIN debe tener 4 dígitos.", 400)
+            return err("El PIN debe tener 4 dÃ­gitos.", 400)
         db.execute("UPDATE socios SET pin_hash = ?, must_change_pin = 0 WHERE id = ?", (generate_password_hash(pin), sid))
 
     db.execute(
@@ -540,11 +704,11 @@ def update_perfil():
 def change_own_pin():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     pin = (data.get("pin") or "").strip()
     if not valid_pin(pin):
-        return err("El PIN debe tener 4 dígitos.", 400)
+        return err("El PIN debe tener 4 dÃ­gitos.", 400)
     db = get_db()
     db.execute("UPDATE socios SET pin_hash = ?, must_change_pin = 0 WHERE id = ?", (generate_password_hash(pin), sid))
     db.commit()
@@ -555,7 +719,7 @@ def change_own_pin():
 def add_familiar():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
     if not nombre:
@@ -574,7 +738,7 @@ def add_familiar():
 def delete_familiar(fid):
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     db = get_db()
     db.execute("DELETE FROM familiares WHERE id = ? AND socio_id = ?", (fid, sid))
     db.commit()
@@ -585,14 +749,14 @@ def delete_familiar(fid):
 def upload_foto(sid):
     sid_session = require_login()
     if not sid_session:
-        return err("No has iniciado sesión.", 401)
-    if sid_session != sid and not is_admin_user(sid_session):
+        return err("No has iniciado sesiÃ³n.", 401)
+    if sid_session != sid and not has_permission(sid_session, "manage_socios"):
         return err("No puedes cambiar la foto de otro socio.")
     if not PIL_OK:
         return err(
             "Falta instalar una dependencia en el servidor: ejecuta "
             "'pip install -r requirements.txt' (o 'pip install Pillow') "
-            "y reinicia la aplicación.",
+            "y reinicia la aplicaciÃ³n.",
             500,
         )
     if "foto" not in request.files or request.files["foto"].filename == "":
@@ -611,7 +775,7 @@ def upload_foto(sid):
         except Exception:
             return err(
                 "No se pudo leer esa imagen. Prueba con un archivo .jpg o .png "
-                "(si es una foto de iPhone en formato HEIC, conviértela a JPG antes de subirla).",
+                "(si es una foto de iPhone en formato HEIC, conviÃ©rtela a JPG antes de subirla).",
                 400,
             )
         im = ImageOps.exif_transpose(im).convert("RGB")
@@ -632,12 +796,12 @@ def upload_foto(sid):
 def toggle_cuota():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     socio_id, year, month = data.get("socio_id"), int(data.get("year")), int(data.get("month"))
 
-    if socio_id != sid and not is_admin_user(sid):
-        return err("Solo puedes marcar tu propia cuota. Pídeselo al administrador si es de otro socio.")
+    if socio_id != sid and not has_permission(sid, "manage_cuotas"):
+        return err("Solo puedes marcar tu propia cuota. PÃ­deselo al administrador si es de otro socio.")
 
     db = get_db()
     row = db.execute(
@@ -663,7 +827,7 @@ def toggle_cuota():
 # -------------------------------------------------------------- reuniones --
 @app.route("/api/reuniones", methods=["POST"])
 def add_reunion():
-    sid = require_login()
+    sid = require_permission("manage_events")
     data = request.get_json(force=True)
     db = get_db()
     rid = new_id()
@@ -686,6 +850,8 @@ def add_reunion():
 
 @app.route("/api/reuniones/<rid>", methods=["DELETE"])
 def delete_reunion(rid):
+    if not require_permission("manage_events"):
+        return err("No tienes permiso para gestionar reuniones.")
     db = get_db()
     db.execute("DELETE FROM reuniones WHERE id = ?", (rid,))
     db.execute("DELETE FROM asistencia WHERE reunion_id = ?", (rid,))
@@ -710,6 +876,8 @@ def toggle_asistencia(rid):
 # -------------------------------------------------------------- inventario --
 @app.route("/api/inventario", methods=["POST"])
 def add_inventario():
+    if not require_permission("manage_inventory"):
+        return err("No tienes permiso para gestionar inventario.")
     data = request.get_json(force=True)
     db = get_db()
     iid = new_id()
@@ -730,6 +898,8 @@ def add_inventario():
 
 @app.route("/api/inventario/<iid>", methods=["DELETE"])
 def delete_inventario(iid):
+    if not require_permission("manage_inventory"):
+        return err("No tienes permiso para gestionar inventario.")
     db = get_db()
     db.execute("DELETE FROM inventario WHERE id = ?", (iid,))
     db.commit()
@@ -739,8 +909,8 @@ def delete_inventario(iid):
 # -------------------------------------------------------------- movimientos (solo admin) --
 @app.route("/api/movimientos", methods=["POST"])
 def add_movimiento():
-    if not require_admin():
-        return err("Solo el administrador puede añadir gastos o ingresos.")
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador puede aÃ±adir gastos o ingresos.")
     data = request.get_json(force=True)
     db = get_db()
     socio_id = data.get("socio_id") or None
@@ -766,7 +936,7 @@ def add_movimiento():
 
 @app.route("/api/movimientos/<mid>", methods=["DELETE"])
 def delete_movimiento(mid):
-    if not require_admin():
+    if not require_permission("manage_finances"):
         return err("Solo el administrador puede borrar gastos o ingresos.")
     db = get_db()
     db.execute("DELETE FROM movimientos WHERE id = ?", (mid,))
@@ -777,6 +947,8 @@ def delete_movimiento(mid):
 # -------------------------------------------------------------- bebidas: precios --
 @app.route("/api/bebidas/precios", methods=["POST"])
 def add_bebida_precio():
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
     data = request.get_json(force=True)
     db = get_db()
     bid = new_id()
@@ -796,6 +968,8 @@ def add_bebida_precio():
 
 @app.route("/api/bebidas/precios/<bid>", methods=["DELETE"])
 def delete_bebida_precio(bid):
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
     db = get_db()
     db.execute("DELETE FROM bebidas_precios WHERE id = ?", (bid,))
     db.commit()
@@ -805,6 +979,8 @@ def delete_bebida_precio(bid):
 # -------------------------------------------------------------- bebidas: consumos --
 @app.route("/api/bebidas/consumos", methods=["POST"])
 def add_consumo():
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
     data = request.get_json(force=True)
     db = get_db()
     bebida = db.execute("SELECT * FROM bebidas_precios WHERE id = ?", (data.get("bebida_id"),)).fetchone()
@@ -832,6 +1008,8 @@ def add_consumo():
 
 @app.route("/api/bebidas/consumos/<cid>", methods=["DELETE"])
 def delete_consumo(cid):
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
     db = get_db()
     db.execute("DELETE FROM bebidas_consumos WHERE id = ?", (cid,))
     db.commit()
@@ -841,6 +1019,8 @@ def delete_consumo(cid):
 # -------------------------------------------------------------- fiestas (gasto bebida evento) --
 @app.route("/api/fiestas", methods=["POST"])
 def add_fiesta_gasto():
+    if not require_permission("manage_finances"):
+        return err("No tienes permiso para registrar gastos.")
     data = request.get_json(force=True)
     db = get_db()
     fid = new_id()
@@ -860,6 +1040,8 @@ def add_fiesta_gasto():
 
 @app.route("/api/fiestas/<fid>", methods=["DELETE"])
 def delete_fiesta_gasto(fid):
+    if not require_permission("manage_finances"):
+        return err("No tienes permiso para borrar gastos.")
     db = get_db()
     db.execute("DELETE FROM fiestas_gastos WHERE id = ?", (fid,))
     db.commit()
@@ -871,7 +1053,7 @@ def delete_fiesta_gasto(fid):
 def add_reserva():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     db = get_db()
     rid = new_id()
@@ -896,12 +1078,12 @@ def add_reserva():
 def delete_reserva(rid):
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     db = get_db()
     row = db.execute("SELECT socio_id FROM reservas WHERE id = ?", (rid,)).fetchone()
     if not row:
         return err("Reserva no encontrada", 404)
-    if row["socio_id"] != sid and not is_admin_user(sid):
+    if row["socio_id"] != sid and not has_permission(sid, "manage_events"):
         return err("No puedes cancelar la reserva de otro socio.")
     db.execute("DELETE FROM reservas WHERE id = ?", (rid,))
     db.commit()
@@ -913,13 +1095,13 @@ def delete_reserva(rid):
 def toggle_responsable():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesión.", 401)
+        return err("No has iniciado sesiÃ³n.", 401)
     data = request.get_json(force=True)
     tarea = data.get("tarea")
     target = data.get("socio_id")
     if tarea not in TAREAS_FIJAS:
-        return err("Tarea no válida", 400)
-    if target != sid and not is_admin_user(sid):
+        return err("Tarea no vÃ¡lida", 400)
+    if target != sid and not has_permission(sid, "manage_tasks"):
         return err("Solo puedes apuntarte a ti mismo (el administrador puede gestionar a cualquiera).")
 
     db = get_db()
@@ -935,13 +1117,13 @@ def toggle_responsable():
 # -------------------------------------------------------------- exportar a Excel --
 @app.route("/api/export.xlsx")
 def export_excel():
-    if not require_login():
-        return err("No has iniciado sesión.", 401)
+    if not require_permission("export_data"):
+        return err("No has iniciado sesiÃ³n.", 401)
     if not OPENPYXL_OK:
         return err(
             "Falta instalar una dependencia en el servidor: ejecuta "
             "'pip install -r requirements.txt' (o 'pip install openpyxl') "
-            "y reinicia la aplicación.",
+            "y reinicia la aplicaciÃ³n.",
             500,
         )
 
@@ -975,7 +1157,7 @@ def _build_excel():
     ).fetchall()
     write_sheet(
         ws1,
-        ["Fecha", "Tipo", "Categoría", "Socio", "Concepto", "Importe (€)"],
+        ["Fecha", "Tipo", "CategorÃ­a", "Socio", "Concepto", "Importe (â‚¬)"],
         [[m["fecha"], m["tipo"], m["categoria"], m["socio_nombre"] or "", m["concepto"], m["importe"]] for m in movs],
     )
 
@@ -985,23 +1167,23 @@ def _build_excel():
     ).fetchall()
     write_sheet(
         ws2,
-        ["Socio", "Año", "Mes", "Importe (€)", "Pagado", "Fecha de pago"],
-        [[c["socio_nombre"], c["year"], c["month"], c["importe"], "Sí" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
+        ["Socio", "AÃ±o", "Mes", "Importe (â‚¬)", "Pagado", "Fecha de pago"],
+        [[c["socio_nombre"], c["year"], c["month"], c["importe"], "SÃ­" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
     )
 
     ws3 = wb.create_sheet("Bebidas")
     consumos = db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha").fetchall()
     write_sheet(
         ws3,
-        ["Fecha", "Consumidor", "Socio", "Cantidad", "Importe (€)"],
-        [[c["fecha"], c["consumidor"], "Sí" if c["es_socio"] else "No", c["cantidad"], c["importe"]] for c in consumos],
+        ["Fecha", "Consumidor", "Socio", "Cantidad", "Importe (â‚¬)"],
+        [[c["fecha"], c["consumidor"], "SÃ­" if c["es_socio"] else "No", c["cantidad"], c["importe"]] for c in consumos],
     )
 
     ws4 = wb.create_sheet("Gastos fiestas")
     fiestas = db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha").fetchall()
     write_sheet(
         ws4,
-        ["Fecha", "Evento", "Concepto", "Importe (€)"],
+        ["Fecha", "Evento", "Concepto", "Importe (â‚¬)"],
         [[f["fecha"], f["evento"], f["concepto"], f["importe"]] for f in fiestas],
     )
 
@@ -1009,7 +1191,7 @@ def _build_excel():
     inventario = db.execute("SELECT * FROM inventario ORDER BY categoria, nombre").fetchall()
     write_sheet(
         ws4b,
-        ["Categoría", "Nombre", "Cantidad", "Estado", "Notas"],
+        ["CategorÃ­a", "Nombre", "Cantidad", "Estado", "Notas"],
         [[i["categoria"], i["nombre"], i["cantidad"], i["estado"], i["notas"] or ""] for i in inventario],
     )
 
@@ -1021,7 +1203,7 @@ def _build_excel():
     saldo = ingresos_cuotas + ingresos_mov + ingresos_bebidas - gastos_mov - gastos_fiestas
 
     ws5 = wb.create_sheet("Resumen")
-    ws5.append(["Concepto", "Importe (€)"])
+    ws5.append(["Concepto", "Importe (â‚¬)"])
     for cell in ws5[1]:
         cell.fill = header_fill
         cell.font = header_font
