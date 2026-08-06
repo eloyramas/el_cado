@@ -481,3 +481,11 @@ textarea{resize:vertical; min-height:60px;}
 
 .foto-upload-row input[type=file]{display:none;}
 .socio-row-avatar{display:flex; align-items:center; gap:10px;}
+
+/* Roles and permissions */
+.role-options{display:flex; flex-wrap:wrap; gap:8px;}
+.role-option{display:inline-flex; align-items:center; gap:5px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px; padding:6px 8px; color:var(--chalk); font-size:.8rem;}
+.role-option input{accent-color:var(--amber);}
+.custom-role-box{margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);}
+.custom-role-box input[type=text]{margin:4px 0 8px;}
+.permissions-options{margin:8px 0;}

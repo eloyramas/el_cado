@@ -385,12 +385,12 @@ function renderApp(){
         
         <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">?? Ver ubicaci�n</a></div></div>
         
-        ${isAdmin() ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
-        
+        ${can('manage_config') ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
+
           <button class="edit-name-btn" data-action="edit-club-name">? renombrar pe�a</button>
-        
+
           <button class="edit-name-btn" data-action="edit-cuota">? cambiar cuota</button>
-        
+
         </div>` : ''}
         
         <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} � <button data-action="logout">cambiar usuario</button></div>
@@ -455,6 +455,14 @@ function renderRoles(){
           <div style="font-weight:600; margin-bottom:8px;">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}</div>
           <div class="role-options">
             ${roles.map(role=>`<label class="role-option"><input type="checkbox" data-role-option="${s.id}" value="${role.id}" ${(s.roles||[]).includes(role.id)?'checked':''}> ${escapeHtml(role.nombre)}</label>`).join('')}
+          </div>
+          <div class="custom-role-box">
+            <label class="f">Otro rol personalizado</label>
+            <input type="text" data-custom-role-name="${s.id}" placeholder="Ej: Vocal, encargado de compras">
+            <div class="role-options permissions-options">
+              ${Object.entries(state.permission_labels||{}).map(([id,label])=>`<label class="role-option"><input type="checkbox" data-custom-permission="${s.id}" value="${id}"> ${escapeHtml(label)}</label>`).join('')}
+            </div>
+            <button class="btn ghost small" data-action="create-custom-role" data-id="${s.id}">Crear y asignar rol</button>
           </div>
         </div>
         <button class="btn ghost small" data-action="save-roles" data-id="${s.id}">Guardar roles</button>
@@ -545,8 +553,8 @@ function renderResumen(){
       <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         
         <span><span class="pin"></span>Cuentas</span>
-        
-        <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
+
+        ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}
       </h2>
       <div class="menu-row"><span class="label">Cuotas cobradas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
       <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
@@ -593,8 +601,9 @@ function renderResumen(){
 
 /* ============ SOCIOS ============ */
 function renderSocios(){
+  const puedeGestionarSocios = can('manage_socios');
   return `
-  ${isAdmin() ? `
+  ${puedeGestionarSocios ? `
   <div class="card">
     <h2><span class="pin"></span>A�adir socio</h2>
     <form data-form="add-socio" class="form-row" style="align-items:flex-end;">
@@ -603,42 +612,42 @@ function renderSocios(){
       <div><label class="f">Foto (opcional)</label><input type="file" name="foto" accept="image/*"></div>
       <div style="flex:none;"><button class="btn" type="submit">A�adir socio</button></div>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: el administrador es quien a�ade o da de baja socios.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona socios es qui�n a�ade o da de baja socios.</p>`}
   <div class="card">
     ${state.socios.length===0 ? '<p class="empty">Todav�a no hay socios.</p>' : state.socios.map(s=>{
       const perfil = state.perfiles[s.id] || {};
       const familia = perfil.familia || [];
-      const puedeCambiarFoto = isAdmin() || s.id===state.current_user;
+      const puedeCambiarFoto = puedeGestionarSocios || s.id===state.current_user;
       return `<div class="list-item">
-        
+
         <div class="socio-row-avatar">
-        
+
           ${avatarHtml(s,'sm')}
-        
+
           <div>
-        
-            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">t�</span>':''}${s.is_admin?'<span class="admin-badge">Admin</span>':''}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
-        
+
+            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">t�</span>':''}${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
+
             <div class="meta">${perfil.telefono ? '?? '+escapeHtml(perfil.telefono) : 'Sin tel�fono'} ${familia.length? '� '+familia.length+' familiar(es)':''}</div>
-        
+
           </div>
-        
+
         </div>
-        
+
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        
+
           ${puedeCambiarFoto ? `<label class="btn ghost small" style="cursor:pointer;">Foto<input type="file" accept="image/*" data-autoupload-foto="${s.id}" style="display:none;"></label>` : ''}
-        
-          ${isAdmin() ? `<button class="btn ghost small" data-action="reset-pin" data-id="${s.id}">Restablecer PIN</button>` : ''}
-        
-          ${isAdmin() && s.id!==state.current_user ? (s.activo
-        
+
+          ${puedeGestionarSocios ? `<button class="btn ghost small" data-action="reset-pin" data-id="${s.id}">Restablecer PIN</button>` : ''}
+
+          ${puedeGestionarSocios && s.id!==state.current_user ? (s.activo
+
             ? `<button class="btn danger small" data-action="toggle-activo" data-activo="1" data-id="${s.id}">Dar de baja</button>`
-        
+
             : `<button class="btn ghost small" data-action="toggle-activo" data-activo="0" data-id="${s.id}">Reactivar</button><button class="btn danger small" data-action="delete-socio" data-id="${s.id}">Eliminar</button>`
-        
+
           ) : ''}
-        
+
         </div>
       </div>`;
     }).join('')}
@@ -647,7 +656,7 @@ function renderSocios(){
 
 /* ============ CUOTAS ============ */
 function renderCuotas(){
-  const admin = isAdmin();
+  const admin = can('manage_cuotas');
   const rows = state.socios.map(s=>{
     const cells = MESES.map((m,i)=>{
       const month = i+1;
@@ -666,7 +675,7 @@ function renderCuotas(){
   return `
   <div class="card">
     <h2><span class="pin"></span>Cuotas mensuales <span style="font-size:0.9rem; color:var(--chalk-dim); font-family:'Work Sans';">(${money(state.config.cuota_mensual)}/mes)</span></h2>
-    <p class="readonly-note">${admin ? 'Como administrador puedes marcar la cuota de cualquier socio.' : 'Solo puedes marcar tu propia cuota (columna resaltada en tu fila).'}</p>
+    <p class="readonly-note">${admin ? 'Con permiso para gestionar cuotas puedes marcar la cuota de cualquier socio.' : 'Solo puedes marcar tu propia cuota (columna resaltada en tu fila).'}</p>
     <div class="year-nav">
       <button data-action="cuota-year" data-dir="-1">? ${cuotasYear-1}</button>
       <b>${cuotasYear}</b>
@@ -721,7 +730,7 @@ function renderReservas(){
         
         </div>
         
-        ${(r.socio_id===state.current_user || isAdmin()) ? `<button class="btn danger small" data-action="delete-reserva" data-id="${r.id}">Cancelar</button>` : ''}
+        ${(r.socio_id===state.current_user || can('manage_events')) ? `<button class="btn danger small" data-action="delete-reserva" data-id="${r.id}">Cancelar</button>` : ''}
       </div>
     `).join('')}
   </div>
@@ -734,48 +743,50 @@ function renderReservas(){
 
 /* ============ REUNIONES ============ */
 function renderReuniones(){
+  const puedeGestionarEventos = can('manage_events');
   const ordenadas = [...state.reuniones].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
+  ${puedeGestionarEventos ? `
   <div class="card">
     <h2><span class="pin"></span>Convocar reuni�n</h2>
     <form data-form="add-reunion">
       <div class="form-row">
-        
+
         <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
-        
+
         <div><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
       </div>
       <div class="form-row">
-        
+
         <div><label class="f">Desde las (opcional)</label><input type="time" name="hora_inicio"></div>
-        
+
         <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin"></div>
       </div>
       <div class="form-row"><div><label class="f">Notas / orden del d�a</label><textarea name="notas" placeholder="De qu� se va a hablar..."></textarea></div></div>
       <button class="btn" type="submit">A�adir reuni�n</button>
     </form>
-  </div>
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona eventos es qui�n convoca reuniones.</p>`}
   <div class="card">
     <h2><span class="pin"></span>Historial</h2>
     ${ordenadas.length===0 ? '<p class="empty">A�n no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
-        
+
         <div style="flex:1;">
-        
+
           <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">� ${fmtDate(r.fecha)}</span></div>
-        
+
           ${r.notas ? `<div class="meta" style="margin-top:2px;">${escapeHtml(r.notas)}</div>` : ''}
-        
+
           <div style="margin-top:8px;">
-        
+
             ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'? ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
-        
+
           </div>
-        
+
         </div>
-        
-        <button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>
+
+        ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
       </div>`;
     }).join('')}
   </div>`;
@@ -783,49 +794,51 @@ function renderReuniones(){
 
 /* ============ INVENTARIO ============ */
 function renderInventario(){
+  const puedeGestionarInventario = can('manage_inventory');
   const porCategoria = {};
   CAT_INV.forEach(c=>porCategoria[c]=[]);
   state.inventario.forEach(i=>{ (porCategoria[i.categoria]||(porCategoria[i.categoria]=[])).push(i); });
   return `
+  ${puedeGestionarInventario ? `
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>A�adir material</span>
-      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
+      ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}
     </h2>
     <form data-form="add-inventario">
       <div class="form-row">
-        
+
         <div><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: Nevera, plancha, mesas..."></div>
-        
+
         <div><label class="f">Categor�a</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
-        
+
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="0"></div>
-        
+
         <div><label class="f">Estado</label><select name="estado"><option>Bien</option><option>Necesita revisi�n</option><option>Hay que comprar</option></select></div>
-        
+
         <div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div>
       </div>
       <button class="btn" type="submit">A�adir al inventario</button>
     </form>
-  </div>
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona inventario es qui�n a�ade o borra material. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}</p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
     return `<div class="card">
       <h2><span class="pin"></span>${cat}</h2>
       ${items.map(i=>`<div class="list-item">
-        
+
         <div>
-        
+
           <div style="font-weight:600;">${escapeHtml(i.nombre)} <span class="meta">� ${i.cantidad}</span></div>
-        
+
           <div class="meta">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revisi�n'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
-        
+
         </div>
-        
-        <button class="btn danger small" data-action="delete-inventario" data-id="${i.id}">Borrar</button>
+
+        ${puedeGestionarInventario ? `<button class="btn danger small" data-action="delete-inventario" data-id="${i.id}">Borrar</button>` : ''}
       </div>`).join('')}
     </div>`;
   }).join('')}
@@ -835,7 +848,7 @@ function renderInventario(){
 
 /* ============ CAJA ============ */
 function renderCaja(){
-  const admin = isAdmin();
+  const admin = can('manage_finances');
   const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
   ${admin ? `
@@ -866,11 +879,11 @@ function renderCaja(){
       </div>
       <button class="btn" type="submit">Guardar movimiento</button>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: el administrador es quien registra los gastos e ingresos.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona finanzas es qui�n registra los gastos e ingresos.</p>`}
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
-      <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
+      ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}
     </h2>
     ${ordenados.length===0 ? '<p class="empty">Sin movimientos registrados.</p>' : ordenados.map(m=>`
       <div class="list-item">
@@ -911,40 +924,42 @@ function renderBebidas(){
       <button class="subtab-btn ${bebidasSubtab==='consumo'?'active':''}" data-action="bebidas-subtab" data-sub="consumo">Consumo del d�a a d�a</button>
       <button class="subtab-btn ${bebidasSubtab==='fiestas'?'active':''}" data-action="bebidas-subtab" data-sub="fiestas">Fiestas / eventos</button>
     </div>
-    <button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>
+    ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}
   </div>
   ${bebidasSubtab==='consumo' ? renderBebidasConsumo() : renderBebidasFiestas()}
   `;
 }
 
 function renderBebidasConsumo(){
+  const puedeGestionarBebidas = can('manage_bebidas');
   const precios = state.bebidas_precios;
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
+  ${puedeGestionarBebidas ? `
   <div class="card">
     <h2><span class="pin"></span>Precios (se paga en el momento)</h2>
     <form data-form="add-bebida-precio">
       <div class="form-row">
-        
+
         <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Ca�a, agua, refresco"></div>
-        
+
         <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botell�n" required></div>
       </div>
       <div class="form-row">
-        
+
         <div><label class="f">Precio socio (�)</label><input type="number" step="0.01" min="0" name="precio_socio" required></div>
-        
+
         <div><label class="f">Precio no socio (�)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required></div>
       </div>
       <button class="btn" type="submit">A�adir precio</button>
     </form>
     ${precios.length ? precios.map(p=>`
       <div class="menu-row">
-        
+
         <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} � socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</small></span>
-        
+
         <span class="dots"></span>
-        
+
         <button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>
       </div>`).join('') : '<p class="empty">A�ade al menos una bebida con precio.</p>'}
   </div>
@@ -953,57 +968,57 @@ function renderBebidasConsumo(){
     ${precios.length===0 ? '<p class="empty">Primero a�ade precios de bebidas arriba.</p>' : `
     <form data-form="add-consumo">
       <div class="form-row">
-        
+
         <div><label class="f">Qui�n consume</label>
-        
+
           <select name="consumidorTipo">
-        
+
             <option value="socio">Socio</option>
-        
+
             <option value="invitado">Invitado / no socio</option>
-        
+
           </select>
-        
+
         </div>
-        
+
         <div><label class="f">Nombre</label>
-        
+
           <select name="socio_id">${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select>
-        
+
           <input type="text" name="nombre_invitado" placeholder="Nombre del invitado" style="display:none; margin-top:6px;">
-        
+
         </div>
       </div>
       <div class="form-row">
-        
+
         <div><label class="f">Bebida</label><select name="bebida_id">${precios.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
-        
+
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
       <button class="btn" type="submit">Registrar (pagado al momento)</button>
     </form>
     `}
-  </div>
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona bebidas es qui�n registra precios y consumos.</p></div>`}
   <div class="card">
     <h2><span class="pin"></span>�ltimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� recaudado total: ${money(totalBebidasIngreso())}</span></h2>
     ${consumos.length===0 ? '<p class="empty">Sin consumos todav�a.</p>' : consumos.slice(0,40).map(c=>{
       const bebida = precios.find(p=>p.id===c.bebida_id);
       return `<div class="list-item">
-        
+
         <div>
-        
+
           <div style="font-weight:600;">${escapeHtml(c.consumidor)} ${c.es_socio?'':'<span class="tag">invitado</span>'}</div>
-        
+
           <div class="meta">${c.cantidad} � ${bebida?escapeHtml(bebida.nombre):'�'} � ${fmtDate(c.fecha)}</div>
-        
+
         </div>
-        
+
         <div style="display:flex; align-items:center; gap:10px;">
-        
+
           <span style="font-family:'JetBrains Mono',monospace; color:var(--sage); font-weight:600;">+ ${money(c.importe)}</span>
-        
-          <button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>
-        
+
+          ${puedeGestionarBebidas ? `<button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>` : ''}
+
         </div>
       </div>`;
     }).join('')}
@@ -1011,45 +1026,47 @@ function renderBebidasConsumo(){
 }
 
 function renderBebidasFiestas(){
+  const puedeGestionarFinanzas = can('manage_finances');
   const gastos = [...state.fiestas_gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
+  ${puedeGestionarFinanzas ? `
   <div class="card">
     <h2><span class="pin"></span>Gasto en bebida para una fiesta</h2>
     <form data-form="add-fiesta-gasto">
       <div class="form-row">
-        
+
         <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Fiestas del pueblo, San Juan..."></div>
-        
+
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row">
-        
+
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Barril de cerveza 30L, agua, refrescos..."></div>
-        
+
         <div><label class="f">Importe (�)</label><input type="number" step="0.01" min="0" name="importe" required></div>
       </div>
       <button class="btn" type="submit">A�adir gasto</button>
     </form>
-  </div>
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona finanzas es qui�n registra gastos de fiestas.</p></div>`}
   <div class="card">
     <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� total: ${money(totalFiestasGasto())}</span></h2>
     ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todav�a.</p>' : gastos.map(g=>`
       <div class="list-item">
-        
+
         <div>
-        
+
           <div style="font-weight:600;">${escapeHtml(g.concepto)}</div>
-        
+
           <div class="meta"><span class="tag">${escapeHtml(g.evento)}</span> ${fmtDate(g.fecha)}</div>
-        
+
         </div>
-        
+
         <div style="display:flex; align-items:center; gap:10px;">
-        
+
           <span style="font-family:'JetBrains Mono',monospace; color:var(--rust); font-weight:600;">- ${money(g.importe)}</span>
-        
-          <button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>
-        
+
+          ${puedeGestionarFinanzas ? `<button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>` : ''}
+
         </div>
       </div>
     `).join('')}
@@ -1058,7 +1075,7 @@ function renderBebidasFiestas(){
 
 /* ============ TAREAS ============ */
 function renderEncargados(){
-  const admin = isAdmin();
+  const admin = can('manage_tasks');
   return `
   <div class="card">
     <p class="readonly-note">Ap�ntate a las tareas de las que quieras encargarte. ${admin ? 'Como administrador puedes a�adir o quitar a cualquier socio.' : ''}</p>
@@ -1430,4 +1447,21 @@ document.addEventListener('click', async (e)=>{
     await loadState();
     render();
   }catch(err){ alert(err.message || 'No se pudieron guardar los roles.'); }
+});
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-action="create-custom-role"]');
+  if(!btn) return;
+  const sid = btn.dataset.id;
+  const input = document.querySelector(`input[data-custom-role-name="${sid}"]`);
+  const nombre = input ? input.value.trim() : '';
+  const permisos = [...document.querySelectorAll(`input[data-custom-permission="${sid}"]:checked`)].map(item=>item.value);
+  if(!nombre){ alert('Escribe un nombre para el rol personalizado.'); return; }
+  try{
+    const created = await apiPost('/api/roles', {nombre, permisos});
+    const roles = [...document.querySelectorAll(`input[data-role-option="${sid}"]:checked`)].map(item=>item.value);
+    roles.push(created.id);
+    await apiPost(`/api/socios/${sid}/roles`, {roles});
+    await loadState();
+    render();
+  }catch(err){ alert(err.message || 'No se pudo crear el rol personalizado.'); }
 });
