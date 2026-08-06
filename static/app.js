@@ -396,34 +396,41 @@ function renderApp(){
         <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} � <button data-action="logout">cambiar usuario</button></div>
       </div>
       <div class="tabs">
-        
-        ${tabBtn('resumen','Resumen')}
-        
-        ${tabBtn('socios','Socios')}
-        
-        ${tabBtn('cuotas','Cuotas')}
-        
-        ${tabBtn('reservas','Reservas')}
-        
-        ${tabBtn('reuniones','Reuniones')}
-        
-        ${tabBtn('inventario','Inventario')}
-        
-        ${tabBtn('caja','Gastos e ingresos')}
-        
-        ${tabBtn('bebidas','Bebidas')}
-        
-        ${tabBtn('encargados','Tareas')}
-        
-        ${isAdmin() ? tabBtn('roles','Roles') : ''}
-        ${tabBtn('perfil','Mi perfil')}
+        ${tabBtn('resumen','Resumen','chart')}
+        ${tabBtn('socios','Socios','people')}
+        ${tabBtn('cuotas','Cuotas','coin')}
+        ${tabBtn('reservas','Reservas','calendar-check')}
+        ${tabBtn('reuniones','Reuniones','calendar')}
+        ${tabBtn('inventario','Inventario','box')}
+        ${tabBtn('caja','Gastos e ingresos','wallet')}
+        ${tabBtn('bebidas','Bebidas','cup')}
+        ${tabBtn('encargados','Tareas','check')}
+        ${isAdmin() ? tabBtn('roles','Roles','key') : ''}
+        ${tabBtn('perfil','Mi perfil','user')}
       </div>
     </div>
     <div id="tab-content">${renderTab()}</div>
   </div>`;
 }
-function tabBtn(id,label){
-  return `<button class="tab-btn ${activeTab===id?'active':''}" data-action="switch-tab" data-tab="${id}">${label}</button>`;
+const TAB_ICON_PATHS = {
+  'chart': '<path d="M4 19V10"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M2 19h20"/>',
+  'people': '<circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.7.4 5 2.4 5 5.8"/>',
+  'coin': '<circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M9.5 9.5c0-1.4 1.2-2.2 2.5-2.2s2.5.8 2.5 2c0 3-5 1.6-5 4.5 0 1.3 1.2 2.2 2.5 2.2s2.5-.8 2.5-2"/>',
+  'calendar-check': '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M9 14.5l2 2 4-4.3"/>',
+  'calendar': '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M7.5 13.5h3"/><path d="M13.5 13.5h3"/><path d="M7.5 17h3"/>',
+  'box': '<path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
+  'wallet': '<rect x="2.5" y="6" width="19" height="14" rx="2.4"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14.5" r="1.3"/>',
+  'cup': '<path d="M6 3h11l-1 12.5a4.5 4.5 0 0 1-4.5 4.1h-1A4.5 4.5 0 0 1 6 15.5L5 3z"/><path d="M17 6.5h2a2.5 2.5 0 0 1 0 5h-2.4"/><path d="M8 20.5h7"/>',
+  'check': '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l2.6 2.6L16.5 9"/>',
+  'key': '<circle cx="8" cy="15" r="4.2"/><path d="M11 12l9-9"/><path d="M16 6l3 3"/><path d="M13.5 8.5l2.3 2.3"/>',
+  'user': '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+};
+function tabIcon(name){
+  const path = TAB_ICON_PATHS[name] || '';
+  return `<svg class="tab-icon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+}
+function tabBtn(id,label,icon){
+  return `<button class="tab-btn ${activeTab===id?'active':''}" data-action="switch-tab" data-tab="${id}">${tabIcon(icon)}<span class="tab-label">${label}</span></button>`;
 }
 function renderTab(){
   switch(activeTab){
@@ -612,7 +619,7 @@ function renderSocios(){
       <div><label class="f">Foto (opcional)</label><input type="file" name="foto" accept="image/*"></div>
       <div style="flex:none;"><button class="btn" type="submit">A�adir socio</button></div>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona socios es qui�n a�ade o da de baja socios.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona socios es quien anade o da de baja socios.</p>`}
   <div class="card">
     ${state.socios.length===0 ? '<p class="empty">Todav�a no hay socios.</p>' : state.socios.map(s=>{
       const perfil = state.perfiles[s.id] || {};
@@ -765,7 +772,7 @@ function renderReuniones(){
       <div class="form-row"><div><label class="f">Notas / orden del d�a</label><textarea name="notas" placeholder="De qu� se va a hablar..."></textarea></div></div>
       <button class="btn" type="submit">A�adir reuni�n</button>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona eventos es qui�n convoca reuniones.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona eventos es quien convoca reuniones.</p>`}
   <div class="card">
     <h2><span class="pin"></span>Historial</h2>
     ${ordenadas.length===0 ? '<p class="empty">A�n no hay reuniones.</p>' : ordenadas.map(r=>{
@@ -822,7 +829,7 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">A�adir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona inventario es qui�n a�ade o borra material. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona inventario es quien anade o borra material. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">? Exportar a Excel</button>` : ''}</p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -879,7 +886,7 @@ function renderCaja(){
       </div>
       <button class="btn" type="submit">Guardar movimiento</button>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona finanzas es qui�n registra los gastos e ingresos.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona finanzas es quien registra los gastos e ingresos.</p>`}
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
@@ -998,7 +1005,7 @@ function renderBebidasConsumo(){
       <button class="btn" type="submit">Registrar (pagado al momento)</button>
     </form>
     `}
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona bebidas es qui�n registra precios y consumos.</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona bebidas es quien registra precios y consumos.</p></div>`}
   <div class="card">
     <h2><span class="pin"></span>�ltimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� recaudado total: ${money(totalBebidasIngreso())}</span></h2>
     ${consumos.length===0 ? '<p class="empty">Sin consumos todav�a.</p>' : consumos.slice(0,40).map(c=>{
@@ -1047,7 +1054,7 @@ function renderBebidasFiestas(){
       </div>
       <button class="btn" type="submit">A�adir gasto</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona finanzas es qui�n registra gastos de fiestas.</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona finanzas es quien registra gastos de fiestas.</p></div>`}
   <div class="card">
     <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� total: ${money(totalFiestasGasto())}</span></h2>
     ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todav�a.</p>' : gastos.map(g=>`

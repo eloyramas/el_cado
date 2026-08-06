@@ -125,18 +125,26 @@ input,select,textarea{font-family:inherit; font-size:0.95rem;}
 
 /* ---------- tabs ---------- */
 .tabs{
-  display:flex; flex-wrap:wrap; gap:4px 4px; padding:4px 0 14px;
+  display:flex; flex-wrap:wrap; gap:8px; padding:10px 0 16px;
   border-bottom:1px solid var(--line); margin-bottom:20px;
 }
 .tab-btn{
-  flex:none; background:none; border:none; color:var(--chalk-dim);
-  padding:8px 14px; font-size:0.88rem; font-weight:600; border-radius:8px 8px 0 0;
-  border-bottom:3px solid transparent; white-space:nowrap;
+  flex:none; display:flex; flex-direction:column; align-items:center; gap:5px;
+  background:var(--bg-panel-2); border:1px solid var(--line); color:var(--chalk-dim);
+  padding:10px 14px 8px; min-width:78px; font-size:0.74rem; font-weight:600;
+  border-radius:12px; white-space:nowrap; letter-spacing:0.01em;
+  transition:transform 0.12s ease, border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
-.tab-btn.active{color:var(--amber); border-bottom-color:var(--amber); background:rgba(232,163,61,0.06);}
-.tab-btn:hover:not(.active){color:var(--chalk);}
+.tab-btn .tab-icon{color:inherit;}
+.tab-btn:hover:not(.active){color:var(--chalk); border-color:var(--amber-dim); transform:translateY(-1px);}
+.tab-btn.active{
+  color:#20160a; background:var(--amber); border-color:var(--amber);
+  box-shadow:0 6px 16px rgba(232,163,61,0.28);
+}
 @media(max-width:600px){
-  .tab-btn{padding:7px 10px; font-size:0.82rem;}
+  .tabs{gap:6px;}
+  .tab-btn{min-width:64px; padding:8px 8px 6px; font-size:0.68rem;}
+  .tab-btn .tab-icon{width:17px; height:17px;}
 }
 
 /* ---------- cards / panels ---------- */
