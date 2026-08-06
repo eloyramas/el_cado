@@ -401,6 +401,7 @@ function renderApp(){
         ${tabBtn('cuotas','Cuotas','coin')}
         ${tabBtn('reservas','Reservas','calendar-check')}
         ${tabBtn('reuniones','Reuniones','calendar')}
+        ${tabBtn('reparto','Reparto','split')}
         ${tabBtn('inventario','Inventario','box')}
         ${tabBtn('caja','Gastos e ingresos','wallet')}
         ${tabBtn('bebidas','Bebidas','cup')}
@@ -424,6 +425,7 @@ const TAB_ICON_PATHS = {
   'check': '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l2.6 2.6L16.5 9"/>',
   'key': '<circle cx="8" cy="15" r="4.2"/><path d="M11 12l9-9"/><path d="M16 6l3 3"/><path d="M13.5 8.5l2.3 2.3"/>',
   'user': '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+  'split': '<path d="M4 7h13"/><path d="M13 3l4 4-4 4"/><path d="M20 17H7"/><path d="M11 21l-4-4 4-4"/>',
 };
 function tabIcon(name){
   const path = TAB_ICON_PATHS[name] || '';
@@ -439,6 +441,7 @@ function renderTab(){
     case 'cuotas': return renderCuotas();
     case 'reservas': return renderReservas();
     case 'reuniones': return renderReuniones();
+    case 'reparto': return renderReparto();
     case 'inventario': return renderInventario();
     case 'caja': return renderCaja();
     case 'bebidas': return renderBebidas();
@@ -796,6 +799,111 @@ function renderReuniones(){
         ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
       </div>`;
     }).join('')}
+  </div>`;
+}
+
+/* ============ REPARTO DE GASTOS (tipo Tricount) ============ */
+function renderReparto(){
+  const eventos = state.gastos_eventos || [];
+  const activos = state.socios.filter(s=>s.activo);
+  return `
+  <div class="card">
+    <h2><span class="pin"></span>Nuevo evento (cena, quedada...)</h2>
+    <form data-form="add-gasto-evento">
+      <div class="form-row">
+
+        <div><label class="f">Nombre del evento</label><input type="text" name="nombre" required placeholder="Ej: Cena de verano"></div>
+
+        <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
+      <label class="f">Quien participa</label>
+      <div class="role-options" style="margin-bottom:12px;">
+        ${activos.map(s=>`<label class="role-option"><input type="checkbox" name="participantes" value="${s.id}" ${s.id===state.current_user?'checked':''}> ${escapeHtml(s.nombre)}</label>`).join('')}
+      </div>
+      <button class="btn" type="submit">Crear evento</button>
+    </form>
+  </div>
+  ${eventos.length===0 ? '<div class="card"><p class="empty">Todavia no hay eventos de reparto de gastos.</p></div>' : eventos.map(ev=>renderGastoEvento(ev)).join('')}
+  `;
+}
+
+function renderGastoEvento(ev){
+  const participantesSet = new Set(ev.participantes||[]);
+  const puedeBorrarEvento = ev.creado_por===state.current_user || can('manage_finances');
+  const soyParticipante = participantesSet.has(state.current_user);
+  const noParticipantes = state.socios.filter(s=>s.activo && !participantesSet.has(s.id));
+  const pagos = ev.pagos||[];
+  const balances = ev.balances||{};
+  const transferencias = ev.transferencias||[];
+  return `
+  <div class="card">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--amber);">${money(ev.total)}</span>
+        ${puedeBorrarEvento ? `<button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar evento</button>` : ''}
+      </span>
+    </h2>
+    ${ev.notas ? `<p class="meta" style="margin:-4px 0 10px;">${escapeHtml(ev.notas)}</p>` : ''}
+
+    <label class="f">Participantes</label>
+    <div class="role-options" style="margin-bottom:10px;">
+      ${(ev.participantes||[]).map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))} <button data-action="quitar-participante-evento" data-evento="${ev.id}" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') || '<span class="empty">Sin participantes.</span>'}
+    </div>
+    ${noParticipantes.length ? `
+    <div class="form-row" style="align-items:flex-end; margin-bottom:14px;">
+      <div><label class="f">Anadir participante</label><select data-nuevo-participante="${ev.id}">${noParticipantes.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-evento" data-evento="${ev.id}">+ Anadir</button></div>
+    </div>` : ''}
+
+    ${(ev.participantes||[]).length ? `
+    <label class="f">Saldos</label>
+    <div style="margin-bottom:10px;">
+      ${(ev.participantes||[]).map(sid=>{
+        const b = balances[sid]||0;
+        const cls = b>0.005 ? 'sage' : (b<-0.005 ? 'rust' : '');
+        const texto = b>0.005 ? `le deben ${money(b)}` : (b<-0.005 ? `debe ${money(-b)}` : 'en paz');
+        return `<div class="menu-row"><span class="label">${escapeHtml(socioNombre(sid))}</span><span class="dots"></span><span class="value ${cls}">${texto}</span></div>`;
+      }).join('')}
+    </div>` : ''}
+
+    ${transferencias.length ? `
+    <label class="f">Quien paga a quien</label>
+    <div style="margin-bottom:10px;">
+      ${transferencias.map(t=>`<div class="menu-row"><span class="label">${escapeHtml(socioNombre(t.de))} &rarr; ${escapeHtml(socioNombre(t.a))}</span><span class="dots"></span><span class="value amber">${money(t.importe)}</span></div>`).join('')}
+    </div>` : ''}
+
+    <label class="f">Pagos registrados</label>
+    ${pagos.length===0 ? '<p class="empty">Sin pagos todavia.</p>' : pagos.map(p=>{
+      const puedeBorrarPago = p.pagador_id===state.current_user || puedeBorrarEvento;
+      const beneficiarios = (p.beneficiarios&&p.beneficiarios.length) ? p.beneficiarios.map(socioNombre).join(', ') : 'todos los participantes';
+      return `<div class="list-item">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(p.concepto)}</div>
+          <div class="meta">Pago de ${escapeHtml(socioNombre(p.pagador_id))} - ${fmtDate(p.fecha)} - reparte entre: ${escapeHtml(beneficiarios)}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--sage);">${money(p.importe)}</span>
+          ${puedeBorrarPago ? `<button class="btn danger small" data-action="delete-pago-evento" data-evento="${ev.id}" data-id="${p.id}">Borrar</button>` : ''}
+        </div>
+      </div>`;
+    }).join('')}
+
+    ${soyParticipante ? `
+    <form data-form="add-pago-evento" data-evento="${ev.id}" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);">
+      <label class="f">Registrar un pago</label>
+      <div class="form-row">
+        <div><label class="f">Quien pago</label><select name="pagador_id">${(ev.participantes||[]).map(sid=>`<option value="${sid}" ${sid===state.current_user?'selected':''}>${escapeHtml(socioNombre(sid))}</option>`).join('')}</select></div>
+        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Cena, bebidas, gasolina..."></div>
+        <div><label class="f">Importe (&euro;)</label><input type="number" step="0.01" min="0.01" name="importe" required></div>
+      </div>
+      <label class="f">Entre quien se reparte (deja todo marcado para repartir entre todos)</label>
+      <div class="role-options" style="margin-bottom:10px;">
+        ${(ev.participantes||[]).map(sid=>`<label class="role-option"><input type="checkbox" name="beneficiarios" value="${sid}" checked> ${escapeHtml(socioNombre(sid))}</label>`).join('')}
+      </div>
+      <button class="btn ghost" type="submit">Anadir pago</button>
+    </form>` : '<p class="readonly-note" style="margin-top:14px;">Solo quien participa en el evento puede anadir pagos.</p>'}
   </div>`;
 }
 
@@ -1300,6 +1408,22 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-reserva'){
       if(confirm('�Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='delete-gasto-evento'){
+      if(confirm('Borrar este evento y todos sus pagos?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='quitar-participante-evento'){
+      await apiPost(`/api/gastos-eventos/${btn.dataset.evento}/participantes/toggle`, {socio_id: btn.dataset.socio});
+      await loadState(); render();
+    }
+    else if(action==='anadir-participante-evento'){
+      const select = document.querySelector(`select[data-nuevo-participante="${btn.dataset.evento}"]`);
+      if(!select || !select.value) return;
+      await apiPost(`/api/gastos-eventos/${btn.dataset.evento}/participantes/toggle`, {socio_id: select.value});
+      await loadState(); render();
+    }
+    else if(action==='delete-pago-evento'){
+      if(confirm('Borrar este pago?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.evento}/pagos/${btn.dataset.id}`); await loadState(); render(); }
+    }
     else if(action==='delete-familiar'){
       await apiDelete(`/api/familiares/${btn.dataset.id}`); await loadState(); render();
     }
@@ -1408,6 +1532,15 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='add-fiesta-gasto'){ await apiPost('/api/fiestas', data); }
     else if(type==='add-reserva'){ await apiPost('/api/reservas', data); }
+    else if(type==='add-gasto-evento'){
+      const participantes = new FormData(form).getAll('participantes');
+      await apiPost('/api/gastos-eventos', {nombre: data.nombre, fecha: data.fecha, notas: data.notas, participantes});
+    }
+    else if(type==='add-pago-evento'){
+      const eid = form.dataset.evento;
+      const beneficiarios = new FormData(form).getAll('beneficiarios');
+      await apiPost(`/api/gastos-eventos/${eid}/pagos`, {pagador_id: data.pagador_id, concepto: data.concepto, importe: data.importe, beneficiarios});
+    }
     else if(type==='save-perfil'){ await apiPost('/api/perfil', data); }
     else if(type==='change-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }

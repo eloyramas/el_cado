@@ -196,6 +196,30 @@ CREATE TABLE IF NOT EXISTS socio_roles (
     FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE CASCADE,
     FOREIGN KEY (rol_id) REFERENCES roles(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS gastos_eventos (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    notas TEXT DEFAULT '',
+    creado_por TEXT,
+    creado_en TEXT
+);
+CREATE TABLE IF NOT EXISTS gastos_evento_participantes (
+    evento_id TEXT NOT NULL,
+    socio_id TEXT NOT NULL,
+    PRIMARY KEY (evento_id, socio_id),
+    FOREIGN KEY (evento_id) REFERENCES gastos_eventos(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS gastos_evento_pagos (
+    id TEXT PRIMARY KEY,
+    evento_id TEXT NOT NULL,
+    pagador_id TEXT NOT NULL,
+    concepto TEXT NOT NULL,
+    importe REAL NOT NULL,
+    fecha TEXT NOT NULL,
+    beneficiarios TEXT NOT NULL DEFAULT '[]',
+    FOREIGN KEY (evento_id) REFERENCES gastos_eventos(id) ON DELETE CASCADE
+);
 """
 
 
@@ -283,6 +307,42 @@ def new_id():
 
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
+
+
+def calcular_balances_evento(participantes, pagos):
+    """balances[socio_id]: positivo = le deben, negativo = debe."""
+    balances = {sid: 0.0 for sid in participantes}
+    for pago in pagos:
+        beneficiarios = [b for b in (pago["beneficiarios"] or participantes) if b in balances]
+        if not beneficiarios:
+            beneficiarios = list(participantes)
+        share = pago["importe"] / len(beneficiarios)
+        if pago["pagador_id"] in balances:
+            balances[pago["pagador_id"]] += pago["importe"]
+        for b in beneficiarios:
+            balances[b] -= share
+    return {sid: round(v, 2) for sid, v in balances.items()}
+
+
+def calcular_transferencias_evento(balances):
+    """Lista minima de pagos {de, a, importe} para saldar el evento."""
+    deudores = sorted([[sid, -v] for sid, v in balances.items() if v < -0.005], key=lambda x: -x[1])
+    acreedores = sorted([[sid, v] for sid, v in balances.items() if v > 0.005], key=lambda x: -x[1])
+    transferencias = []
+    i = j = 0
+    while i < len(deudores) and j < len(acreedores):
+        deudor_id, debe = deudores[i]
+        acreedor_id, le_deben = acreedores[j]
+        importe = min(debe, le_deben)
+        if importe > 0.005:
+            transferencias.append({"de": deudor_id, "a": acreedor_id, "importe": round(importe, 2)})
+        deudores[i][1] -= importe
+        acreedores[j][1] -= importe
+        if deudores[i][1] <= 0.005:
+            i += 1
+        if acreedores[j][1] <= 0.005:
+            j += 1
+    return transferencias
 
 
 def current_socio_id():
@@ -454,6 +514,33 @@ def state():
         movimientos, bebidas_precios, bebidas_consumos, fiestas_gastos = [], [], [], []
     reservas = [dict(r) for r in db.execute("SELECT * FROM reservas ORDER BY fecha")]
 
+    gastos_eventos = []
+    for r in db.execute("SELECT * FROM gastos_eventos ORDER BY fecha DESC"):
+        evento = dict(r)
+        participantes = [
+            p["socio_id"]
+            for p in db.execute(
+                "SELECT socio_id FROM gastos_evento_participantes WHERE evento_id = ?", (evento["id"],)
+            )
+        ]
+        pagos = []
+        for p in db.execute(
+            "SELECT * FROM gastos_evento_pagos WHERE evento_id = ? ORDER BY fecha DESC", (evento["id"],)
+        ):
+            pago = dict(p)
+            try:
+                pago["beneficiarios"] = json.loads(pago["beneficiarios"])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pago["beneficiarios"] = []
+            pagos.append(pago)
+        balances = calcular_balances_evento(participantes, pagos)
+        evento["participantes"] = participantes
+        evento["pagos"] = pagos
+        evento["balances"] = balances
+        evento["transferencias"] = calcular_transferencias_evento(balances)
+        evento["total"] = round(sum(p["importe"] for p in pagos), 2)
+        gastos_eventos.append(evento)
+
     responsables = {t: [] for t in TAREAS_FIJAS}
     for r in db.execute("SELECT * FROM tareas_asignadas"):
         responsables.setdefault(r["tarea"], []).append(r["socio_id"])
@@ -474,6 +561,7 @@ def state():
             "bebidas_consumos": bebidas_consumos,
             "fiestas_gastos": fiestas_gastos,
             "reservas": reservas,
+            "gastos_eventos": gastos_eventos,
             "responsables": responsables,
             "tareas_fijas": TAREAS_FIJAS,
             "current_user": sid,
@@ -1044,6 +1132,140 @@ def delete_fiesta_gasto(fid):
         return err("No tienes permiso para borrar gastos.")
     db = get_db()
     db.execute("DELETE FROM fiestas_gastos WHERE id = ?", (fid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- reparto de gastos por evento --
+@app.route("/api/gastos-eventos", methods=["POST"])
+def add_gasto_evento():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre del evento es obligatorio.", 400)
+    db = get_db()
+    validos = {r["id"] for r in db.execute("SELECT id FROM socios")}
+    participantes = data.get("participantes") or []
+    if not isinstance(participantes, list):
+        participantes = []
+    participantes = [p for p in participantes if p in validos]
+    if sid not in participantes:
+        participantes.append(sid)
+    eid = new_id()
+    db.execute(
+        "INSERT INTO gastos_eventos (id, nombre, fecha, notas, creado_por, creado_en) VALUES (?,?,?,?,?,?)",
+        (eid, nombre, data.get("fecha") or date.today().isoformat(), (data.get("notas") or "").strip(), sid, now_iso()),
+    )
+    db.executemany(
+        "INSERT OR IGNORE INTO gastos_evento_participantes (evento_id, socio_id) VALUES (?, ?)",
+        [(eid, p) for p in participantes],
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": eid})
+
+
+@app.route("/api/gastos-eventos/<eid>", methods=["DELETE"])
+def delete_gasto_evento(eid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT creado_por FROM gastos_eventos WHERE id = ?", (eid,)).fetchone()
+    if not row:
+        return err("Evento no encontrado", 404)
+    if row["creado_por"] != sid and not has_permission(sid, "manage_finances"):
+        return err("Solo quien creo el evento (o quien gestiona finanzas) puede borrarlo.")
+    db.execute("DELETE FROM gastos_evento_pagos WHERE evento_id = ?", (eid,))
+    db.execute("DELETE FROM gastos_evento_participantes WHERE evento_id = ?", (eid,))
+    db.execute("DELETE FROM gastos_eventos WHERE id = ?", (eid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-eventos/<eid>/participantes/toggle", methods=["POST"])
+def toggle_gasto_evento_participante(eid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    target = data.get("socio_id")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM gastos_eventos WHERE id = ?", (eid,)).fetchone():
+        return err("Evento no encontrado", 404)
+    if not db.execute("SELECT 1 FROM socios WHERE id = ?", (target,)).fetchone():
+        return err("Socio no encontrado", 404)
+    ya = db.execute(
+        "SELECT 1 FROM gastos_evento_participantes WHERE evento_id = ? AND socio_id = ?", (eid, target)
+    ).fetchone()
+    if ya:
+        tiene_pagos = db.execute(
+            "SELECT 1 FROM gastos_evento_pagos WHERE evento_id = ? AND pagador_id = ?", (eid, target)
+        ).fetchone()
+        if tiene_pagos:
+            return err("Este socio ya tiene pagos registrados en el evento: borralos primero.", 400)
+        db.execute("DELETE FROM gastos_evento_participantes WHERE evento_id = ? AND socio_id = ?", (eid, target))
+    else:
+        db.execute("INSERT INTO gastos_evento_participantes (evento_id, socio_id) VALUES (?, ?)", (eid, target))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-eventos/<eid>/pagos", methods=["POST"])
+def add_gasto_evento_pago(eid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM gastos_eventos WHERE id = ?", (eid,)).fetchone():
+        return err("Evento no encontrado", 404)
+    data = request.get_json(force=True)
+    participantes = {
+        r["socio_id"] for r in db.execute("SELECT socio_id FROM gastos_evento_participantes WHERE evento_id = ?", (eid,))
+    }
+    pagador_id = data.get("pagador_id")
+    if pagador_id not in participantes:
+        return err("El pagador debe ser uno de los participantes del evento.", 400)
+    beneficiarios = data.get("beneficiarios") or []
+    if not isinstance(beneficiarios, list):
+        beneficiarios = []
+    beneficiarios = [b for b in beneficiarios if b in participantes]
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    if importe <= 0:
+        return err("El importe debe ser mayor que 0.", 400)
+    concepto = (data.get("concepto") or "").strip()
+    if not concepto:
+        return err("El concepto es obligatorio.", 400)
+    pid = new_id()
+    db.execute(
+        "INSERT INTO gastos_evento_pagos (id, evento_id, pagador_id, concepto, importe, fecha, beneficiarios) VALUES (?,?,?,?,?,?,?)",
+        (pid, eid, pagador_id, concepto, importe, data.get("fecha") or date.today().isoformat(), json.dumps(beneficiarios)),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": pid})
+
+
+@app.route("/api/gastos-eventos/<eid>/pagos/<pid>", methods=["DELETE"])
+def delete_gasto_evento_pago(eid, pid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    pago = db.execute(
+        "SELECT pagador_id FROM gastos_evento_pagos WHERE id = ? AND evento_id = ?", (pid, eid)
+    ).fetchone()
+    if not pago:
+        return err("Pago no encontrado", 404)
+    evento = db.execute("SELECT creado_por FROM gastos_eventos WHERE id = ?", (eid,)).fetchone()
+    puede = sid == pago["pagador_id"] or (evento and sid == evento["creado_por"]) or has_permission(sid, "manage_finances")
+    if not puede:
+        return err("Solo quien pago, quien creo el evento o quien gestiona finanzas puede borrar este pago.")
+    db.execute("DELETE FROM gastos_evento_pagos WHERE id = ?", (pid,))
     db.commit()
     return jsonify({"ok": True})
 
