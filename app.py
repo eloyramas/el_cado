@@ -1,16 +1,16 @@
 """
-El Cado - gestor de la peÃ±a
+El Cado - gestor de la pena
 ----------------------------
 Backend Flask + SQLite.
 
 Roles:
-- El primer socio que se crea (cuando la base de datos estÃ¡ vacÃ­a) se
-  convierte automÃ¡ticamente en administrador.
-- Solo el administrador puede: aÃ±adir socios, dar de baja/reactivar
-  socios, renombrar la peÃ±a, y aÃ±adir/borrar movimientos de caja
+- El primer socio que se crea (cuando la base de datos esta vacia) se
+  convierte automaticamente en administrador.
+- Solo el administrador puede: anadir socios, dar de baja/reactivar
+  socios, renombrar la pena, y anadir/borrar movimientos de caja
   (gastos e ingresos).
 - Cualquier socio puede: marcar SU PROPIA cuota (el admin puede marcar
-  cualquiera), reservar la peÃ±a, apuntarse a tareas, editar su propio
+  cualquiera), reservar la pena, apuntarse a tareas, editar su propio
   perfil (incluido su nombre), y ver todo en modo lectura.
 
 Para arrancar en local:
@@ -47,7 +47,7 @@ DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR,
 AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
 
 app = Flask(__name__)
-# En producciÃ³n, define la variable de entorno SECRET_KEY con un valor propio.
+# En produccion, define la variable de entorno SECRET_KEY con un valor propio.
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
 
 TAREAS_FIJAS = ["Compras", "Limpieza", "Tesoreria", "Carrozas", "Concursos", "Comidas", "Otros"]
@@ -260,7 +260,7 @@ def init_db():
         try:
             db.execute("ALTER TABLE socios ADD COLUMN pin_hash TEXT")
         except sqlite3.OperationalError:
-            pass  # ya existÃ­a (base de datos creada con una versiÃ³n anterior)
+            pass  # ya existia (base de datos creada con una version anterior)
         try:
             db.execute("ALTER TABLE socios ADD COLUMN must_change_pin INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
@@ -277,7 +277,7 @@ def init_db():
             db.execute("ALTER TABLE bebidas_consumos ADD COLUMN pagado INTEGER NOT NULL DEFAULT 1")
         except sqlite3.OperationalError:
             pass
-        # MigraciÃ³n: actualizar tabla reuniones si existe con estructura antigua
+        # Migracion: actualizar tabla reuniones si existe con estructura antigua
         try:
             cur = db.execute("PRAGMA table_info(reuniones)")
             columns = [row[1] for row in cur.fetchall()]
@@ -314,7 +314,7 @@ def init_db():
                 "INSERT OR IGNORE INTO roles (id, nombre, permisos, es_sistema) VALUES (?, ?, ?, ?)",
                 (role_id, nombre, json.dumps(permisos), es_sistema),
             )
-        # Las instalaciones previas solo tenían is_admin. Se traduce a un rol asignado.
+        # Las instalaciones previas solo tenian is_admin. Se traduce a un rol asignado.
         for socio in db.execute("SELECT id, is_admin FROM socios"):
             default_role = "administrador" if socio["is_admin"] else "socio"
             db.execute(
@@ -381,7 +381,7 @@ def current_socio_id():
 
 
 def require_login():
-    """Devuelve el id del socio en sesiÃ³n, o None. Limpia la sesiÃ³n si el socio ya no existe."""
+    """Devuelve el id del socio en sesion, o None. Limpia la sesion si el socio ya no existe."""
     sid = current_socio_id()
     if not sid:
         return None
@@ -432,7 +432,7 @@ def err(msg, code=403):
     return jsonify({"error": msg}), code
 
 
-# ---------------------------------------------------------------- pÃ¡ginas --
+# ---------------------------------------------------------------- paginas --
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -451,7 +451,7 @@ def random_pin():
     return f"{random.randint(0, 9999):04d}"
 
 
-# ---------------------------------------------------------------- sesiÃ³n --
+# ---------------------------------------------------------------- sesion --
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json(force=True)
@@ -462,11 +462,11 @@ def login():
     if not row:
         return err("Socio no encontrado", 404)
     if not row["activo"]:
-        return err("Este socio estÃ¡ dado de baja", 403)
+        return err("Este socio esta dado de baja", 403)
     if row["pin_hash"]:
         if not pin or not check_password_hash(row["pin_hash"], pin):
             return err("PIN incorrecto.", 403)
-    # Si el socio todavÃ­a no tiene PIN configurado (cuentas antiguas), se deja
+    # Si el socio todavia no tiene PIN configurado (cuentas antiguas), se deja
     # entrar sin comprobarlo; se le anima a crear uno desde "Mi perfil".
     session["socio_id"] = socio_id
     return jsonify({"ok": True})
@@ -612,7 +612,7 @@ def state():
 @app.route("/api/config", methods=["POST"])
 def update_config():
     if not require_permission("manage_config"):
-        return err("Solo el administrador puede renombrar la peÃ±a o cambiar la cuota.")
+        return err("Solo el administrador puede renombrar la pena o cambiar la cuota.")
     data = request.get_json(force=True)
     db = get_db()
     try:
@@ -642,18 +642,18 @@ def add_socio():
     if total == 0:
         # Bootstrap: el primer socio que se crea es el administrador y DEBE fijar un PIN.
         if not valid_pin(pin):
-            return err("El PIN debe tener 4 dÃ­gitos.", 400)
+            return err("El PIN debe tener 4 digitos.", 400)
         is_admin = 1
         pin_generado = None
         must_change = 0  # el propio admin ha elegido su PIN, no hace falta forzar cambio
     else:
         if not require_permission("manage_socios"):
-            return err("Solo el administrador puede aÃ±adir socios nuevos.")
+            return err("Solo el administrador puede anadir socios nuevos.")
         is_admin = 0
-        must_change = 1  # el PIN lo ha puesto el administrador: se le obligarÃ¡ a cambiarlo
+        must_change = 1  # el PIN lo ha puesto el administrador: se le obligara a cambiarlo
         if pin:
             if not valid_pin(pin):
-                return err("El PIN debe tener 4 dÃ­gitos.", 400)
+                return err("El PIN debe tener 4 digitos.", 400)
             pin_generado = None
         else:
             pin = random_pin()
@@ -669,7 +669,7 @@ def add_socio():
     db.commit()
 
     if total == 0:
-        session["socio_id"] = sid  # login automÃ¡tico del primer administrador
+        session["socio_id"] = sid  # login automatico del primer administrador
 
     return jsonify({"ok": True, "id": sid, "is_admin": bool(is_admin), "pin_generado": pin_generado})
 
@@ -747,7 +747,7 @@ def update_socio_roles(sid):
     valid_ids = {r["id"] for r in db.execute("SELECT id FROM roles")}
     if any(role_id not in valid_ids for role_id in role_ids):
         return err("Uno de los roles no existe.", 400)
-    # Evita que alguien se quite a s� mismo el �ltimo rol con permiso para administrar roles.
+    # Evita que alguien se quite a si mismo eel ultimo rol con permiso para administrar roles.
     if sid == current_socio_id():
         permitted = set()
         for role in db.execute("SELECT permisos FROM roles WHERE id IN ({})".format(",".join("?" for _ in role_ids)), role_ids):
@@ -771,7 +771,7 @@ def create_role():
     if not nombre:
         return err("El nombre del rol es obligatorio.", 400)
     if not isinstance(permisos, list) or any(p not in PERMISSIONS for p in permisos):
-        return err("La lista de permisos no es v�lida.", 400)
+        return err("La lista de permisos no es valida.", 400)
     db = get_db()
     role_id = new_id()
     try:
@@ -789,9 +789,9 @@ def update_role(role_id):
     data = request.get_json(force=True)
     permisos = data.get("permisos") or []
     if not isinstance(permisos, list) or any(p not in PERMISSIONS for p in permisos):
-        return err("La lista de permisos no es v�lida.", 400)
+        return err("La lista de permisos no es valida.", 400)
     if role_id == "administrador" and "manage_roles" not in permisos:
-        return err("El rol Administrador debe conservar la gesti�n de roles.", 400)
+        return err("El rol Administrador debe conservar la gestion de roles.", 400)
     db = get_db()
     if not db.execute("SELECT 1 FROM roles WHERE id = ?", (role_id,)).fetchone():
         return err("Rol no encontrado", 404)
@@ -804,7 +804,7 @@ def update_role(role_id):
 def update_perfil():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     db = get_db()
 
@@ -815,7 +815,7 @@ def update_perfil():
     pin = (data.get("pin") or "").strip()
     if pin:
         if not valid_pin(pin):
-            return err("El PIN debe tener 4 dÃ­gitos.", 400)
+            return err("El PIN debe tener 4 digitos.", 400)
         db.execute("UPDATE socios SET pin_hash = ?, must_change_pin = 0 WHERE id = ?", (generate_password_hash(pin), sid))
 
     db.execute(
@@ -830,11 +830,11 @@ def update_perfil():
 def change_own_pin():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     pin = (data.get("pin") or "").strip()
     if not valid_pin(pin):
-        return err("El PIN debe tener 4 dÃ­gitos.", 400)
+        return err("El PIN debe tener 4 digitos.", 400)
     db = get_db()
     db.execute("UPDATE socios SET pin_hash = ?, must_change_pin = 0 WHERE id = ?", (generate_password_hash(pin), sid))
     db.commit()
@@ -845,7 +845,7 @@ def change_own_pin():
 def add_familiar():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
     if not nombre:
@@ -864,7 +864,7 @@ def add_familiar():
 def delete_familiar(fid):
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     db = get_db()
     db.execute("DELETE FROM familiares WHERE id = ? AND socio_id = ?", (fid, sid))
     db.commit()
@@ -875,14 +875,14 @@ def delete_familiar(fid):
 def upload_foto(sid):
     sid_session = require_login()
     if not sid_session:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     if sid_session != sid and not has_permission(sid_session, "manage_socios"):
         return err("No puedes cambiar la foto de otro socio.")
     if not PIL_OK:
         return err(
             "Falta instalar una dependencia en el servidor: ejecuta "
             "'pip install -r requirements.txt' (o 'pip install Pillow') "
-            "y reinicia la aplicaciÃ³n.",
+            "y reinicia la aplicacion.",
             500,
         )
     if "foto" not in request.files or request.files["foto"].filename == "":
@@ -901,7 +901,7 @@ def upload_foto(sid):
         except Exception:
             return err(
                 "No se pudo leer esa imagen. Prueba con un archivo .jpg o .png "
-                "(si es una foto de iPhone en formato HEIC, conviÃ©rtela a JPG antes de subirla).",
+                "(si es una foto de iPhone en formato HEIC, conviertela a JPG antes de subirla).",
                 400,
             )
         im = ImageOps.exif_transpose(im).convert("RGB")
@@ -922,12 +922,12 @@ def upload_foto(sid):
 def toggle_cuota():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     socio_id, year, month = data.get("socio_id"), int(data.get("year")), int(data.get("month"))
 
     if socio_id != sid and not has_permission(sid, "manage_cuotas"):
-        return err("Solo puedes marcar tu propia cuota. PÃ­deselo al administrador si es de otro socio.")
+        return err("Solo puedes marcar tu propia cuota. Pideselo al administrador si es de otro socio.")
 
     db = get_db()
     row = db.execute(
@@ -1036,7 +1036,7 @@ def delete_inventario(iid):
 @app.route("/api/movimientos", methods=["POST"])
 def add_movimiento():
     if not require_permission("manage_finances"):
-        return err("Solo el administrador puede aÃ±adir gastos o ingresos.")
+        return err("Solo el administrador puede anadir gastos o ingresos.")
     data = request.get_json(force=True)
     db = get_db()
     socio_id = data.get("socio_id") or None
@@ -1330,7 +1330,7 @@ def delete_gasto_evento_pago(eid, pid):
 def add_reserva():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     db = get_db()
     rid = new_id()
@@ -1355,7 +1355,7 @@ def add_reserva():
 def delete_reserva(rid):
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     db = get_db()
     row = db.execute("SELECT socio_id FROM reservas WHERE id = ?", (rid,)).fetchone()
     if not row:
@@ -1479,12 +1479,12 @@ def delete_tarea_ticket(tid):
 @app.route("/api/export.xlsx")
 def export_excel():
     if not require_permission("export_data"):
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     if not OPENPYXL_OK:
         return err(
             "Falta instalar una dependencia en el servidor: ejecuta "
             "'pip install -r requirements.txt' (o 'pip install openpyxl') "
-            "y reinicia la aplicaciÃ³n.",
+            "y reinicia la aplicacion.",
             500,
         )
 
@@ -1518,7 +1518,7 @@ def _build_excel():
     ).fetchall()
     write_sheet(
         ws1,
-        ["Fecha", "Tipo", "CategorÃ­a", "Socio", "Concepto", "Importe (â‚¬)"],
+        ["Fecha", "Tipo", "Categoria", "Socio", "Concepto", "Importe (a,)"],
         [[m["fecha"], m["tipo"], m["categoria"], m["socio_nombre"] or "", m["concepto"], m["importe"]] for m in movs],
     )
 
@@ -1528,23 +1528,23 @@ def _build_excel():
     ).fetchall()
     write_sheet(
         ws2,
-        ["Socio", "AÃ±o", "Mes", "Importe (â‚¬)", "Pagado", "Fecha de pago"],
-        [[c["socio_nombre"], c["year"], c["month"], c["importe"], "SÃ­" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
+        ["Socio", "Ano", "Mes", "Importe (a,)", "Pagado", "Fecha de pago"],
+        [[c["socio_nombre"], c["year"], c["month"], c["importe"], "Si" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
     )
 
     ws3 = wb.create_sheet("Bebidas")
     consumos = db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha").fetchall()
     write_sheet(
         ws3,
-        ["Fecha", "Consumidor", "Socio", "Cantidad", "Importe (â‚¬)"],
-        [[c["fecha"], c["consumidor"], "SÃ­" if c["es_socio"] else "No", c["cantidad"], c["importe"]] for c in consumos],
+        ["Fecha", "Consumidor", "Socio", "Cantidad", "Importe (a,)"],
+        [[c["fecha"], c["consumidor"], "Si" if c["es_socio"] else "No", c["cantidad"], c["importe"]] for c in consumos],
     )
 
     ws4 = wb.create_sheet("Gastos fiestas")
     fiestas = db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha").fetchall()
     write_sheet(
         ws4,
-        ["Fecha", "Evento", "Concepto", "Importe (â‚¬)"],
+        ["Fecha", "Evento", "Concepto", "Importe (a,)"],
         [[f["fecha"], f["evento"], f["concepto"], f["importe"]] for f in fiestas],
     )
 
@@ -1552,7 +1552,7 @@ def _build_excel():
     inventario = db.execute("SELECT * FROM inventario ORDER BY categoria, nombre").fetchall()
     write_sheet(
         ws4b,
-        ["CategorÃ­a", "Nombre", "Cantidad", "Estado", "Notas"],
+        ["Categoria", "Nombre", "Cantidad", "Estado", "Notas"],
         [[i["categoria"], i["nombre"], i["cantidad"], i["estado"], i["notas"] or ""] for i in inventario],
     )
 
@@ -1564,7 +1564,7 @@ def _build_excel():
     saldo = ingresos_cuotas + ingresos_mov + ingresos_bebidas - gastos_mov - gastos_fiestas
 
     ws5 = wb.create_sheet("Resumen")
-    ws5.append(["Concepto", "Importe (â‚¬)"])
+    ws5.append(["Concepto", "Importe (a,)"])
     for cell in ws5[1]:
         cell.fill = header_fill
         cell.font = header_font
