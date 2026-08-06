@@ -425,16 +425,25 @@ textarea{resize:vertical; min-height:60px;}
 .cuota-cell[disabled]{opacity:0.45; cursor:default;}
 .cuota-cell.mine{border-color:var(--amber-dim);}
 
-.tarea-card .chip-row{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0;}
-.tarea-chip{
-  display:inline-flex; align-items:center; gap:6px; background:var(--bg-panel-2);
-  border:1px solid var(--line); border-radius:20px; padding:4px 6px 4px 12px; font-size:0.82rem;
+/* calendario de tareas */
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.cal-weekday{font-size:0.68rem; color:var(--chalk-dim); text-align:center; padding:4px 0; text-transform:uppercase; letter-spacing:0.3px;}
+.cal-day{
+  background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px;
+  min-height:64px; padding:4px; font-size:0.7rem; overflow:hidden;
 }
-.tarea-chip button{
-  background:none; border:none; color:var(--chalk-dim); width:18px; height:18px; border-radius:50%;
-  line-height:1; font-size:0.8rem;
+.cal-day-empty{background:transparent; border-color:transparent;}
+.cal-day-num{font-weight:600; color:var(--chalk-dim); margin-bottom:3px;}
+.cal-ticket{
+  background:var(--bg-raised); border-radius:4px; padding:2px 4px; margin-bottom:2px;
+  font-size:0.64rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--chalk);
 }
-.tarea-chip button:hover{color:var(--rust);}
+.cal-ticket.ok{background:rgba(127,168,140,0.28); color:var(--sage);}
+.cal-ticket.warn{background:rgba(193,85,58,0.24); color:var(--rust);}
+@media(max-width:600px){
+  .cal-day{min-height:48px; font-size:0.6rem; padding:3px;}
+  .cal-ticket{font-size:0.56rem;}
+}
 
 /* avatares */
 .avatar{

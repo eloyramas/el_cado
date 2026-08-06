@@ -1207,49 +1207,108 @@ function renderBebidasFiestas(){
 }
 
 /* ============ TAREAS ============ */
+const ESTADO_LABELS = {pendiente:'Pendiente', en_curso:'En curso', hecho:'Hecho'};
+const ESTADO_CLASS = {pendiente:'warn', en_curso:'', hecho:'ok'};
+const ESTADO_CICLO = {pendiente:'en_curso', en_curso:'hecho', hecho:'pendiente'};
+const ROTACION_OPCIONES = ['', 'Semanal', 'Quincenal', 'Mensual'];
+let tareasSubtab = 'lista';
+let tareasCalFecha = new Date();
+
 function renderEncargados(){
-  const admin = can('manage_tasks');
+  return `
+  <div class="subtabs">
+    <button class="subtab-btn ${tareasSubtab==='lista'?'active':''}" data-action="tareas-subtab" data-sub="lista">Lista</button>
+    <button class="subtab-btn ${tareasSubtab==='calendario'?'active':''}" data-action="tareas-subtab" data-sub="calendario">Calendario</button>
+  </div>
+  <div class="card">
+    <h2><span class="pin"></span>Nuevo ticket de tarea</h2>
+    <form data-form="add-tarea-ticket">
+      <div class="form-row">
+        <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required placeholder="Ej: Compras, Limpieza..."></div>
+        <div><label class="f">Responsable</label><select name="responsable_id"><option value="">(sin asignar)</option>${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}" ${s.id===state.current_user?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">Fecha (opcional)</label><input type="date" name="fecha"></div>
+        <div><label class="f">Turno (opcional)</label><input type="text" name="turno" placeholder="Ej: Manana, tarde, noche..."></div>
+        <div><label class="f">Rotacion</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}">${r||'Ninguna'}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
+      <datalist id="tareas-tipos-list">${state.tareas_fijas.map(t=>`<option value="${escapeHtml(t)}">`).join('')}</datalist>
+      <button class="btn" type="submit">Crear ticket</button>
+    </form>
+  </div>
+  ${tareasSubtab==='lista' ? renderTareasLista() : renderTareasCalendario()}
+  `;
+}
+
+function renderTicketRow(t){
+  const puedeEditar = t.responsable_id===state.current_user || t.creado_por===state.current_user || can('manage_tasks');
+  const estadoLabel = ESTADO_LABELS[t.estado]||t.estado;
+  const estadoClass = ESTADO_CLASS[t.estado]||'';
+  return `<div class="list-item">
+    <div>
+      <div style="font-weight:600;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotacion: ${escapeHtml(t.rotacion)}</span>`:''}</div>
+      <div class="meta">${t.responsable_id?escapeHtml(socioNombre(t.responsable_id)):'Sin asignar'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.turno?' - '+escapeHtml(t.turno):''}</div>
+      ${t.notas?`<div class="meta" style="margin-top:2px;">${escapeHtml(t.notas)}</div>`:''}
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      ${!t.responsable_id ? `<button class="btn ghost small" data-action="asignarme-ticket" data-id="${t.id}">+ Asignarme</button>` : ''}
+      ${puedeEditar ? `<button class="btn ghost small" data-action="ciclar-estado-ticket" data-id="${t.id}" data-estado="${t.estado}">Cambiar estado</button>` : ''}
+      ${puedeEditar ? `<button class="btn danger small" data-action="delete-tarea-ticket" data-id="${t.id}">Borrar</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderTareasLista(){
+  const tickets = state.tareas_tickets || [];
+  if(!tickets.length) return '<div class="card"><p class="empty">Todavia no hay tickets de tareas.</p></div>';
+  return `<div class="card">${tickets.map(t=>renderTicketRow(t)).join('')}</div>`;
+}
+
+function renderTareasCalendario(){
+  const year = tareasCalFecha.getFullYear();
+  const month = tareasCalFecha.getMonth();
+  const ultimoDia = new Date(year, month+1, 0);
+  const totalDias = ultimoDia.getDate();
+  let offset = (new Date(year, month, 1).getDay()+6)%7;
+
+  const porDia = {};
+  (state.tareas_tickets||[]).forEach(t=>{
+    if(!t.fecha) return;
+    const partes = t.fecha.split('-').map(Number);
+    if(partes[0]===year && (partes[1]-1)===month){
+      (porDia[partes[2]] = porDia[partes[2]]||[]).push(t);
+    }
+  });
+
+  const celdas = [];
+  for(let i=0;i<offset;i++) celdas.push('<div class="cal-day cal-day-empty"></div>');
+  for(let d=1; d<=totalDias; d++){
+    const tickets = porDia[d]||[];
+    celdas.push(`<div class="cal-day">
+      <div class="cal-day-num">${d}</div>
+      ${tickets.map(t=>`<div class="cal-ticket ${ESTADO_CLASS[t.estado]||''}" title="${escapeHtml(t.tipo)}">${escapeHtml(t.tipo)}${t.responsable_id?': '+escapeHtml(socioNombre(t.responsable_id)):''}</div>`).join('')}
+    </div>`);
+  }
+
+  const sinFecha = (state.tareas_tickets||[]).filter(t=>!t.fecha && t.turno);
+
   return `
   <div class="card">
-    <p class="readonly-note">Ap�ntate a las tareas de las que quieras encargarte. ${admin ? 'Como administrador puedes a�adir o quitar a cualquier socio.' : ''}</p>
+    <div class="year-nav">
+      <button data-action="tareas-mes" data-dir="-1">&larr; anterior</button>
+      <b>${MESES[month]} ${year}</b>
+      <button data-action="tareas-mes" data-dir="1">siguiente &rarr;</button>
+    </div>
+    <div class="cal-grid">
+      ${['Lun','Mar','Mie','Jue','Vie','Sab','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')}
+      ${celdas.join('')}
+    </div>
   </div>
-  ${state.tareas_fijas.map(tarea=>{
-    const asignados = state.responsables[tarea] || [];
-    const yaApuntado = asignados.includes(state.current_user);
-    return `<div class="card tarea-card">
-      <h2><span class="pin"></span>${tarea}</h2>
-      <div class="chip-row">
-        
-        ${asignados.length===0 ? '<span class="empty">Nadie encargado todav�a.</span>' : asignados.map(sid=>`
-        
-          <span class="tarea-chip">${escapeHtml(socioNombre(sid))}
-        
-            ${(sid===state.current_user || admin) ? `<button data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${sid}" title="Quitar">�</button>` : ''}
-        
-          </span>
-        
-        `).join('')}
-      </div>
-      ${admin ? `
-      <div class="task-admin-list" style="margin-top:14px;">
-        
-        ${state.socios.map(s=>{
-        
-          const assigned = asignados.includes(s.id);
-        
-          return `<div class="list-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.06);">
-        
-            <div>${escapeHtml(s.nombre)}${assigned ? ' <span class="tag ok">asignado</span>' : ''}</div>
-        
-            <div>${assigned ? `<button class="btn danger small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">Quitar</button>` : `<button class="btn ghost small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${s.id}">+ A�adir</button>`}</div>
-        
-          </div>`;
-        
-        }).join('')}
-      </div>` : `
-      ${!yaApuntado ? `<button class="btn ghost small" data-action="toggle-tarea" data-tarea="${tarea}" data-socio="${state.current_user}">+ Apuntarme</button>` : ''}`}
-    </div>`;
-  }).join('')}
+  ${sinFecha.length ? `<div class="card">
+    <h2><span class="pin"></span>Tickets por turno (sin fecha fija)</h2>
+    ${sinFecha.map(t=>renderTicketRow(t)).join('')}
+  </div>` : ''}
   `;
 }
 
@@ -1401,9 +1460,19 @@ document.addEventListener('click', async (e)=>{
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
       await loadState(); render();
     }
-    else if(action==='toggle-tarea'){
-      await apiPost('/api/responsables/toggle', {tarea: btn.dataset.tarea, socio_id: btn.dataset.socio});
+    else if(action==='tareas-subtab'){ tareasSubtab = btn.dataset.sub; render(); }
+    else if(action==='tareas-mes'){ tareasCalFecha.setMonth(tareasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
+    else if(action==='asignarme-ticket'){
+      await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {responsable_id: state.current_user});
       await loadState(); render();
+    }
+    else if(action==='ciclar-estado-ticket'){
+      const siguiente = ESTADO_CICLO[btn.dataset.estado] || 'pendiente';
+      await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {estado: siguiente});
+      await loadState(); render();
+    }
+    else if(action==='delete-tarea-ticket'){
+      if(confirm('Borrar este ticket de tarea?')){ await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-reunion'){
       if(confirm('�Borrar esta reuni�n?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
@@ -1564,6 +1633,7 @@ document.addEventListener('submit', async (e)=>{
       const beneficiarios = new FormData(form).getAll('beneficiarios');
       await apiPost(`/api/gastos-eventos/${eid}/pagos`, {pagador_id: data.pagador_id, concepto: data.concepto, importe: data.importe, beneficiarios});
     }
+    else if(type==='add-tarea-ticket'){ await apiPost('/api/tareas-tickets', data); }
     else if(type==='save-perfil'){ await apiPost('/api/perfil', data); }
     else if(type==='change-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }

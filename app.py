@@ -50,7 +50,8 @@ app = Flask(__name__)
 # En producciÃ³n, define la variable de entorno SECRET_KEY con un valor propio.
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
 
-TAREAS_FIJAS = ["Compras", "Limpieza", "TesorerÃ­a", "Carrozas", "Concursos", "Comidas", "Otros"]
+TAREAS_FIJAS = ["Compras", "Limpieza", "Tesoreria", "Carrozas", "Concursos", "Comidas", "Otros"]
+ESTADOS_TICKET = ["pendiente", "en_curso", "hecho"]
 
 PERMISSIONS = {
     "manage_roles": "Manage roles and permissions",
@@ -185,6 +186,18 @@ CREATE TABLE IF NOT EXISTS tareas_asignadas (
     socio_id TEXT NOT NULL,
     UNIQUE(tarea, socio_id)
 );
+CREATE TABLE IF NOT EXISTS tareas_tickets (
+    id TEXT PRIMARY KEY,
+    tipo TEXT NOT NULL,
+    responsable_id TEXT,
+    estado TEXT NOT NULL DEFAULT 'pendiente',
+    fecha TEXT,
+    turno TEXT DEFAULT '',
+    notas TEXT DEFAULT '',
+    rotacion TEXT DEFAULT '',
+    creado_por TEXT,
+    creado_en TEXT
+);
 CREATE TABLE IF NOT EXISTS roles (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
@@ -308,6 +321,14 @@ def init_db():
                 "INSERT OR IGNORE INTO socio_roles (socio_id, rol_id) VALUES (?, ?)",
                 (socio["id"], default_role),
             )
+        # Migracion unica: las tareas del sistema antiguo (solo tipo + socio) pasan a ser tickets.
+        if db.execute("SELECT COUNT(*) AS n FROM tareas_tickets").fetchone()["n"] == 0:
+            for row in db.execute("SELECT tarea, socio_id FROM tareas_asignadas"):
+                db.execute(
+                    "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, creado_por, creado_en) "
+                    "VALUES (?, ?, ?, 'pendiente', NULL, '', '', '', NULL, ?)",
+                    (uuid.uuid4().hex[:12], row["tarea"], row["socio_id"], datetime.now().isoformat(timespec="seconds")),
+                )
         db.commit()
 
 
@@ -559,9 +580,7 @@ def state():
         evento["total"] = round(sum(p["importe"] for p in pagos), 2)
         gastos_eventos.append(evento)
 
-    responsables = {t: [] for t in TAREAS_FIJAS}
-    for r in db.execute("SELECT * FROM tareas_asignadas"):
-        responsables.setdefault(r["tarea"], []).append(r["socio_id"])
+    tareas_tickets = [dict(r) for r in db.execute("SELECT * FROM tareas_tickets ORDER BY (fecha IS NULL), fecha, tipo")]
 
     return jsonify(
         {
@@ -580,8 +599,9 @@ def state():
             "fiestas_gastos": fiestas_gastos,
             "reservas": reservas,
             "gastos_eventos": gastos_eventos,
-            "responsables": responsables,
+            "tareas_tickets": tareas_tickets,
             "tareas_fijas": TAREAS_FIJAS,
+            "estados_ticket": ESTADOS_TICKET,
             "current_user": sid,
             "is_admin": is_admin_user(sid),
         }
@@ -1347,26 +1367,110 @@ def delete_reserva(rid):
     return jsonify({"ok": True})
 
 
-# -------------------------------------------------------------- encargados/tareas --
-@app.route("/api/responsables/toggle", methods=["POST"])
-def toggle_responsable():
+# -------------------------------------------------------------- tareas: tickets --
+@app.route("/api/tareas-tickets", methods=["POST"])
+def add_tarea_ticket():
     sid = require_login()
     if not sid:
-        return err("No has iniciado sesiÃ³n.", 401)
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
-    tarea = data.get("tarea")
-    target = data.get("socio_id")
-    if tarea not in TAREAS_FIJAS:
-        return err("Tarea no vÃ¡lida", 400)
-    if target != sid and not has_permission(sid, "manage_tasks"):
-        return err("Solo puedes apuntarte a ti mismo (el administrador puede gestionar a cualquiera).")
-
+    tipo = (data.get("tipo") or "").strip()
+    if not tipo:
+        return err("El tipo de tarea es obligatorio.", 400)
+    responsable_id = data.get("responsable_id") or None
+    if responsable_id and responsable_id != sid and not has_permission(sid, "manage_tasks"):
+        return err("Solo puedes crear tickets para ti mismo (o dejarlos sin responsable).")
+    estado = data.get("estado") or "pendiente"
+    if estado not in ESTADOS_TICKET:
+        estado = "pendiente"
     db = get_db()
-    row = db.execute("SELECT id FROM tareas_asignadas WHERE tarea = ? AND socio_id = ?", (tarea, target)).fetchone()
-    if row:
-        db.execute("DELETE FROM tareas_asignadas WHERE id = ?", (row["id"],))
-    else:
-        db.execute("INSERT INTO tareas_asignadas (id, tarea, socio_id) VALUES (?, ?, ?)", (new_id(), tarea, target))
+    if responsable_id and not db.execute("SELECT 1 FROM socios WHERE id = ?", (responsable_id,)).fetchone():
+        return err("Socio no encontrado", 404)
+    tid = new_id()
+    db.execute(
+        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, creado_por, creado_en) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            tid, tipo, responsable_id, estado,
+            data.get("fecha") or None, (data.get("turno") or "").strip(),
+            (data.get("notas") or "").strip(), (data.get("rotacion") or "").strip(),
+            sid, now_iso(),
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": tid})
+
+
+@app.route("/api/tareas-tickets/<tid>", methods=["POST"])
+def update_tarea_ticket(tid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    ticket = db.execute("SELECT * FROM tareas_tickets WHERE id = ?", (tid,)).fetchone()
+    if not ticket:
+        return err("Ticket no encontrado", 404)
+    puede_editar = sid == ticket["responsable_id"] or sid == ticket["creado_por"] or has_permission(sid, "manage_tasks")
+    if not puede_editar:
+        return err("No tienes permiso para editar este ticket.")
+
+    data = request.get_json(force=True)
+    campos, valores = [], []
+
+    if "responsable_id" in data:
+        nuevo_resp = data.get("responsable_id") or None
+        asignando_a_otro = nuevo_resp and nuevo_resp != sid
+        if asignando_a_otro and not has_permission(sid, "manage_tasks"):
+            return err("Solo quien gestiona tareas puede asignar el ticket a otro socio.")
+        if nuevo_resp and not db.execute("SELECT 1 FROM socios WHERE id = ?", (nuevo_resp,)).fetchone():
+            return err("Socio no encontrado", 404)
+        campos.append("responsable_id = ?")
+        valores.append(nuevo_resp)
+    if "estado" in data:
+        estado = data.get("estado")
+        if estado not in ESTADOS_TICKET:
+            return err("Estado no valido.", 400)
+        campos.append("estado = ?")
+        valores.append(estado)
+    if "tipo" in data:
+        tipo = (data.get("tipo") or "").strip()
+        if not tipo:
+            return err("El tipo de tarea es obligatorio.", 400)
+        campos.append("tipo = ?")
+        valores.append(tipo)
+    if "fecha" in data:
+        campos.append("fecha = ?")
+        valores.append(data.get("fecha") or None)
+    if "turno" in data:
+        campos.append("turno = ?")
+        valores.append((data.get("turno") or "").strip())
+    if "notas" in data:
+        campos.append("notas = ?")
+        valores.append((data.get("notas") or "").strip())
+    if "rotacion" in data:
+        campos.append("rotacion = ?")
+        valores.append((data.get("rotacion") or "").strip())
+
+    if campos:
+        valores.append(tid)
+        db.execute(f"UPDATE tareas_tickets SET {', '.join(campos)} WHERE id = ?", valores)
+        db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/tareas-tickets/<tid>", methods=["DELETE"])
+def delete_tarea_ticket(tid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    ticket = db.execute("SELECT * FROM tareas_tickets WHERE id = ?", (tid,)).fetchone()
+    if not ticket:
+        return err("Ticket no encontrado", 404)
+    puede_borrar = sid == ticket["responsable_id"] or sid == ticket["creado_por"] or has_permission(sid, "manage_tasks")
+    if not puede_borrar:
+        return err("No tienes permiso para borrar este ticket.")
+    db.execute("DELETE FROM tareas_tickets WHERE id = ?", (tid,))
     db.commit()
     return jsonify({"ok": True})
 
