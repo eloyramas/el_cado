@@ -156,9 +156,11 @@ CREATE TABLE IF NOT EXISTS bebidas_consumos (
     fecha TEXT NOT NULL,
     consumidor TEXT NOT NULL,
     es_socio INTEGER NOT NULL,
+    socio_id TEXT,
     bebida_id TEXT NOT NULL,
     cantidad INTEGER NOT NULL,
-    importe REAL NOT NULL
+    importe REAL NOT NULL,
+    pagado INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS fiestas_gastos (
     id TEXT PRIMARY KEY,
@@ -252,6 +254,14 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE movimientos ADD COLUMN socio_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE bebidas_consumos ADD COLUMN socio_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE bebidas_consumos ADD COLUMN pagado INTEGER NOT NULL DEFAULT 1")
         except sqlite3.OperationalError:
             pass
         # MigraciÃ³n: actualizar tabla reuniones si existe con estructura antigua
@@ -505,13 +515,21 @@ def state():
         reuniones.append(row)
 
     inventario = [dict(r) for r in db.execute("SELECT * FROM inventario ORDER BY categoria, nombre")]
+    consumo_cols = (
+        "SELECT bc.*, bp.nombre AS bebida_nombre FROM bebidas_consumos bc "
+        "LEFT JOIN bebidas_precios bp ON bp.id = bc.bebida_id "
+    )
     if can_view_finances or has_permission(sid, "manage_finances"):
         movimientos = [dict(r) for r in db.execute("SELECT m.*, s.nombre AS socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha DESC")]
         bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
-        bebidas_consumos = [dict(r) for r in db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha DESC LIMIT 80")]
+        bebidas_consumos = [dict(r) for r in db.execute(consumo_cols + "ORDER BY bc.fecha DESC LIMIT 80")]
         fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
     else:
-        movimientos, bebidas_precios, bebidas_consumos, fiestas_gastos = [], [], [], []
+        movimientos, bebidas_precios, fiestas_gastos = [], [], []
+        bebidas_consumos = (
+            [dict(r) for r in db.execute(consumo_cols + "WHERE bc.socio_id = ? ORDER BY bc.fecha DESC", (sid,))]
+            if sid else []
+        )
     reservas = [dict(r) for r in db.execute("SELECT * FROM reservas ORDER BY fecha")]
 
     gastos_eventos = []
@@ -1077,18 +1095,21 @@ def add_consumo():
 
     es_socio = bool(data.get("es_socio"))
     cantidad = int(data.get("cantidad") or 1)
+    socio_id = None
     if es_socio:
-        consumidor_row = db.execute("SELECT nombre FROM socios WHERE id = ?", (data.get("socio_id"),)).fetchone()
+        socio_id = data.get("socio_id") or None
+        consumidor_row = db.execute("SELECT nombre FROM socios WHERE id = ?", (socio_id,)).fetchone()
         consumidor = consumidor_row["nombre"] if consumidor_row else "Socio"
         precio_unit = bebida["precio_socio"]
     else:
         consumidor = (data.get("nombre_invitado") or "Invitado").strip()
         precio_unit = bebida["precio_no_socio"]
+    pagado = 1 if data.get("pagado", True) else 0
 
     cid = new_id()
     db.execute(
-        "INSERT INTO bebidas_consumos (id, fecha, consumidor, es_socio, bebida_id, cantidad, importe) VALUES (?,?,?,?,?,?,?)",
-        (cid, date.today().isoformat(), consumidor, int(es_socio), bebida["id"], cantidad, precio_unit * cantidad),
+        "INSERT INTO bebidas_consumos (id, fecha, consumidor, es_socio, socio_id, bebida_id, cantidad, importe, pagado) VALUES (?,?,?,?,?,?,?,?,?)",
+        (cid, date.today().isoformat(), consumidor, int(es_socio), socio_id, bebida["id"], cantidad, precio_unit * cantidad, pagado),
     )
     db.commit()
     return jsonify({"ok": True, "id": cid})
@@ -1102,6 +1123,20 @@ def delete_consumo(cid):
     db.execute("DELETE FROM bebidas_consumos WHERE id = ?", (cid,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.route("/api/bebidas/consumos/<cid>/pagado", methods=["POST"])
+def toggle_consumo_pagado(cid):
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
+    db = get_db()
+    row = db.execute("SELECT pagado FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
+    if not row:
+        return err("Consumo no encontrado", 404)
+    nuevo = 0 if row["pagado"] else 1
+    db.execute("UPDATE bebidas_consumos SET pagado = ? WHERE id = ?", (nuevo, cid))
+    db.commit()
+    return jsonify({"ok": True, "pagado": bool(nuevo)})
 
 
 # -------------------------------------------------------------- fiestas (gasto bebida evento) --

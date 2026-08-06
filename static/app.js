@@ -487,7 +487,9 @@ function renderRoles(){
 function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalBebidasIngreso(){ return state.bebidas_consumos.reduce((a,c)=>a+Number(c.importe||0),0); }
+function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
+function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
+function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
 function totalFiestasGasto(){ return state.fiestas_gastos.reduce((a,f)=>a+Number(f.importe||0),0); }
 function saldoTotal(){
   const ingresos = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso();
@@ -517,6 +519,12 @@ function construirAlertas(){
         alertas.push({tipo:'warn', texto:`${s.nombre} todav�a no ha pagado la cuota de ${MESES[now.getMonth()]}`});
       }
     });
+  }
+
+  const misPendientes = misBebidasPendientes();
+  if(misPendientes.length){
+    const total = misPendientes.reduce((a,c)=>a+Number(c.importe||0),0);
+    alertas.push({tipo:'warn', texto:`Tienes ${money(total)} pendientes de pagar en bebidas (pestana Bebidas).`});
   }
 
   const recientes = [];
@@ -1049,7 +1057,14 @@ function renderBebidasConsumo(){
   const puedeGestionarBebidas = can('manage_bebidas');
   const precios = state.bebidas_precios;
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const misPendientes = misBebidasPendientes();
   return `
+  ${misPendientes.length ? `
+  <div class="card">
+    <h2><span class="pin"></span>Mi deuda de bebidas pendiente</h2>
+    ${misPendientes.map(c=>`<div class="menu-row"><span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}<small>${c.cantidad} x - ${fmtDate(c.fecha)}</small></span><span class="dots"></span><span class="value rust">${money(c.importe)}</span></div>`).join('')}
+    <div class="menu-row" style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px;"><span class="label"><strong>Total pendiente</strong></span><span class="dots"></span><span class="value rust"><strong>${money(misPendientes.reduce((a,c)=>a+Number(c.importe||0),0))}</strong></span></div>
+  </div>` : ''}
   ${puedeGestionarBebidas ? `
   <div class="card">
     <h2><span class="pin"></span>Precios (se paga en el momento)</h2>
@@ -1110,27 +1125,30 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
-      <button class="btn" type="submit">Registrar (pagado al momento)</button>
+      <label class="role-option" style="margin-bottom:10px;"><input type="checkbox" name="pagado" checked> Pagado en el momento (si no, queda pendiente en la deuda del socio)</label>
+      <button class="btn" type="submit">Registrar consumo</button>
     </form>
     `}
   </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona bebidas es quien registra precios y consumos.</p></div>`}
   <div class="card">
-    <h2><span class="pin"></span>�ltimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">� recaudado total: ${money(totalBebidasIngreso())}</span></h2>
-    ${consumos.length===0 ? '<p class="empty">Sin consumos todav�a.</p>' : consumos.slice(0,40).map(c=>{
-      const bebida = precios.find(p=>p.id===c.bebida_id);
+    <h2><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></h2>
+    ${consumos.length===0 ? '<p class="empty">Sin consumos todavia.</p>' : consumos.slice(0,40).map(c=>{
+      const nombreBebida = c.bebida_nombre || '-';
       return `<div class="list-item">
 
         <div>
 
-          <div style="font-weight:600;">${escapeHtml(c.consumidor)} ${c.es_socio?'':'<span class="tag">invitado</span>'}</div>
+          <div style="font-weight:600;">${escapeHtml(c.consumidor)} ${c.es_socio?'':'<span class="tag">invitado</span>'} ${c.pagado?'<span class="tag ok">pagado</span>':'<span class="tag warn">pendiente</span>'}</div>
 
-          <div class="meta">${c.cantidad} � ${bebida?escapeHtml(bebida.nombre):'�'} � ${fmtDate(c.fecha)}</div>
+          <div class="meta">${c.cantidad} x ${escapeHtml(nombreBebida)} - ${fmtDate(c.fecha)}</div>
 
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
 
-          <span style="font-family:'JetBrains Mono',monospace; color:var(--sage); font-weight:600;">+ ${money(c.importe)}</span>
+          <span style="font-family:'JetBrains Mono',monospace; color:${c.pagado?'var(--sage)':'var(--rust)'}; font-weight:600;">${c.pagado?'+':''} ${money(c.importe)}</span>
+
+          ${puedeGestionarBebidas ? `<button class="btn ghost small" data-action="toggle-consumo-pagado" data-id="${c.id}">${c.pagado?'Marcar pendiente':'Marcar pagado'}</button>` : ''}
 
           ${puedeGestionarBebidas ? `<button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>` : ''}
 
@@ -1402,6 +1420,10 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-consumo'){
       if(confirm('�Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='toggle-consumo-pagado'){
+      await apiPost(`/api/bebidas/consumos/${btn.dataset.id}/pagado`);
+      await loadState(); render();
+    }
     else if(action==='delete-fiesta-gasto'){
       if(confirm('�Borrar este gasto?')){ await apiDelete(`/api/fiestas/${btn.dataset.id}`); await loadState(); render(); }
     }
@@ -1528,6 +1550,7 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='add-bebida-precio'){ await apiPost('/api/bebidas/precios', data); }
     else if(type==='add-consumo'){
       data.es_socio = data.consumidorTipo==='socio';
+      data.pagado = form.querySelector('[name=pagado]').checked;
       await apiPost('/api/bebidas/consumos', data);
     }
     else if(type==='add-fiesta-gasto'){ await apiPost('/api/fiestas', data); }
