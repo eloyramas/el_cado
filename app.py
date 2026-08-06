@@ -23,7 +23,7 @@ import sqlite3
 import uuid
 import json
 from contextlib import closing
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 from flask import Flask, g, jsonify, request, session, send_from_directory, render_template, send_file
@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS tareas_tickets (
     turno TEXT DEFAULT '',
     notas TEXT DEFAULT '',
     rotacion TEXT DEFAULT '',
+    completado_en TEXT,
     creado_por TEXT,
     creado_en TEXT
 );
@@ -275,6 +276,10 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE bebidas_consumos ADD COLUMN pagado INTEGER NOT NULL DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE tareas_tickets ADD COLUMN completado_en TEXT")
         except sqlite3.OperationalError:
             pass
         # Migracion: actualizar tabla reuniones si existe con estructura antigua
@@ -374,6 +379,45 @@ def calcular_transferencias_evento(balances):
         if acreedores[j][1] <= 0.005:
             j += 1
     return transferencias
+
+
+DIAS_EN_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+def es_bisiesto(year):
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+
+
+def siguiente_fecha_rotacion(fecha_iso, rotacion):
+    if not fecha_iso:
+        return None
+    d = date.fromisoformat(fecha_iso)
+    rot = (rotacion or "").strip().lower()
+    if rot == "semanal":
+        d = d + timedelta(days=7)
+    elif rot == "quincenal":
+        d = d + timedelta(days=14)
+    elif rot == "mensual":
+        month = d.month + 1
+        year = d.year + (1 if month > 12 else 0)
+        month = month if month <= 12 else 1
+        dias_mes = DIAS_EN_MES[month - 1] + (1 if month == 2 and es_bisiesto(year) else 0)
+        d = date(year, month, min(d.day, dias_mes))
+    else:
+        return None
+    return d.isoformat()
+
+
+def crear_siguiente_ocurrencia_tarea(db, ticket):
+    nueva_fecha = siguiente_fecha_rotacion(ticket["fecha"], ticket["rotacion"])
+    db.execute(
+        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, completado_en, creado_por, creado_en) "
+        "VALUES (?,?,?,'pendiente',?,?,?,?,NULL,?,?)",
+        (
+            new_id(), ticket["tipo"], ticket["responsable_id"], nueva_fecha, ticket["turno"],
+            ticket["notas"], ticket["rotacion"], ticket["creado_por"], now_iso(),
+        ),
+    )
 
 
 def current_socio_id():
@@ -796,6 +840,28 @@ def update_role(role_id):
     if not db.execute("SELECT 1 FROM roles WHERE id = ?", (role_id,)).fetchone():
         return err("Rol no encontrado", 404)
     db.execute("UPDATE roles SET permisos = ? WHERE id = ?", (json.dumps(permisos), role_id))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/roles/<role_id>", methods=["DELETE"])
+def delete_role(role_id):
+    if not require_permission("manage_roles"):
+        return err("No tienes permiso para gestionar roles.")
+    db = get_db()
+    row = db.execute("SELECT es_sistema FROM roles WHERE id = ?", (role_id,)).fetchone()
+    if not row:
+        return err("Rol no encontrado", 404)
+    if row["es_sistema"]:
+        return err("Los roles del sistema no se pueden borrar.", 400)
+    huerfanos = db.execute(
+        "SELECT sr.socio_id FROM socio_roles sr WHERE sr.rol_id = ? "
+        "AND (SELECT COUNT(*) FROM socio_roles sr2 WHERE sr2.socio_id = sr.socio_id) = 1",
+        (role_id,),
+    ).fetchall()
+    if huerfanos:
+        return err("Hay socios que solo tienen este rol: asignales otro antes de borrarlo.", 400)
+    db.execute("DELETE FROM roles WHERE id = ?", (role_id,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1426,12 +1492,22 @@ def update_tarea_ticket(tid):
             return err("Socio no encontrado", 404)
         campos.append("responsable_id = ?")
         valores.append(nuevo_resp)
+    nueva_tarea_generada = False
     if "estado" in data:
         estado = data.get("estado")
         if estado not in ESTADOS_TICKET:
             return err("Estado no valido.", 400)
         campos.append("estado = ?")
         valores.append(estado)
+        if estado == "hecho" and ticket["estado"] != "hecho":
+            campos.append("completado_en = ?")
+            valores.append(now_iso())
+            if (ticket["rotacion"] or "").strip():
+                crear_siguiente_ocurrencia_tarea(db, ticket)
+                nueva_tarea_generada = True
+        elif estado != "hecho" and ticket["estado"] == "hecho":
+            campos.append("completado_en = ?")
+            valores.append(None)
     if "tipo" in data:
         tipo = (data.get("tipo") or "").strip()
         if not tipo:
@@ -1455,7 +1531,7 @@ def update_tarea_ticket(tid):
         valores.append(tid)
         db.execute(f"UPDATE tareas_tickets SET {', '.join(campos)} WHERE id = ?", valores)
         db.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "nueva_tarea_generada": nueva_tarea_generada})
 
 
 @app.route("/api/tareas-tickets/<tid>", methods=["DELETE"])
@@ -1510,87 +1586,600 @@ def _build_excel():
             ws.append(r)
         for i, h in enumerate(headers, start=1):
             ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(14, len(h) + 4)
+        ws.freeze_panes = "A2"
 
-    ws1 = wb.active
-    ws1.title = "Movimientos"
-    movs = db.execute(
-        "SELECT m.*, s.nombre as socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha"
-    ).fetchall()
+    socios_rows = db.execute("SELECT * FROM socios ORDER BY nombre").fetchall()
+    nombre_de = {s["id"]: s["nombre"] for s in socios_rows}
+
+    def nombres(ids):
+        return ", ".join(nombre_de.get(i, i) for i in ids if i)
+
+    ws0 = wb.active
+    roles_rows = db.execute("SELECT * FROM roles ORDER BY nombre").fetchall()
+    nombre_rol = {r["id"]: r["nombre"] for r in roles_rows}
+    roles_de_socio = {}
+    for sr in db.execute("SELECT * FROM socio_roles"):
+        roles_de_socio.setdefault(sr["socio_id"], []).append(nombre_rol.get(sr["rol_id"], sr["rol_id"]))
+
+    ws0.title = "Socios"
+    write_sheet(
+        ws0,
+        ["ID", "Nombre", "Activo", "Roles (separados por coma)"],
+        [[s["id"], s["nombre"], "Si" if s["activo"] else "No", ", ".join(roles_de_socio.get(s["id"], []))] for s in socios_rows],
+    )
+
+    ws0b = wb.create_sheet("Roles")
+    write_sheet(
+        ws0b,
+        ["ID", "Nombre", "Permisos (separados por coma)", "Es del sistema"],
+        [[r["id"], r["nombre"], ",".join(json.loads(r["permisos"] or "[]")), "Si" if r["es_sistema"] else "No"] for r in roles_rows],
+    )
+
+    ws1 = wb.create_sheet("Movimientos")
+    movs = db.execute("SELECT * FROM movimientos ORDER BY fecha").fetchall()
     write_sheet(
         ws1,
-        ["Fecha", "Tipo", "Categoria", "Socio", "Concepto", "Importe (a,)"],
-        [[m["fecha"], m["tipo"], m["categoria"], m["socio_nombre"] or "", m["concepto"], m["importe"]] for m in movs],
+        ["ID", "Fecha", "Tipo", "Categoria", "Socio ID", "Socio", "Concepto", "Importe (EUR)"],
+        [[m["id"], m["fecha"], m["tipo"], m["categoria"], m["socio_id"] or "", nombre_de.get(m["socio_id"], ""), m["concepto"], m["importe"]] for m in movs],
     )
 
     ws2 = wb.create_sheet("Cuotas")
-    cuotas = db.execute(
-        "SELECT c.*, s.nombre as socio_nombre FROM cuotas c JOIN socios s ON s.id = c.socio_id ORDER BY c.year, c.month, s.nombre"
-    ).fetchall()
+    cuotas = db.execute("SELECT * FROM cuotas ORDER BY year, month").fetchall()
     write_sheet(
         ws2,
-        ["Socio", "Ano", "Mes", "Importe (a,)", "Pagado", "Fecha de pago"],
-        [[c["socio_nombre"], c["year"], c["month"], c["importe"], "Si" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
+        ["ID", "Socio ID", "Socio", "Ano", "Mes", "Importe (EUR)", "Pagado", "Fecha de pago"],
+        [[c["id"], c["socio_id"], nombre_de.get(c["socio_id"], ""), c["year"], c["month"], c["importe"], "Si" if c["pagado"] else "No", c["fecha"] or ""] for c in cuotas],
     )
 
-    ws3 = wb.create_sheet("Bebidas")
+    ws3p = wb.create_sheet("Bebidas-Precios")
+    precios = db.execute("SELECT * FROM bebidas_precios ORDER BY nombre").fetchall()
+    nombre_bebida = {p["id"]: p["nombre"] for p in precios}
+    write_sheet(
+        ws3p,
+        ["ID", "Nombre", "Unidad", "Precio socio (EUR)", "Precio no socio (EUR)"],
+        [[p["id"], p["nombre"], p["unidad"], p["precio_socio"], p["precio_no_socio"]] for p in precios],
+    )
+
+    ws3 = wb.create_sheet("Bebidas-Consumos")
     consumos = db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha").fetchall()
     write_sheet(
         ws3,
-        ["Fecha", "Consumidor", "Socio", "Cantidad", "Importe (a,)"],
-        [[c["fecha"], c["consumidor"], "Si" if c["es_socio"] else "No", c["cantidad"], c["importe"]] for c in consumos],
+        ["ID", "Fecha", "Bebida ID", "Bebida", "Socio ID", "Consumidor", "Es socio", "Cantidad", "Importe (EUR)", "Pagado"],
+        [[
+            c["id"], c["fecha"], c["bebida_id"], nombre_bebida.get(c["bebida_id"], ""), c["socio_id"] or "",
+            c["consumidor"], "Si" if c["es_socio"] else "No", c["cantidad"], c["importe"], "Si" if c["pagado"] else "No",
+        ] for c in consumos],
     )
 
-    ws4 = wb.create_sheet("Gastos fiestas")
+    ws4 = wb.create_sheet("Gastos-Fiestas")
     fiestas = db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha").fetchall()
     write_sheet(
         ws4,
-        ["Fecha", "Evento", "Concepto", "Importe (a,)"],
-        [[f["fecha"], f["evento"], f["concepto"], f["importe"]] for f in fiestas],
+        ["ID", "Fecha", "Evento", "Concepto", "Importe (EUR)"],
+        [[f["id"], f["fecha"], f["evento"], f["concepto"], f["importe"]] for f in fiestas],
     )
 
     ws4b = wb.create_sheet("Inventario")
     inventario = db.execute("SELECT * FROM inventario ORDER BY categoria, nombre").fetchall()
     write_sheet(
         ws4b,
-        ["Categoria", "Nombre", "Cantidad", "Estado", "Notas"],
-        [[i["categoria"], i["nombre"], i["cantidad"], i["estado"], i["notas"] or ""] for i in inventario],
+        ["ID", "Categoria", "Nombre", "Cantidad", "Estado", "Notas"],
+        [[i["id"], i["categoria"], i["nombre"], i["cantidad"], i["estado"], i["notas"] or ""] for i in inventario],
+    )
+
+    ws6 = wb.create_sheet("Reservas")
+    reservas = db.execute("SELECT * FROM reservas ORDER BY fecha").fetchall()
+    write_sheet(
+        ws6,
+        ["ID", "Fecha", "Hora inicio", "Hora fin", "Socio ID", "Socio", "Evento", "Notas"],
+        [[r["id"], r["fecha"], r["hora_inicio"] or "", r["hora_fin"] or "", r["socio_id"] or "", nombre_de.get(r["socio_id"], ""), r["evento"], r["notas"] or ""] for r in reservas],
+    )
+
+    ws7 = wb.create_sheet("Reuniones")
+    reuniones = db.execute("SELECT * FROM reuniones ORDER BY fecha").fetchall()
+    asistentes_de = {}
+    for a in db.execute("SELECT * FROM asistencia"):
+        asistentes_de.setdefault(a["reunion_id"], []).append(a["socio_id"])
+    write_sheet(
+        ws7,
+        ["ID", "Fecha", "Hora inicio", "Hora fin", "Evento", "Notas", "Asistentes"],
+        [[
+            r["id"], r["fecha"], r["hora_inicio"] or "", r["hora_fin"] or "", r["evento"], r["notas"] or "",
+            nombres(asistentes_de.get(r["id"], [])),
+        ] for r in reuniones],
+    )
+
+    ws8 = wb.create_sheet("Tareas")
+    tareas = db.execute("SELECT * FROM tareas_tickets ORDER BY (fecha IS NULL), fecha, tipo").fetchall()
+    write_sheet(
+        ws8,
+        ["ID", "Tipo", "Responsable ID", "Responsable", "Estado", "Fecha", "Turno", "Rotacion", "Notas", "Completado en"],
+        [[
+            t["id"], t["tipo"], t["responsable_id"] or "", nombre_de.get(t["responsable_id"], ""), t["estado"],
+            t["fecha"] or "", t["turno"] or "", t["rotacion"] or "", t["notas"] or "", t["completado_en"] or "",
+        ] for t in tareas],
+    )
+
+    ws9 = wb.create_sheet("Reparto-Eventos")
+    eventos = db.execute("SELECT * FROM gastos_eventos ORDER BY fecha").fetchall()
+    participantes_de = {}
+    for p in db.execute("SELECT * FROM gastos_evento_participantes"):
+        participantes_de.setdefault(p["evento_id"], []).append(p["socio_id"])
+    write_sheet(
+        ws9,
+        ["ID", "Nombre", "Fecha", "Notas", "Participantes", "Creado por"],
+        [[
+            e["id"], e["nombre"], e["fecha"], e["notas"] or "",
+            nombres(participantes_de.get(e["id"], [])), nombre_de.get(e["creado_por"], ""),
+        ] for e in eventos],
+    )
+
+    ws10 = wb.create_sheet("Reparto-Pagos")
+    pagos = db.execute("SELECT * FROM gastos_evento_pagos ORDER BY fecha").fetchall()
+    nombre_evento = {e["id"]: e["nombre"] for e in eventos}
+    write_sheet(
+        ws10,
+        ["ID", "Evento ID", "Evento", "Pagador ID", "Pagador", "Concepto", "Importe (EUR)", "Fecha", "Beneficiarios"],
+        [[
+            p["id"], p["evento_id"], nombre_evento.get(p["evento_id"], ""), p["pagador_id"], nombre_de.get(p["pagador_id"], ""),
+            p["concepto"], p["importe"], p["fecha"], nombres(json.loads(p["beneficiarios"] or "[]")),
+        ] for p in pagos],
     )
 
     ingresos_cuotas = sum(c["importe"] for c in cuotas if c["pagado"])
     ingresos_mov = sum(m["importe"] for m in movs if m["tipo"] == "ingreso")
     gastos_mov = sum(m["importe"] for m in movs if m["tipo"] == "gasto")
-    ingresos_bebidas = sum(c["importe"] for c in consumos)
+    ingresos_bebidas = sum(c["importe"] for c in consumos if c["pagado"])
+    pendiente_bebidas = sum(c["importe"] for c in consumos if not c["pagado"])
     gastos_fiestas = sum(f["importe"] for f in fiestas)
     saldo = ingresos_cuotas + ingresos_mov + ingresos_bebidas - gastos_mov - gastos_fiestas
 
     ws5 = wb.create_sheet("Resumen")
-    ws5.append(["Concepto", "Importe (a,)"])
+    ws5.append(["Concepto", "Importe (EUR)"])
     for cell in ws5[1]:
         cell.fill = header_fill
         cell.font = header_font
     for concepto, importe in [
         ("Cuotas cobradas", ingresos_cuotas),
         ("Otros ingresos", ingresos_mov),
-        ("Bebidas recaudadas", ingresos_bebidas),
+        ("Bebidas cobradas", ingresos_bebidas),
+        ("Bebidas pendientes de cobro", pendiente_bebidas),
         ("Gastos generales", -gastos_mov),
         ("Gastos de fiestas", -gastos_fiestas),
-        ("SALDO TOTAL", saldo),
+        ("SALDO TOTAL (solo lo cobrado)", saldo),
     ]:
         ws5.append([concepto, importe])
-    ws5.column_dimensions["A"].width = 24
+    ws5.column_dimensions["A"].width = 28
     ws5.column_dimensions["B"].width = 16
-    wb.move_sheet("Resumen", offset=-5)  # dejarla la primera
+    wb.move_sheet("Resumen", offset=-(len(wb.sheetnames) - 1))  # dejarla la primera
 
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    filename = f"el_cado_cuentas_{date.today().isoformat()}.xlsx"
+    filename = f"el_cado_datos_{date.today().isoformat()}.xlsx"
     return send_file(
         buf,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=filename,
     )
+
+
+# -------------------------------------------------------------- importar desde Excel --
+def _cell_str(v):
+    return "" if v is None else str(v).strip()
+
+
+def _cell_bool(v):
+    return _cell_str(v).lower() in ("si", "s", "yes", "y", "true", "1", "x")
+
+
+def _cell_float(v, default=0.0):
+    try:
+        if v is None or v == "":
+            return default
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _cell_int(v, default=None):
+    try:
+        if v is None or v == "":
+            return default
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _sheet_rows(wb, name):
+    if name not in wb.sheetnames:
+        return []
+    ws = wb[name]
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    return [r for r in rows if any(c is not None and str(c).strip() != "" for c in r)]
+
+
+@app.route("/api/import.xlsx", methods=["POST"])
+def import_excel():
+    sid = require_login()
+    if not sid or not has_permission(sid, "manage_roles"):
+        return err("Solo quien gestiona roles puede importar datos (afecta a socios, roles y finanzas).", 403)
+    if not OPENPYXL_OK:
+        return err("Falta instalar openpyxl en el servidor.", 500)
+    if "archivo" not in request.files or request.files["archivo"].filename == "":
+        return err("No se ha recibido ningun archivo.", 400)
+
+    try:
+        wb = openpyxl.load_workbook(BytesIO(request.files["archivo"].read()), data_only=True)
+    except Exception as e:
+        return err(f"No se pudo leer el archivo. Asegurate de que es un .xlsx valido: {e}", 400)
+
+    try:
+        resumen = _import_excel(wb, sid)
+    except Exception as e:
+        app.logger.exception("Error importando el Excel")
+        return err(f"No se pudo importar: {e}", 500)
+    return jsonify({"ok": True, "resumen": resumen})
+
+
+def _import_excel(wb, sid):
+    db = get_db()
+    resumen = {}
+
+    def marcar(hoja, creado=False, actualizado=False, error=None):
+        r = resumen.setdefault(hoja, {"creados": 0, "actualizados": 0, "errores": []})
+        if creado:
+            r["creados"] += 1
+        if actualizado:
+            r["actualizados"] += 1
+        if error:
+            r["errores"].append(error)
+
+    socios_by_id = {s["id"] for s in db.execute("SELECT id FROM socios")}
+    socios_by_name = {s["nombre"].strip().lower(): s["id"] for s in db.execute("SELECT id, nombre FROM socios")}
+
+    def resolver_socio(id_val, nombre_val):
+        id_val = _cell_str(id_val)
+        if id_val and id_val in socios_by_id:
+            return id_val
+        nombre_val = _cell_str(nombre_val)
+        if nombre_val and nombre_val.lower() in socios_by_name:
+            return socios_by_name[nombre_val.lower()]
+        return None
+
+    def resolver_socios(texto):
+        nombres = [n.strip() for n in _cell_str(texto).split(",") if n.strip()]
+        return [socios_by_name[n.lower()] for n in nombres if n.lower() in socios_by_name]
+
+    # ---- Socios ----
+    pendientes_roles = []  # (socio_id, [nombres de rol])
+    for row in _sheet_rows(wb, "Socios"):
+        rid, nombre, activo, roles_txt = (list(row) + [None] * 4)[:4]
+        nombre = _cell_str(nombre)
+        if not nombre:
+            marcar("Socios", error="Fila sin nombre, omitida.")
+            continue
+        rid = _cell_str(rid)
+        target_id = rid if rid in socios_by_id else socios_by_name.get(nombre.lower())
+        activo_val = 1 if (activo is None or _cell_bool(activo)) else 0
+        if target_id:
+            db.execute("UPDATE socios SET nombre = ?, activo = ? WHERE id = ?", (nombre, activo_val, target_id))
+            marcar("Socios", actualizado=True)
+        else:
+            target_id = rid if rid and rid not in socios_by_id else new_id()
+            db.execute(
+                "INSERT INTO socios (id, nombre, is_admin, activo, pin_hash, must_change_pin) VALUES (?, ?, 0, ?, NULL, 0)",
+                (target_id, nombre, activo_val),
+            )
+            db.execute("INSERT INTO perfiles (socio_id, telefono, notas) VALUES (?, '', '')", (target_id,))
+            db.execute("INSERT OR IGNORE INTO socio_roles (socio_id, rol_id) VALUES (?, 'socio')", (target_id,))
+            marcar("Socios", creado=True)
+        socios_by_id.add(target_id)
+        socios_by_name[nombre.lower()] = target_id
+        if roles_txt is not None:
+            pendientes_roles.append((target_id, [r.strip() for r in _cell_str(roles_txt).split(",") if r.strip()]))
+
+    # ---- Roles ----
+    roles_by_id = {r["id"] for r in db.execute("SELECT id FROM roles")}
+    roles_by_name = {r["nombre"].strip().lower(): r["id"] for r in db.execute("SELECT id, nombre FROM roles")}
+    for row in _sheet_rows(wb, "Roles"):
+        rid, nombre, permisos_txt, _es_sistema = (list(row) + [None] * 4)[:4]
+        nombre = _cell_str(nombre)
+        if not nombre:
+            marcar("Roles", error="Fila sin nombre, omitida.")
+            continue
+        permisos = [p.strip() for p in _cell_str(permisos_txt).split(",") if p.strip() in PERMISSIONS]
+        rid = _cell_str(rid)
+        target_id = rid if rid in roles_by_id else roles_by_name.get(nombre.lower())
+        if target_id:
+            db.execute("UPDATE roles SET permisos = ? WHERE id = ?", (json.dumps(permisos), target_id))
+            marcar("Roles", actualizado=True)
+        else:
+            target_id = new_id()
+            try:
+                db.execute("INSERT INTO roles (id, nombre, permisos, es_sistema) VALUES (?, ?, ?, 0)", (target_id, nombre, json.dumps(permisos)))
+                marcar("Roles", creado=True)
+            except sqlite3.IntegrityError:
+                marcar("Roles", error=f"Ya existe un rol llamado '{nombre}'.")
+                continue
+        roles_by_id.add(target_id)
+        roles_by_name[nombre.lower()] = target_id
+
+    for socio_id, nombres_rol in pendientes_roles:
+        rol_ids = [roles_by_name[n.lower()] for n in nombres_rol if n.lower() in roles_by_name]
+        if rol_ids:
+            db.execute("DELETE FROM socio_roles WHERE socio_id = ?", (socio_id,))
+            db.executemany("INSERT INTO socio_roles (socio_id, rol_id) VALUES (?, ?)", [(socio_id, r) for r in rol_ids])
+            db.execute("UPDATE socios SET is_admin = ? WHERE id = ?", (int("administrador" in rol_ids), socio_id))
+
+    # ---- Bebidas-Precios ----
+    bebidas_by_id = {b["id"] for b in db.execute("SELECT id FROM bebidas_precios")}
+    bebidas_by_name = {b["nombre"].strip().lower(): b["id"] for b in db.execute("SELECT id, nombre FROM bebidas_precios")}
+    for row in _sheet_rows(wb, "Bebidas-Precios"):
+        rid, nombre, unidad, p_socio, p_no_socio = (list(row) + [None] * 5)[:5]
+        nombre = _cell_str(nombre)
+        if not nombre:
+            marcar("Bebidas-Precios", error="Fila sin nombre, omitida.")
+            continue
+        rid = _cell_str(rid)
+        target_id = rid if rid in bebidas_by_id else bebidas_by_name.get(nombre.lower())
+        valores = (nombre, _cell_str(unidad), _cell_float(p_socio), _cell_float(p_no_socio))
+        if target_id:
+            db.execute("UPDATE bebidas_precios SET nombre=?, unidad=?, precio_socio=?, precio_no_socio=? WHERE id=?", valores + (target_id,))
+            marcar("Bebidas-Precios", actualizado=True)
+        else:
+            target_id = new_id()
+            db.execute("INSERT INTO bebidas_precios (id, nombre, unidad, precio_socio, precio_no_socio) VALUES (?,?,?,?,?)", (target_id,) + valores)
+            marcar("Bebidas-Precios", creado=True)
+        bebidas_by_id.add(target_id)
+        bebidas_by_name[nombre.lower()] = target_id
+
+    # ---- Reparto-Eventos ----
+    eventos_by_id = {e["id"] for e in db.execute("SELECT id FROM gastos_eventos")}
+    eventos_by_key = {(e["nombre"].strip().lower(), e["fecha"]): e["id"] for e in db.execute("SELECT id, nombre, fecha FROM gastos_eventos")}
+    eventos_by_name_import = {}
+    for row in _sheet_rows(wb, "Reparto-Eventos"):
+        rid, nombre, fecha, notas, participantes_txt, creado_por_txt = (list(row) + [None] * 6)[:6]
+        nombre = _cell_str(nombre)
+        fecha = _cell_str(fecha) or date.today().isoformat()
+        if not nombre:
+            marcar("Reparto-Eventos", error="Fila sin nombre, omitida.")
+            continue
+        rid = _cell_str(rid)
+        target_id = rid if rid in eventos_by_id else eventos_by_key.get((nombre.lower(), fecha))
+        creado_por = resolver_socio(None, creado_por_txt) or sid
+        if target_id:
+            db.execute("UPDATE gastos_eventos SET nombre=?, fecha=?, notas=? WHERE id=?", (nombre, fecha, _cell_str(notas), target_id))
+            marcar("Reparto-Eventos", actualizado=True)
+        else:
+            target_id = new_id()
+            db.execute(
+                "INSERT INTO gastos_eventos (id, nombre, fecha, notas, creado_por, creado_en) VALUES (?,?,?,?,?,?)",
+                (target_id, nombre, fecha, _cell_str(notas), creado_por, now_iso()),
+            )
+            marcar("Reparto-Eventos", creado=True)
+        participantes = resolver_socios(participantes_txt)
+        if creado_por and creado_por not in participantes:
+            participantes.append(creado_por)
+        db.execute("DELETE FROM gastos_evento_participantes WHERE evento_id = ?", (target_id,))
+        db.executemany(
+            "INSERT OR IGNORE INTO gastos_evento_participantes (evento_id, socio_id) VALUES (?, ?)",
+            [(target_id, p) for p in participantes],
+        )
+        eventos_by_id.add(target_id)
+        eventos_by_key[(nombre.lower(), fecha)] = target_id
+        eventos_by_name_import[nombre.lower()] = target_id
+
+    # ---- Cuotas ----
+    cuotas_by_id = {c["id"] for c in db.execute("SELECT id FROM cuotas")}
+    cuotas_by_key = {(c["socio_id"], c["year"], c["month"]): c["id"] for c in db.execute("SELECT id, socio_id, year, month FROM cuotas")}
+    for row in _sheet_rows(wb, "Cuotas"):
+        rid, socio_id_txt, socio_txt, anio, mes, importe, pagado, fecha_pago = (list(row) + [None] * 8)[:8]
+        socio_id = resolver_socio(socio_id_txt, socio_txt)
+        anio, mes = _cell_int(anio), _cell_int(mes)
+        if not socio_id or not anio or not mes:
+            marcar("Cuotas", error=f"No se pudo resolver socio/ano/mes en una fila (socio={_cell_str(socio_txt)}).")
+            continue
+        rid = _cell_str(rid)
+        target_id = rid if rid in cuotas_by_id else cuotas_by_key.get((socio_id, anio, mes))
+        pagado_val = 1 if _cell_bool(pagado) else 0
+        valores = (socio_id, anio, mes, _cell_float(importe), pagado_val, _cell_str(fecha_pago) or None)
+        if target_id:
+            db.execute("UPDATE cuotas SET socio_id=?, year=?, month=?, importe=?, pagado=?, fecha=? WHERE id=?", valores + (target_id,))
+            marcar("Cuotas", actualizado=True)
+        else:
+            target_id = new_id()
+            db.execute("INSERT INTO cuotas (id, socio_id, year, month, importe, pagado, fecha) VALUES (?,?,?,?,?,?,?)", (target_id,) + valores)
+            marcar("Cuotas", creado=True)
+        cuotas_by_id.add(target_id)
+        cuotas_by_key[(socio_id, anio, mes)] = target_id
+
+    # ---- Movimientos ----
+    movs_by_id = {m["id"] for m in db.execute("SELECT id FROM movimientos")}
+    for row in _sheet_rows(wb, "Movimientos"):
+        rid, fecha, tipo, categoria, socio_id_txt, socio_txt, concepto, importe = (list(row) + [None] * 8)[:8]
+        rid = _cell_str(rid)
+        socio_id = resolver_socio(socio_id_txt, socio_txt)
+        valores = (
+            _cell_str(fecha) or date.today().isoformat(), _cell_str(tipo) or "gasto", _cell_str(categoria) or "Otros",
+            _cell_str(concepto), _cell_float(importe), socio_id,
+        )
+        if rid in movs_by_id:
+            db.execute("UPDATE movimientos SET fecha=?, tipo=?, categoria=?, concepto=?, importe=?, socio_id=? WHERE id=?", valores + (rid,))
+            marcar("Movimientos", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute("INSERT INTO movimientos (id, fecha, tipo, categoria, concepto, importe, socio_id) VALUES (?,?,?,?,?,?,?)",
+                       (target_id, valores[0], valores[1], valores[2], valores[3], valores[4], valores[5]))
+            movs_by_id.add(target_id)
+            marcar("Movimientos", creado=True)
+
+    # ---- Bebidas-Consumos ----
+    consumos_by_id = {c["id"] for c in db.execute("SELECT id FROM bebidas_consumos")}
+    for row in _sheet_rows(wb, "Bebidas-Consumos"):
+        rid, fecha, bebida_id_txt, bebida_txt, socio_id_txt, consumidor, es_socio, cantidad, importe, pagado = (list(row) + [None] * 10)[:10]
+        bebida_id = _cell_str(bebida_id_txt)
+        if bebida_id not in bebidas_by_id:
+            bebida_id = bebidas_by_name.get(_cell_str(bebida_txt).lower())
+        es_socio_val = 1 if _cell_bool(es_socio) else 0
+        socio_id = resolver_socio(socio_id_txt, consumidor) if es_socio_val else None
+        rid = _cell_str(rid)
+        valores = (
+            _cell_str(fecha) or date.today().isoformat(), _cell_str(consumidor) or "Socio", es_socio_val, socio_id,
+            bebida_id, _cell_int(cantidad, 1), _cell_float(importe), 1 if _cell_bool(pagado) else 0,
+        )
+        if rid in consumos_by_id:
+            db.execute(
+                "UPDATE bebidas_consumos SET fecha=?, consumidor=?, es_socio=?, socio_id=?, bebida_id=?, cantidad=?, importe=?, pagado=? WHERE id=?",
+                valores + (rid,),
+            )
+            marcar("Bebidas-Consumos", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute(
+                "INSERT INTO bebidas_consumos (id, fecha, consumidor, es_socio, socio_id, bebida_id, cantidad, importe, pagado) VALUES (?,?,?,?,?,?,?,?,?)",
+                (target_id,) + valores,
+            )
+            consumos_by_id.add(target_id)
+            marcar("Bebidas-Consumos", creado=True)
+
+    # ---- Gastos-Fiestas ----
+    fiestas_by_id = {f["id"] for f in db.execute("SELECT id FROM fiestas_gastos")}
+    for row in _sheet_rows(wb, "Gastos-Fiestas"):
+        rid, fecha, evento, concepto, importe = (list(row) + [None] * 5)[:5]
+        rid = _cell_str(rid)
+        valores = (_cell_str(fecha) or date.today().isoformat(), _cell_str(evento), _cell_str(concepto), _cell_float(importe))
+        if rid in fiestas_by_id:
+            db.execute("UPDATE fiestas_gastos SET fecha=?, evento=?, concepto=?, importe=? WHERE id=?", valores + (rid,))
+            marcar("Gastos-Fiestas", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute("INSERT INTO fiestas_gastos (id, fecha, evento, concepto, importe) VALUES (?,?,?,?,?)", (target_id,) + valores)
+            fiestas_by_id.add(target_id)
+            marcar("Gastos-Fiestas", creado=True)
+
+    # ---- Inventario ----
+    inventario_by_id = {i["id"] for i in db.execute("SELECT id FROM inventario")}
+    for row in _sheet_rows(wb, "Inventario"):
+        rid, categoria, nombre, cantidad, estado, notas = (list(row) + [None] * 6)[:6]
+        nombre = _cell_str(nombre)
+        if not nombre:
+            marcar("Inventario", error="Fila sin nombre, omitida.")
+            continue
+        rid = _cell_str(rid)
+        valores = (_cell_str(categoria) or "Otros", nombre, _cell_int(cantidad, 1), _cell_str(estado) or "Bien", _cell_str(notas))
+        if rid in inventario_by_id:
+            db.execute("UPDATE inventario SET categoria=?, nombre=?, cantidad=?, estado=?, notas=? WHERE id=?", valores + (rid,))
+            marcar("Inventario", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute("INSERT INTO inventario (id, categoria, nombre, cantidad, estado, notas) VALUES (?,?,?,?,?,?)", (target_id,) + valores)
+            inventario_by_id.add(target_id)
+            marcar("Inventario", creado=True)
+
+    # ---- Reservas ----
+    reservas_by_id = {r["id"] for r in db.execute("SELECT id FROM reservas")}
+    for row in _sheet_rows(wb, "Reservas"):
+        rid, fecha, hora_inicio, hora_fin, socio_id_txt, socio_txt, evento, notas = (list(row) + [None] * 8)[:8]
+        socio_id = resolver_socio(socio_id_txt, socio_txt) or sid
+        rid = _cell_str(rid)
+        valores = (_cell_str(fecha) or date.today().isoformat(), _cell_str(hora_inicio), _cell_str(hora_fin), socio_id, _cell_str(evento), _cell_str(notas))
+        if rid in reservas_by_id:
+            db.execute("UPDATE reservas SET fecha=?, hora_inicio=?, hora_fin=?, socio_id=?, evento=?, notas=? WHERE id=?", valores + (rid,))
+            marcar("Reservas", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute(
+                "INSERT INTO reservas (id, fecha, hora_inicio, hora_fin, socio_id, evento, notas, creado_en) VALUES (?,?,?,?,?,?,?,?)",
+                (target_id,) + valores + (now_iso(),),
+            )
+            reservas_by_id.add(target_id)
+            marcar("Reservas", creado=True)
+
+    # ---- Reuniones ----
+    reuniones_by_id = {r["id"] for r in db.execute("SELECT id FROM reuniones")}
+    for row in _sheet_rows(wb, "Reuniones"):
+        rid, fecha, hora_inicio, hora_fin, evento, notas, asistentes_txt = (list(row) + [None] * 7)[:7]
+        rid = _cell_str(rid)
+        valores = (_cell_str(fecha) or date.today().isoformat(), _cell_str(hora_inicio), _cell_str(hora_fin), _cell_str(evento), _cell_str(notas))
+        if rid in reuniones_by_id:
+            db.execute("UPDATE reuniones SET fecha=?, hora_inicio=?, hora_fin=?, evento=?, notas=? WHERE id=?", valores + (rid,))
+            target_id = rid
+            marcar("Reuniones", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute(
+                "INSERT INTO reuniones (id, fecha, hora_inicio, hora_fin, evento, notas, creado_en) VALUES (?,?,?,?,?,?,?)",
+                (target_id,) + valores + (now_iso(),),
+            )
+            reuniones_by_id.add(target_id)
+            marcar("Reuniones", creado=True)
+        asistentes = resolver_socios(asistentes_txt)
+        db.execute("DELETE FROM asistencia WHERE reunion_id = ?", (target_id,))
+        db.executemany("INSERT OR IGNORE INTO asistencia (reunion_id, socio_id) VALUES (?, ?)", [(target_id, a) for a in asistentes])
+
+    # ---- Tareas ----
+    tareas_by_id = {t["id"] for t in db.execute("SELECT id FROM tareas_tickets")}
+    for row in _sheet_rows(wb, "Tareas"):
+        rid, tipo, resp_id_txt, resp_txt, estado, fecha, turno, rotacion, notas, completado_en = (list(row) + [None] * 10)[:10]
+        tipo = _cell_str(tipo)
+        if not tipo:
+            marcar("Tareas", error="Fila sin tipo, omitida.")
+            continue
+        estado = _cell_str(estado).lower() or "pendiente"
+        if estado not in ESTADOS_TICKET:
+            estado = "pendiente"
+        responsable_id = resolver_socio(resp_id_txt, resp_txt)
+        rid = _cell_str(rid)
+        valores = (
+            tipo, responsable_id, estado, _cell_str(fecha) or None, _cell_str(turno),
+            _cell_str(notas), _cell_str(rotacion), _cell_str(completado_en) or None,
+        )
+        if rid in tareas_by_id:
+            db.execute(
+                "UPDATE tareas_tickets SET tipo=?, responsable_id=?, estado=?, fecha=?, turno=?, notas=?, rotacion=?, completado_en=? WHERE id=?",
+                valores + (rid,),
+            )
+            marcar("Tareas", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute(
+                "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, completado_en, creado_por, creado_en) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (target_id,) + valores + (sid, now_iso()),
+            )
+            tareas_by_id.add(target_id)
+            marcar("Tareas", creado=True)
+
+    # ---- Reparto-Pagos ----
+    pagos_by_id = {p["id"] for p in db.execute("SELECT id FROM gastos_evento_pagos")}
+    for row in _sheet_rows(wb, "Reparto-Pagos"):
+        rid, evento_id_txt, evento_txt, pagador_id_txt, pagador_txt, concepto, importe, fecha, beneficiarios_txt = (list(row) + [None] * 9)[:9]
+        evento_id = _cell_str(evento_id_txt)
+        if evento_id not in eventos_by_id:
+            evento_id = eventos_by_name_import.get(_cell_str(evento_txt).lower()) or eventos_by_key.get((_cell_str(evento_txt).lower(), _cell_str(fecha)))
+        pagador_id = resolver_socio(pagador_id_txt, pagador_txt)
+        if not evento_id or not pagador_id:
+            marcar("Reparto-Pagos", error=f"No se pudo resolver evento/pagador en una fila (evento={_cell_str(evento_txt)}).")
+            continue
+        beneficiarios = resolver_socios(beneficiarios_txt)
+        rid = _cell_str(rid)
+        valores = (evento_id, pagador_id, _cell_str(concepto), _cell_float(importe), _cell_str(fecha) or date.today().isoformat(), json.dumps(beneficiarios))
+        if rid in pagos_by_id:
+            db.execute("UPDATE gastos_evento_pagos SET evento_id=?, pagador_id=?, concepto=?, importe=?, fecha=?, beneficiarios=? WHERE id=?", valores + (rid,))
+            marcar("Reparto-Pagos", actualizado=True)
+        else:
+            target_id = rid or new_id()
+            db.execute(
+                "INSERT INTO gastos_evento_pagos (id, evento_id, pagador_id, concepto, importe, fecha, beneficiarios) VALUES (?,?,?,?,?,?,?)",
+                (target_id,) + valores,
+            )
+            pagos_by_id.add(target_id)
+            marcar("Reparto-Pagos", creado=True)
+
+    db.commit()
+    return resumen
 
 
 if __name__ == "__main__":

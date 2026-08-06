@@ -115,6 +115,8 @@ let state = null;
 let activeTab = 'resumen';
 let bebidasSubtab = 'consumo';
 let cuotasYear = new Date().getFullYear();
+let reservasCalFecha = new Date();
+let reunionesCalFecha = new Date();
 let loaded = false;
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
 let loginDragInitialized = false;
@@ -383,7 +385,7 @@ function renderApp(){
     <div class="header-panel">
       <div class="masthead">
         
-        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;">Ver ubicacion</a></div></div>
+        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.2 7-12a7 7 0 0 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg>Ver ubicacion</a></div></div>
         
         ${can('manage_config') ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
 
@@ -455,10 +457,27 @@ function renderTab(){
 function renderRoles(){
   if(!isAdmin()) return '<p class="readonly-note">No tienes permiso para gestionar roles.</p>';
   const roles = state.roles || [];
+  const labels = state.permission_labels || {};
   return `
   <div class="card">
-    <h2><span class="pin"></span>Roles y permisos</h2>
-    <p class="readonly-note">Un socio puede tener varios roles. Los cambios se aplican al momento y el servidor los comprueba en cada accion.</p>
+    <h2><span class="pin"></span>Crear un rol</h2>
+    <form data-form="add-role">
+      <div class="form-row"><div><label class="f">Nombre del rol</label><input type="text" name="nombre" required placeholder="Ej: Vocal, encargado de compras"></div></div>
+      <details class="permisos-dropdown">
+        <summary>Elegir permisos</summary>
+        <div class="role-options">
+          ${Object.entries(labels).map(([id,label])=>`<label class="role-option"><input type="checkbox" name="permisos" value="${id}"> ${escapeHtml(label)}</label>`).join('')}
+        </div>
+      </details>
+      <button class="btn" type="submit">Crear rol</button>
+    </form>
+  </div>
+  <div class="card">
+    ${roles.length===0 ? '<p class="empty">Todavia no hay roles.</p>' : roles.map(role=>renderRoleRow(role, labels)).join('')}
+  </div>
+  <div class="card">
+    <h2><span class="pin"></span>Asignar roles a socios</h2>
+    <p class="readonly-note">Un socio puede tener varios roles. Los cambios se aplican al momento.</p>
     ${state.socios.map(s=>`
       <div class="list-item" style="align-items:flex-start;">
         <div style="flex:1;">
@@ -466,21 +485,27 @@ function renderRoles(){
           <div class="role-options">
             ${roles.map(role=>`<label class="role-option"><input type="checkbox" data-role-option="${s.id}" value="${role.id}" ${(s.roles||[]).includes(role.id)?'checked':''}> ${escapeHtml(role.nombre)}</label>`).join('')}
           </div>
-          <div class="custom-role-box">
-            <label class="f">Otro rol personalizado</label>
-            <input type="text" data-custom-role-name="${s.id}" placeholder="Ej: Vocal, encargado de compras">
-            <div class="role-options permissions-options">
-              ${Object.entries(state.permission_labels||{}).map(([id,label])=>`<label class="role-option"><input type="checkbox" data-custom-permission="${s.id}" value="${id}"> ${escapeHtml(label)}</label>`).join('')}
-            </div>
-            <button class="btn ghost small" data-action="create-custom-role" data-id="${s.id}">Crear y asignar rol</button>
-          </div>
         </div>
         <button class="btn ghost small" data-action="save-roles" data-id="${s.id}">Guardar roles</button>
       </div>`).join('')}
-  </div>
-  <div class="card">
-    <h2><span class="pin"></span>Permisos incluidos</h2>
-    ${roles.map(role=>`<div class="menu-row"><span class="label">${escapeHtml(role.nombre)}<small>${(role.permisos||[]).map(p=>escapeHtml((state.permission_labels||{})[p]||p)).join(' - ') || 'Sin permisos especiales'}</small></span></div>`).join('')}
+  </div>`;
+}
+
+function renderRoleRow(role, labels){
+  const permisos = role.permisos||[];
+  return `<div class="list-item">
+    <div style="flex:1;">
+      <div style="font-weight:600;">${escapeHtml(role.nombre)} ${role.es_sistema?'<span class="tag">rol del sistema</span>':''}</div>
+      <div class="meta">${permisos.length ? permisos.map(p=>escapeHtml(labels[p]||p)).join(', ') : 'Sin permisos especiales'}</div>
+      <details class="permisos-dropdown" style="margin-top:8px;">
+        <summary>Editar permisos</summary>
+        <div class="role-options">
+          ${Object.entries(labels).map(([id,label])=>`<label class="role-option"><input type="checkbox" data-edit-role-permiso="${role.id}" value="${id}" ${permisos.includes(id)?'checked':''}> ${escapeHtml(label)}</label>`).join('')}
+        </div>
+        <button class="btn ghost small" data-action="update-role-permisos" data-id="${role.id}" style="margin-top:8px;">Guardar permisos</button>
+      </details>
+    </div>
+    ${!role.es_sistema ? `<button class="btn danger small" data-action="delete-role" data-id="${role.id}">Borrar</button>` : ''}
   </div>`;
 }
 /* ============ calculos ============ */
@@ -572,7 +597,10 @@ function renderResumen(){
         
         <span><span class="pin"></span>Cuentas</span>
 
-        ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+        <span style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+          ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
+        </span>
       </h2>
       <div class="menu-row"><span class="label">Cuotas cobradas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
       <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
@@ -752,6 +780,10 @@ function renderReservas(){
       </div>
     `).join('')}
   </div>
+  <div class="card">
+    <h2><span class="pin"></span>Calendario de reservas</h2>
+    ${renderMiniCalendario(reservasCalFecha, state.reservas.map(r=>({fecha:r.fecha, label:r.evento+' - '+socioNombre(r.socio_id)})), 'reservas-mes')}
+  </div>
   ${pasadas.length ? `<div class="card">
     <h2><span class="pin"></span>Historial reciente</h2>
     ${pasadas.map(r=>`<div class="list-item"><div><div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)} - ${fmtHoras(r)}</span></div><div class="meta">${escapeHtml(socioNombre(r.socio_id))}</div></div></div>`).join('')}
@@ -798,7 +830,7 @@ function renderReuniones(){
 
           <div style="margin-top:8px;">
 
-            ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'? ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
+            ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'&check; ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
 
           </div>
 
@@ -807,6 +839,10 @@ function renderReuniones(){
         ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
       </div>`;
     }).join('')}
+  </div>
+  <div class="card">
+    <h2><span class="pin"></span>Calendario de reuniones</h2>
+    ${renderMiniCalendario(reunionesCalFecha, state.reuniones.map(r=>({fecha:r.fecha, label:r.evento})), 'reuniones-mes')}
   </div>`;
 }
 
@@ -1211,17 +1247,54 @@ const ESTADO_LABELS = {pendiente:'Pendiente', en_curso:'En curso', hecho:'Hecho'
 const ESTADO_CLASS = {pendiente:'warn', en_curso:'', hecho:'ok'};
 const ESTADO_CICLO = {pendiente:'en_curso', en_curso:'hecho', hecho:'pendiente'};
 const ROTACION_OPCIONES = ['', 'Semanal', 'Quincenal', 'Mensual'];
-let tareasSubtab = 'lista';
 let tareasCalFecha = new Date();
 
-function renderEncargados(){
+function renderMiniCalendario(fechaRef, items, navAction){
+  const year = fechaRef.getFullYear();
+  const month = fechaRef.getMonth();
+  const totalDias = new Date(year, month+1, 0).getDate();
+  const offset = (new Date(year, month, 1).getDay()+6)%7;
+
+  const porDia = {};
+  items.forEach(it=>{
+    if(!it.fecha) return;
+    const partes = it.fecha.split('-').map(Number);
+    if(partes[0]===year && (partes[1]-1)===month){
+      (porDia[partes[2]] = porDia[partes[2]]||[]).push(it);
+    }
+  });
+
+  const celdas = [];
+  for(let i=0;i<offset;i++) celdas.push('<div class="cal-day cal-day-empty"></div>');
+  for(let d=1; d<=totalDias; d++){
+    const dia = porDia[d]||[];
+    celdas.push(`<div class="cal-day">
+      <div class="cal-day-num">${d}</div>
+      ${dia.map(it=>`<div class="cal-ticket ${it.cls||''}" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</div>`).join('')}
+    </div>`);
+  }
+
   return `
-  <div class="subtabs">
-    <button class="subtab-btn ${tareasSubtab==='lista'?'active':''}" data-action="tareas-subtab" data-sub="lista">Lista</button>
-    <button class="subtab-btn ${tareasSubtab==='calendario'?'active':''}" data-action="tareas-subtab" data-sub="calendario">Calendario</button>
+  <div class="year-nav">
+    <button data-action="${navAction}" data-dir="-1">&larr; anterior</button>
+    <b>${MESES[month]} ${year}</b>
+    <button data-action="${navAction}" data-dir="1">siguiente &rarr;</button>
   </div>
+  <div class="cal-grid">
+    ${['Lun','Mar','Mie','Jue','Vie','Sab','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')}
+    ${celdas.join('')}
+  </div>`;
+}
+
+function renderEncargados(){
+  const tareas = state.tareas_tickets || [];
+  const activas = tareas.filter(t=>t.estado!=='hecho');
+  const historial = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
+  const sinFecha = activas.filter(t=>!t.fecha && t.turno);
+  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+(t.responsable_id?': '+socioNombre(t.responsable_id):''), cls:ESTADO_CLASS[t.estado]}));
+  return `
   <div class="card">
-    <h2><span class="pin"></span>Nuevo ticket de tarea</h2>
+    <h2><span class="pin"></span>Nueva tarea</h2>
     <form data-form="add-tarea-ticket">
       <div class="form-row">
         <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required placeholder="Ej: Compras, Limpieza..."></div>
@@ -1234,10 +1307,25 @@ function renderEncargados(){
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <datalist id="tareas-tipos-list">${state.tareas_fijas.map(t=>`<option value="${escapeHtml(t)}">`).join('')}</datalist>
-      <button class="btn" type="submit">Crear ticket</button>
+      <button class="btn" type="submit">Crear tarea</button>
     </form>
   </div>
-  ${tareasSubtab==='lista' ? renderTareasLista() : renderTareasCalendario()}
+  <div class="card">
+    <h2><span class="pin"></span>Tareas activas</h2>
+    ${activas.length===0 ? '<p class="empty">No hay tareas activas.</p>' : activas.map(t=>renderTicketRow(t)).join('')}
+  </div>
+  ${sinFecha.length ? `<div class="card">
+    <h2><span class="pin"></span>Tareas por turno (sin fecha fija)</h2>
+    ${sinFecha.map(t=>renderTicketRow(t)).join('')}
+  </div>` : ''}
+  <div class="card">
+    <h2><span class="pin"></span>Calendario de tareas</h2>
+    ${renderMiniCalendario(tareasCalFecha, calItems, 'tareas-mes')}
+  </div>
+  ${historial.length ? `<div class="card">
+    <h2><span class="pin"></span>Historial de tareas completadas</h2>
+    ${historial.map(t=>renderTicketRow(t)).join('')}
+  </div>` : ''}
   `;
 }
 
@@ -1248,7 +1336,7 @@ function renderTicketRow(t){
   return `<div class="list-item">
     <div>
       <div style="font-weight:600;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotacion: ${escapeHtml(t.rotacion)}</span>`:''}</div>
-      <div class="meta">${t.responsable_id?escapeHtml(socioNombre(t.responsable_id)):'Sin asignar'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.turno?' - '+escapeHtml(t.turno):''}</div>
+      <div class="meta">${t.responsable_id?escapeHtml(socioNombre(t.responsable_id)):'Sin asignar'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.turno?' - '+escapeHtml(t.turno):''}${t.completado_en?' - completada el '+fmtDate(t.completado_en.slice(0,10)):''}</div>
       ${t.notas?`<div class="meta" style="margin-top:2px;">${escapeHtml(t.notas)}</div>`:''}
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -1257,59 +1345,6 @@ function renderTicketRow(t){
       ${puedeEditar ? `<button class="btn danger small" data-action="delete-tarea-ticket" data-id="${t.id}">Borrar</button>` : ''}
     </div>
   </div>`;
-}
-
-function renderTareasLista(){
-  const tickets = state.tareas_tickets || [];
-  if(!tickets.length) return '<div class="card"><p class="empty">Todavia no hay tickets de tareas.</p></div>';
-  return `<div class="card">${tickets.map(t=>renderTicketRow(t)).join('')}</div>`;
-}
-
-function renderTareasCalendario(){
-  const year = tareasCalFecha.getFullYear();
-  const month = tareasCalFecha.getMonth();
-  const ultimoDia = new Date(year, month+1, 0);
-  const totalDias = ultimoDia.getDate();
-  let offset = (new Date(year, month, 1).getDay()+6)%7;
-
-  const porDia = {};
-  (state.tareas_tickets||[]).forEach(t=>{
-    if(!t.fecha) return;
-    const partes = t.fecha.split('-').map(Number);
-    if(partes[0]===year && (partes[1]-1)===month){
-      (porDia[partes[2]] = porDia[partes[2]]||[]).push(t);
-    }
-  });
-
-  const celdas = [];
-  for(let i=0;i<offset;i++) celdas.push('<div class="cal-day cal-day-empty"></div>');
-  for(let d=1; d<=totalDias; d++){
-    const tickets = porDia[d]||[];
-    celdas.push(`<div class="cal-day">
-      <div class="cal-day-num">${d}</div>
-      ${tickets.map(t=>`<div class="cal-ticket ${ESTADO_CLASS[t.estado]||''}" title="${escapeHtml(t.tipo)}">${escapeHtml(t.tipo)}${t.responsable_id?': '+escapeHtml(socioNombre(t.responsable_id)):''}</div>`).join('')}
-    </div>`);
-  }
-
-  const sinFecha = (state.tareas_tickets||[]).filter(t=>!t.fecha && t.turno);
-
-  return `
-  <div class="card">
-    <div class="year-nav">
-      <button data-action="tareas-mes" data-dir="-1">&larr; anterior</button>
-      <b>${MESES[month]} ${year}</b>
-      <button data-action="tareas-mes" data-dir="1">siguiente &rarr;</button>
-    </div>
-    <div class="cal-grid">
-      ${['Lun','Mar','Mie','Jue','Vie','Sab','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')}
-      ${celdas.join('')}
-    </div>
-  </div>
-  ${sinFecha.length ? `<div class="card">
-    <h2><span class="pin"></span>Tickets por turno (sin fecha fija)</h2>
-    ${sinFecha.map(t=>renderTicketRow(t)).join('')}
-  </div>` : ''}
-  `;
 }
 
 /* ============ PERFIL ============ */
@@ -1460,19 +1495,21 @@ document.addEventListener('click', async (e)=>{
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
       await loadState(); render();
     }
-    else if(action==='tareas-subtab'){ tareasSubtab = btn.dataset.sub; render(); }
     else if(action==='tareas-mes'){ tareasCalFecha.setMonth(tareasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
+    else if(action==='reservas-mes'){ reservasCalFecha.setMonth(reservasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
+    else if(action==='reuniones-mes'){ reunionesCalFecha.setMonth(reunionesCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
     else if(action==='asignarme-ticket'){
       await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {responsable_id: state.current_user});
       await loadState(); render();
     }
     else if(action==='ciclar-estado-ticket'){
       const siguiente = ESTADO_CICLO[btn.dataset.estado] || 'pendiente';
-      await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {estado: siguiente});
+      const r = await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {estado: siguiente});
       await loadState(); render();
+      if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotacion, se ha creado la siguiente automaticamente.'); }
     }
     else if(action==='delete-tarea-ticket'){
-      if(confirm('Borrar este ticket de tarea?')){ await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('Borrar esta tarea?')){ await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-reunion'){
       if(confirm('Borrar esta reunion?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
@@ -1572,6 +1609,27 @@ document.addEventListener('change', async (e)=>{
       await loadState(); render();
     }catch(err){ alert(err.message || 'No se pudo subir la foto'); }
   }
+  if(e.target.matches('[data-import-excel]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    const fd = new FormData();
+    fd.append('archivo', file);
+    try{
+      const res = await fetch('/api/import.xlsx', {method:'POST', body:fd});
+      const resultado = await res.json();
+      if(!res.ok) throw new Error(resultado.error || 'No se pudo importar.');
+      const resumen = resultado.resumen || {};
+      let msg = 'Importacion completada:\n';
+      for(const hoja of Object.keys(resumen)){
+        const r = resumen[hoja];
+        msg += `- ${hoja}: ${r.creados} creados, ${r.actualizados} actualizados`;
+        msg += r.errores.length ? `, ${r.errores.length} con error\n` : '\n';
+      }
+      await loadState(); render();
+      alert(msg);
+    }catch(err){ alert(err.message || 'No se pudo importar el archivo.'); }
+    e.target.value = '';
+  }
 });
 
 /* ============ EVENTOS: formularios ============ */
@@ -1634,6 +1692,10 @@ document.addEventListener('submit', async (e)=>{
       await apiPost(`/api/gastos-eventos/${eid}/pagos`, {pagador_id: data.pagador_id, concepto: data.concepto, importe: data.importe, beneficiarios});
     }
     else if(type==='add-tarea-ticket'){ await apiPost('/api/tareas-tickets', data); }
+    else if(type==='add-role'){
+      const permisos = new FormData(form).getAll('permisos');
+      await apiPost('/api/roles', {nombre: data.nombre, permisos});
+    }
     else if(type==='save-perfil'){ await apiPost('/api/perfil', data); }
     else if(type==='change-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }
@@ -1682,19 +1744,23 @@ document.addEventListener('click', async (e)=>{
   }catch(err){ alert(err.message || 'No se pudieron guardar los roles.'); }
 });
 document.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('[data-action="create-custom-role"]');
+  const btn = e.target.closest('[data-action="update-role-permisos"]');
   if(!btn) return;
-  const sid = btn.dataset.id;
-  const input = document.querySelector(`input[data-custom-role-name="${sid}"]`);
-  const nombre = input ? input.value.trim() : '';
-  const permisos = [...document.querySelectorAll(`input[data-custom-permission="${sid}"]:checked`)].map(item=>item.value);
-  if(!nombre){ alert('Escribe un nombre para el rol personalizado.'); return; }
+  const rid = btn.dataset.id;
+  const permisos = [...document.querySelectorAll(`input[data-edit-role-permiso="${rid}"]:checked`)].map(item=>item.value);
   try{
-    const created = await apiPost('/api/roles', {nombre, permisos});
-    const roles = [...document.querySelectorAll(`input[data-role-option="${sid}"]:checked`)].map(item=>item.value);
-    roles.push(created.id);
-    await apiPost(`/api/socios/${sid}/roles`, {roles});
+    await apiPost(`/api/roles/${rid}`, {permisos});
     await loadState();
     render();
-  }catch(err){ alert(err.message || 'No se pudo crear el rol personalizado.'); }
+  }catch(err){ alert(err.message || 'No se pudieron guardar los permisos.'); }
+});
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-action="delete-role"]');
+  if(!btn) return;
+  if(!confirm('Borrar este rol? Los socios que lo tengan lo perderan.')) return;
+  try{
+    await apiDelete(`/api/roles/${btn.dataset.id}`);
+    await loadState();
+    render();
+  }catch(err){ alert(err.message || 'No se pudo borrar el rol.'); }
 });
