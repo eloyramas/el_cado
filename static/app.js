@@ -13,6 +13,83 @@ const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/b
 const PENA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
 let avatarVersion = Date.now();
 
+/* ============ AYUDA (FAQ con guion, sin IA externa) ============ */
+const FAQ_ENTRIES = [
+  {id:'entrar', pregunta:'Como entro / inicio sesion?', palabras:['entrar','entro','sesion','login','iniciar','acceder'],
+    respuesta:'Escribe tu nombre en el buscador de la pantalla de inicio, elige tu cara entre los resultados y escribe tu PIN de 4 digitos. Si es la primera vez que entras, la app te pedira crear tu propio PIN antes de continuar.'},
+  {id:'pin-olvidado', pregunta:'Se me ha olvidado el PIN, que hago?', palabras:['olvide','olvidado','pin','recuperar','restablecer','reset'],
+    respuesta:'Pidele al administrador (o a quien gestione socios) que te restablezca el PIN desde la pestana Socios, boton "Restablecer PIN". Te dara uno temporal y tendras que cambiarlo por el tuyo la proxima vez que entres.'},
+  {id:'marcar-cuota', pregunta:'Quien puede ver y marcar las cuotas?', palabras:['cuota','cuotas','pagar','pagado','marcar','tesorero'],
+    respuesta:'La pestana Cuotas solo la ven el tesorero y el administrador, que son los unicos que pueden marcar una cuota como pagada (se marca con una cruz), previa comprobacion. El resto de socios no ve esa pestana, pero recibe aviso en la campanita si tiene alguna cuota pendiente.'},
+  {id:'reservar', pregunta:'Como reservo la pena?', palabras:['reservar','reserva','reservas','calendario'],
+    respuesta:'Ve a la pestana Reservas, rellena la fecha y el evento (las horas son opcionales) y pulsa "Reservar a mi nombre". Puedes cancelar tu propia reserva desde la lista de proximas reservas. En los calendarios (Reservas, Reuniones, Tareas) puedes pulsar la etiqueta de un dia para ver los detalles de ese evento, muy util desde el movil.'},
+  {id:'tricount', pregunta:'Como funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
+    respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
+  {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket'],
+    respuesta:'En la pestana Tareas puedes crear un ticket para ti mismo, o asignarte uno existente que no tenga responsable. Quien gestiona tareas puede ademas asignar cualquier ticket a cualquier socio.'},
+  {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
+    respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se recorta sola en cuadrado. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
+  {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
+    respuesta:'Cualquier socio puede consultar los precios en Bebidas > Consumo del dia a dia, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos o registrar consumos es cosa del administrador o el tesorero.'},
+  {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso'],
+    respuesta:'En Gastos e ingresos, tarjeta "Gastos de socios para la pena", rellena el concepto, el importe y la fecha. Una vez creado, puedes subir una foto del ticket (.jpg o .png) desde el propio gasto de la lista. Cuando el tesorero te lo abone, marcalo como "Abonado" (puedes hacerlo tu mismo o el administrador/tesorero). Solo tu o el administrador/tesorero podeis editar o borrar ese gasto; no los de otros socios.'},
+  {id:'excel', pregunta:'Como exporto los datos a Excel?', palabras:['excel','exportar','descargar','xlsx','cuentas'],
+    respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario o Bebidas. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.'},
+  {id:'roles', pregunta:'Que son los roles y quien los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
+    respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignarselos a los socios, desde la pestana Roles.'},
+  {id:'avisos', pregunta:'Que es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
+    respuesta:'La campanita de la cabecera avisa de cuotas pendientes, bebidas por pagar y actividad reciente (reservas y reuniones). El numero indica cuantos avisos hay ahora mismo; desde ahi tambien puedes exportarlos como un log de texto. Para cerrar el desplegable, pulsa la campanita otra vez o toca en cualquier otro sitio de la pantalla.'},
+  {id:'baja', pregunta:'Que pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
+    respuesta:'Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia a reuniones, etc): simplemente deja de aparecer en el buscador de la pantalla de inicio y se marca como "de baja" en la lista de socios.'},
+];
+function buscarFaq(query){
+  const q = query.toLowerCase().trim();
+  if(!q) return FAQ_ENTRIES;
+  const terminos = q.split(/\s+/).filter(Boolean);
+  return FAQ_ENTRIES
+    .map(entry=>{
+      let score = 0;
+      terminos.forEach(t=>{
+        if(entry.palabras.some(p=>p.includes(t) || t.includes(p))) score += 2;
+        if(entry.pregunta.toLowerCase().includes(t)) score += 1;
+      });
+      return {entry, score};
+    })
+    .filter(r=>r.score>0)
+    .sort((a,b)=>b.score-a.score)
+    .map(r=>r.entry);
+}
+let ayudaAbierta = false;
+let ayudaQuery = '';
+let ayudaTranscript = []; // {pregunta, respuesta}
+const HELP_ICON_PATH = '<circle cx="12" cy="12" r="9"/><path d="M9.2 9.2a2.8 2.8 0 0 1 5.4.9c0 1.8-2.6 2-2.6 3.7"/><path d="M12 17.2h.01"/>';
+function renderAyuda(){
+  const btn = `<button class="help-fab" data-action="toggle-ayuda" title="${ayudaAbierta?'Cerrar ayuda':'Ayuda'}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HELP_ICON_PATH}</svg></button>`;
+  if(!ayudaAbierta) return btn;
+  const sugerencias = buscarFaq(ayudaQuery);
+  return `
+  <div class="help-panel">
+    <div class="help-panel-header">
+      <b>Ayuda rapida</b>
+      <button class="help-close" data-action="toggle-ayuda" title="Cerrar">&times;</button>
+    </div>
+    <div class="help-transcript" id="help-transcript">
+      ${ayudaTranscript.length===0 ? '<p class="empty">Escribe tu duda o elige una pregunta frecuente de abajo.</p>' : ayudaTranscript.map(t=>`
+        <div class="help-msg help-msg-q">${escapeHtml(t.pregunta)}</div>
+        <div class="help-msg help-msg-a">${escapeHtml(t.respuesta)}</div>
+      `).join('')}
+    </div>
+    <input type="text" id="help-search-input" class="help-search-input" placeholder="Escribe tu duda..." value="${escapeHtml(ayudaQuery)}" autocomplete="off">
+    <div class="help-suggestions" id="help-suggestions">${renderHelpSuggestions(sugerencias)}</div>
+    <p class="meta" style="margin:8px 0 0; text-align:center;">Preguntas frecuentes con respuesta ya escrita: si tu duda no aparece, preguntale al administrador o al tesorero.</p>
+  </div>
+  ${btn}`;
+}
+function renderHelpSuggestions(entries){
+  if(entries.length===0) return '<p class="empty" style="font-size:0.8rem;">No he encontrado nada parecido.</p>';
+  return entries.slice(0,6).map(e=>`<button class="help-suggestion" data-action="ask-faq" data-id="${e.id}">${escapeHtml(e.pregunta)}</button>`).join('');
+}
+
 function initBackgroundSlideshow(){
   const layerA = document.getElementById('bg-layer-a');
   const layerB = document.getElementById('bg-layer-b');
@@ -115,10 +192,16 @@ let state = null;
 let activeTab = 'resumen';
 let bebidasSubtab = 'consumo';
 let cuotasYear = new Date().getFullYear();
+let cuotasMesMovil = new Date().getMonth()+1;
+let resumenGraficoYear = new Date().getFullYear();
 let reservasCalFecha = new Date();
 let reunionesCalFecha = new Date();
+let nuevoEventoParticipantes = [];
+let editandoGastoSocioId = null;
+let ticketVersion = Date.now();
 let loaded = false;
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
+let loginSearchQuery = ''; // texto escrito en "Escribe tu nombre" de la pantalla de login
 let loginDragInitialized = false;
 
 // Guardar y recuperar usuario favorito
@@ -210,6 +293,28 @@ async function uploadFoto(socioId, file){
   }
   avatarVersion = Date.now();
 }
+async function uploadTicketGasto(gastoId, file){
+  const fd = new FormData();
+  fd.append('ticket', file);
+  const res = await fetch(`/api/gastos-socios/${gastoId}/ticket`, {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el ticket.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  ticketVersion = Date.now();
+}
+async function uploadTicketPago(eventoId, pagoId, file){
+  const fd = new FormData();
+  fd.append('ticket', file);
+  const res = await fetch(`/api/gastos-eventos/${eventoId}/pagos/${pagoId}/ticket`, {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el ticket.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  ticketVersion = Date.now();
+}
 function escapeHtml(str){
   return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -228,16 +333,22 @@ function render(){
   const app = document.getElementById('app');
   if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la pena</div>`; return; }
   if(!state.current_user){
-    app.innerHTML = renderLogin();
+    app.innerHTML = renderLogin() + renderAyuda();
     if(!loginDragInitialized){
       loginDragInitialized = true;
       initLoginDrag();
     }
+    scrollHelpTranscript();
     return;
   }
   const me = state.socios.find(s=>s.id===state.current_user);
-  if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me); return; }
-  app.innerHTML = renderApp();
+  if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me) + renderAyuda(); scrollHelpTranscript(); return; }
+  app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel();
+  scrollHelpTranscript();
+}
+function scrollHelpTranscript(){
+  const t = document.getElementById('help-transcript');
+  if(t) t.scrollTop = t.scrollHeight;
 }
 
 function renderForcePin(me){
@@ -252,7 +363,7 @@ function renderForcePin(me){
       <label class="f">Nuevo PIN (4 digitos, el que tu quieras)</label>
       <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****" autofocus
         
-        style="text-align:center; font-size:1.4rem; letter-spacing:0.5rem; margin-bottom:10px;">
+        style="text-align:center; font-size:1.4rem; letter-spacing:0.5rem; text-indent:0.5rem; margin-bottom:10px;">
       <label class="f">Repite el PIN</label>
       <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="****"
         
@@ -298,7 +409,7 @@ function renderLogin(){
               <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" name="pin" placeholder="****" autofocus
         
                 
-        style="text-align:center; font-size:1.8rem; letter-spacing:0.8rem; padding:14px; border-radius:8px; border:1px solid var(--line); background:rgba(15,26,21,0.72); color:var(--chalk);">
+        style="text-align:center; font-size:1.8rem; letter-spacing:0.8rem; text-indent:0.8rem; padding:14px; border-radius:8px; border:1px solid var(--line); background:rgba(15,26,21,0.72); color:var(--chalk);">
         
               <button class="btn" type="submit" style="width:100%; margin-top:16px;">${s.tiene_pin ? 'Entrar' : 'Entrar y crear mi PIN luego'}</button>
         
@@ -314,72 +425,77 @@ function renderLogin(){
     pendingLoginId = null;
   }
 
+  if(sinSocios){
+    return `
+    <div class="login-wrap">
+      <div class="login-header">
+        <div class="login-header-content">${logoBadge()}<h1>${escapeHtml(state.config.nombre)}</h1></div>
+      </div>
+      <div class="login-panel login-panel-search">
+        <div class="login-panel-center">
+          <div class="login-content">
+            <form data-form="bootstrap-admin" style="margin-top:24px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">
+              <label class="f">Tu nombre</label>
+              <input type="text" name="nombre" required placeholder="Nombre y apellido" style="margin-bottom:10px;">
+              <label class="f">Elige un PIN de 4 digitos</label>
+              <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****" style="margin-bottom:10px;">
+              <button class="btn" type="submit" style="width:100%;">Crear pena y entrar como administrador</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const query = loginSearchQuery.trim().toLowerCase();
+  const matches = query.length>=2 ? socios.filter(s=>s.nombre.toLowerCase().includes(query)) : [];
+
   return `
   <div class="login-wrap">
     <div class="login-header">
       <div class="login-header-content">
-        
+
         ${logoBadge()}
-        
+
         <h1>${escapeHtml(state.config.nombre)}</h1>
       </div>
     </div>
-    <div class="login-panel">
-      <div class="login-content-full">
-        
-        <div class="login-left-sidebar">
-        
-          ${socios.slice(0, Math.ceil(socios.length / 2)).map(s=>`<button class="user-chip-photo" data-action="select-user" data-id="${s.id}">${avatarHtml(s,'md')}<span>${escapeHtml(s.nombre)}</span></button>`).join('')}
-        
-        </div>
-        
-        <div class="login-center">
-        
-          ${sinSocios ? `
-        
-          <div class="login-panel-center">
-        
-            <div class="login-content">
-        
-              <form data-form="bootstrap-admin" style="margin-top:24px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">
-        
-                
-        <label class="f">Tu nombre</label>
-        
-                
-        <input type="text" name="nombre" required placeholder="Nombre y apellido" style="margin-bottom:10px;">
-        
-                
-        <label class="f">Elige un PIN de 4 digitos</label>
-        
-                
-        <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****" style="margin-bottom:10px;">
-        
-                
-        <button class="btn" type="submit" style="width:100%;">Crear pena y entrar como administrador</button>
-        
-              </form>
-        
-            </div>
-        
-          </div>
-        
-          ` : ``}
-        
-        </div>
-        
-        <div class="login-right-sidebar">
-        
-          ${socios.slice(Math.ceil(socios.length / 2)).map(s=>`<button class="user-chip-photo" data-action="select-user" data-id="${s.id}">${avatarHtml(s,'md')}<span>${escapeHtml(s.nombre)}</span></button>`).join('')}
-        
-        </div>
+    <div class="login-panel login-panel-search">
+      <div class="login-search-wrap">
+        <label class="f" style="text-align:center; display:block;">Escribe tu nombre</label>
+        <input type="text" id="login-search-input" class="login-search-input" placeholder="Empieza a escribir..." autocomplete="off" autofocus value="${escapeHtml(loginSearchQuery)}">
+        <div id="login-search-results" class="login-search-results">${renderLoginSearchResults(matches, query)}</div>
       </div>
     </div>
   </div>`;
 }
 
+function renderLoginSearchResults(matches, query){
+  if(!query) return '';
+  if(matches.length===0) return '<p class="empty" style="text-align:center;">Nadie coincide con eso.</p>';
+  return `<div class="login-grid">${matches.map(s=>`<button class="user-chip-photo" data-action="select-user" data-id="${s.id}">${avatarHtml(s,'md')}<span>${escapeHtml(s.nombre)}</span></button>`).join('')}</div>`;
+}
+
+const BELL_ICON_PATH = '<path d="M12 3a5 5 0 0 0-5 5v3.2c0 .6-.2 1.2-.6 1.7L5 15.5V17h14v-1.5l-1.4-2.6a2.8 2.8 0 0 1-.6-1.7V8a5 5 0 0 0-5-5z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>';
+let alertasAbiertas = false;
+function renderAlertasPanel(){
+  if(!alertasAbiertas) return '';
+  const alertas = construirAlertas();
+  return `<div class="bell-backdrop" data-action="cerrar-alertas"></div>
+  <div class="bell-dropdown">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <b>Avisos</b>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn ghost small" data-action="export-log-eventos">Exportar log</button>
+        <button class="help-close" data-action="cerrar-alertas" title="Cerrar">&times;</button>
+      </div>
+    </div>
+    ${alertas.length ? alertas.map(a=>`<div class="alert-item"><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">- ${a.meta}</span>`:''}</div></div>`).join('') : '<p class="empty">Sin avisos por ahora.</p>'}
+  </div>`;
+}
 function renderApp(){
   const me = state.socios.find(s=>s.id===state.current_user);
+  const alertas = construirAlertas();
   return `
   <div class="container">
     <div class="header-panel">
@@ -395,19 +511,24 @@ function renderApp(){
 
         </div>` : ''}
         
-        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">cambiar usuario</button></div>
+        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">cambiar usuario</button>
+          <button type="button" class="bell-btn" data-action="toggle-alertas" title="Avisos">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BELL_ICON_PATH}</svg>
+            ${alertas.length ? `<span class="bell-badge">${alertas.length}</span>` : ''}
+          </button>
+        </div>
       </div>
       <div class="tabs">
         ${tabBtn('resumen','Resumen','chart')}
         ${tabBtn('socios','Socios','people')}
-        ${tabBtn('cuotas','Cuotas','coin')}
+        ${can('manage_cuotas') ? tabBtn('cuotas','Cuotas','coin') : ''}
         ${tabBtn('reservas','Reservas','calendar-check')}
         ${tabBtn('reuniones','Reuniones','calendar')}
-        ${tabBtn('reparto','Reparto','split')}
         ${tabBtn('inventario','Inventario','box')}
         ${tabBtn('caja','Gastos e ingresos','wallet')}
         ${tabBtn('bebidas','Bebidas','cup')}
         ${tabBtn('encargados','Tareas','check')}
+        ${tabBtn('reparto','Tricount','split')}
         ${isAdmin() ? tabBtn('roles','Roles','key') : ''}
         ${tabBtn('perfil','Mi perfil','user')}
       </div>
@@ -454,9 +575,25 @@ function renderTab(){
   }
 }
 
+function sortedRoles(){
+  // Igual que el orden alfabetico del backend, pero dejando "Otro" siempre al final.
+  const roles = [...(state.roles || [])];
+  roles.sort((a,b)=>{
+    if(a.id==='otro') return 1;
+    if(b.id==='otro') return -1;
+    return a.nombre.localeCompare(b.nombre, 'es');
+  });
+  return roles;
+}
+const SOCIO_SWATCH_COLORS = ['#c1553a','#7fa88c','#e8a33d','#6b8fb0','#a874a8','#4f9d8a','#c98a3a','#8a7fc9'];
+function socioSwatchColor(socioId){
+  let hash = 0;
+  for(let i=0;i<socioId.length;i++){ hash = (hash*31 + socioId.charCodeAt(i)) >>> 0; }
+  return SOCIO_SWATCH_COLORS[hash % SOCIO_SWATCH_COLORS.length];
+}
 function renderRoles(){
   if(!isAdmin()) return '<p class="readonly-note">No tienes permiso para gestionar roles.</p>';
-  const roles = state.roles || [];
+  const roles = sortedRoles();
   const labels = state.permission_labels || {};
   return `
   <div class="card">
@@ -479,7 +616,7 @@ function renderRoles(){
     <h2><span class="pin"></span>Asignar roles a socios</h2>
     <p class="readonly-note">Un socio puede tener varios roles. Los cambios se aplican al momento.</p>
     ${state.socios.map(s=>`
-      <div class="list-item" style="align-items:flex-start;">
+      <div class="list-item socio-role-row" style="align-items:flex-start; border-left-color:${socioSwatchColor(s.id)};">
         <div style="flex:1;">
           <div style="font-weight:600; margin-bottom:8px;">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}</div>
           <div class="role-options">
@@ -515,10 +652,23 @@ function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').
 function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
+function actualizarTotalConsumo(form){
+  const el = form.querySelector('#consumo-total');
+  if(!el) return;
+  const bebidaId = form.querySelector('[name=bebida_id]').value;
+  const cantidad = Number(form.querySelector('[name=cantidad]').value) || 0;
+  const esSocio = form.querySelector('[name=consumidorTipo]').value === 'socio';
+  const precio = state.bebidas_precios.find(p=>p.id===bebidaId);
+  const unit = precio ? Number(esSocio ? precio.precio_socio : precio.precio_no_socio) : 0;
+  el.textContent = `Total a pagar: ${money(unit * cantidad)}`;
+}
 function totalFiestasGasto(){ return state.fiestas_gastos.reduce((a,f)=>a+Number(f.importe||0),0); }
+function totalIngresosSociosVerificados(){ return (state.gastos_socios||[]).filter(g=>g.tipo==='ingreso' && g.abonado).reduce((a,g)=>a+Number(g.importe||0),0); }
+function totalGastosSociosVerificados(){ return (state.gastos_socios||[]).filter(g=>g.tipo!=='ingreso' && g.abonado).reduce((a,g)=>a+Number(g.importe||0),0); }
+function gastosSociosPendientes(){ return (state.gastos_socios||[]).filter(g=>!g.abonado); }
 function saldoTotal(){
-  const ingresos = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso();
-  const gastos = totalGastosMov() + totalFiestasGasto();
+  const ingresos = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
+  const gastos = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
   return ingresos - gastos;
 }
 function fiestasPorEvento(){
@@ -529,21 +679,27 @@ function fiestasPorEvento(){
   return Object.entries(map).sort((a,b)=>b[1]-a[1]);
 }
 
-/* ============ ALERTAS ============ */
+/* ============ ALERTAS (ya no se muestran en pantalla: se exportan como log) ============ */
 function construirAlertas(){
   const alertas = [];
   const now = new Date();
   const hoy = now.getDate();
 
-  if(hoy > DIA_LIMITE_CUOTA){
+  if(hoy >= DIA_LIMITE_CUOTA){
     const activos = state.socios.filter(s=>s.activo);
     activos.forEach(s=>{
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===now.getFullYear() && c.month===now.getMonth()+1);
       if(!c || !c.pagado){
-        
+
         alertas.push({tipo:'warn', texto:`${s.nombre} todavia no ha pagado la cuota de ${MESES[now.getMonth()]}`});
       }
     });
+  }
+
+  const gastosPendientes = gastosSociosPendientes();
+  if(gastosPendientes.length){
+    const total = gastosPendientes.reduce((a,g)=>a+Number(g.importe||0),0);
+    alertas.push({tipo:'warn', texto:`Hay ${gastosPendientes.length} gasto(s)/ingreso(s) de socios (${money(total)}) pendientes de verificar por el tesorero (pestana Gastos e ingresos).`});
   }
 
   const misPendientes = misBebidasPendientes();
@@ -557,12 +713,122 @@ function construirAlertas(){
     if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservo la pena para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`});
   });
   state.reuniones.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoco una reunion para el ${fmtDate(r.fecha)}: ${escapeHtml(r.titulo)}`});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoco una reunion para el ${fmtDate(r.fecha)}: ${escapeHtml(r.evento)}`});
   });
   recientes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
   recientes.slice(0,5).forEach(r=>alertas.push({tipo:'info', texto:r.texto, meta:timeAgoEs(r.fecha)}));
 
   return alertas;
+}
+
+function exportarLogEventos(){
+  const alertas = construirAlertas();
+  const ahora = new Date();
+  const lineas = [`Log de eventos y avisos - ${state.config.nombre} - generado el ${ahora.toLocaleString('es-ES')}`, ''];
+  if(alertas.length===0){
+    lineas.push('Sin avisos en este momento.');
+  } else {
+    alertas.forEach(a=>{
+      const etiqueta = a.tipo==='warn' ? '[AVISO]' : '[INFO]';
+      lineas.push(`${etiqueta} ${a.texto}${a.meta ? ' ('+a.meta+')' : ''}`);
+    });
+  }
+  const blob = new Blob([lineas.join('\n')], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `el_cado_log_eventos_${todayISO()}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ============ GRAFICAS: evolucion de ingresos y gastos ============ */
+function movimientosPorMes(){
+  const map = {}; // 'YYYY-MM' -> {ingresos, gastos}
+  function add(fecha, campo, importe){
+    if(!fecha) return;
+    const key = String(fecha).slice(0,7);
+    if(!map[key]) map[key] = {ingresos:0, gastos:0};
+    map[key][campo] += Number(importe||0);
+  }
+  state.cuotas.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
+  state.movimientos.forEach(m=>add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe));
+  state.bebidas_consumos.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
+  state.fiestas_gastos.forEach(f=>add(f.fecha, 'gastos', f.importe));
+  (state.gastos_socios||[]).forEach(g=>{ if(g.abonado) add(g.fecha, g.tipo==='ingreso' ? 'ingresos' : 'gastos', g.importe); });
+  return map;
+}
+function aniosConDatos(){
+  const map = movimientosPorMes();
+  const anios = new Set(Object.keys(map).map(k=>Number(k.slice(0,4))));
+  anios.add(new Date().getFullYear());
+  return [...anios].sort((a,b)=>a-b);
+}
+function renderGraficoMensual(year){
+  const map = movimientosPorMes();
+  const datos = MESES.map((m,i)=>{
+    const key = `${year}-${String(i+1).padStart(2,'0')}`;
+    const d = map[key] || {ingresos:0, gastos:0};
+    return {mes:m, ingresos:d.ingresos, gastos:d.gastos, balance:d.ingresos-d.gastos};
+  });
+  const max = Math.max(1, ...datos.map(d=>Math.max(d.ingresos, d.gastos, Math.abs(d.balance))));
+  const W = 760, H = 200, padBottom = 24, padLeft = 4;
+  const groupW = (W - padLeft) / 12;
+  const barW = Math.min(9, groupW / 4);
+  const scale = v => (H - 14 - padBottom) * (v / max);
+  const barras = datos.map((d,i)=>{
+    const gx = padLeft + i * groupW;
+    const hIng = scale(d.ingresos), hGas = scale(d.gastos), hBal = scale(Math.abs(d.balance));
+    const xIng = gx + groupW/2 - barW*1.5 - 2, xGas = gx + groupW/2 - barW/2, xBal = gx + groupW/2 + barW/2 + 2;
+    const yIng = H - padBottom - hIng, yGas = H - padBottom - hGas, yBal = H - padBottom - hBal;
+    const tooltip = `${d.mes} ${year}\nIngresos: ${money(d.ingresos)}\nGastos: ${money(d.gastos)}\nBalance: ${d.balance<0?'- ':'+ '}${money(Math.abs(d.balance))}`;
+    return `
+      <rect x="${xIng.toFixed(1)}" y="${yIng.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hIng).toFixed(1)}" rx="2" class="bar-ingreso"></rect>
+      <rect x="${xGas.toFixed(1)}" y="${yGas.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hGas).toFixed(1)}" rx="2" class="bar-gasto"></rect>
+      <rect x="${xBal.toFixed(1)}" y="${yBal.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hBal).toFixed(1)}" rx="2" class="bar-balance ${d.balance<0?'negativo':''}"></rect>
+      <rect x="${gx.toFixed(1)}" y="0" width="${groupW.toFixed(1)}" height="${(H-padBottom).toFixed(1)}" class="chart-hit" data-tooltip="${escapeHtml(tooltip)}"></rect>
+      <text x="${(gx+groupW/2).toFixed(1)}" y="${H-7}" class="chart-label" text-anchor="middle">${d.mes}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ingresos, gastos y balance por mes de ${year}">
+    <line x1="${padLeft}" y1="${H-padBottom}" x2="${W}" y2="${H-padBottom}" class="chart-axis"></line>
+    ${barras}
+  </svg>`;
+}
+function totalesPorAnio(year){
+  const map = movimientosPorMes();
+  let ingresos = 0, gastos = 0;
+  Object.keys(map).forEach(k=>{ if(Number(k.slice(0,4))===year){ ingresos += map[k].ingresos; gastos += map[k].gastos; } });
+  return {ingresos, gastos};
+}
+function totalesPorMes(year, month){
+  const map = movimientosPorMes();
+  const key = `${year}-${String(month).padStart(2,'0')}`;
+  return map[key] || {ingresos:0, gastos:0};
+}
+function renderGraficoAnual(){
+  const map = movimientosPorMes();
+  const anios = aniosConDatos();
+  const totales = anios.map(anio=>{
+    let ingresos = 0, gastos = 0;
+    Object.keys(map).forEach(k=>{ if(Number(k.slice(0,4))===anio){ ingresos += map[k].ingresos; gastos += map[k].gastos; } });
+    return {anio, ingresos, gastos};
+  });
+  const max = Math.max(1, ...totales.map(d=>Math.max(d.ingresos, d.gastos)));
+  const W = Math.max(280, anios.length * 74), H = 170, padBottom = 24;
+  const groupW = W / anios.length;
+  const barW = Math.min(22, groupW / 2.6);
+  const scale = v => (H - 14 - padBottom) * (v / max);
+  const barras = totales.map((d,i)=>{
+    const gx = i * groupW;
+    const hIng = scale(d.ingresos), hGas = scale(d.gastos);
+    const xIng = gx + groupW/2 - barW - 1, xGas = gx + groupW/2 + 1;
+    const yIng = H - padBottom - hIng, yGas = H - padBottom - hGas;
+    return `
+      <rect x="${xIng.toFixed(1)}" y="${yIng.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hIng).toFixed(1)}" rx="2" class="bar-ingreso"><title>${d.anio} - Ingresos: ${money(d.ingresos)}</title></rect>
+      <rect x="${xGas.toFixed(1)}" y="${yGas.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hGas).toFixed(1)}" rx="2" class="bar-gasto"><title>${d.anio} - Gastos: ${money(d.gastos)}</title></rect>
+      <text x="${(gx+groupW/2).toFixed(1)}" y="${H-7}" class="chart-label" text-anchor="middle">${d.anio}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg chart-svg-anual" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ingresos y gastos por ano">${barras}</svg>`;
 }
 
 /* ============ RESUMEN ============ */
@@ -572,23 +838,46 @@ function renderResumen(){
   const proximasReuniones = state.reuniones.filter(r=>r.fecha >= todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const proxima = proximasReuniones[0];
   const proximasReservas = state.reservas.filter(r=>r.fecha >= todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,3);
-  const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso();
-  const gastosTotales = totalGastosMov() + totalFiestasGasto();
+  const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
+  const gastosTotales = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
   const saldo = ingresosTotales - gastosTotales;
-  const alertas = construirAlertas();
+  const pendientesSocios = gastosSociosPendientes();
+  const pendientesSociosTotal = pendientesSocios.reduce((a,g)=>a+Number(g.importe||0),0);
   const fiestasEvento = fiestasPorEvento();
+  const anios = aniosConDatos();
+  const totalesAnio = totalesPorAnio(resumenGraficoYear);
+  const totalesMesActual = totalesPorMes(now.getFullYear(), now.getMonth()+1);
 
   return `
   <div class="stat-grid">
-    <div class="stat ${saldo<0?'rust':'sage'}"><div class="n">${money(saldo)}</div><div class="l">Saldo de la pena</div></div>
-    <div class="stat"><div class="n">${money(ingresosTotales)}</div><div class="l">Ingresos totales</div></div>
-    <div class="stat"><div class="n">- ${money(gastosTotales)}</div><div class="l">Gastos totales</div></div>
+    <div class="stat"><div class="n">${saldo<0?'- ':''}${money(Math.abs(saldo))}</div><div class="l">SALDO TOTAL</div></div>
+    <div class="stat sage"><div class="n">${money(totalesMesActual.ingresos)}</div><div class="l">Ingresos ${MESES[now.getMonth()]}</div></div>
+    <div class="stat rust"><div class="n">- ${money(totalesMesActual.gastos)}</div><div class="l">Gastos ${MESES[now.getMonth()]}</div></div>
+  </div>
+  <div class="year-nav">
+    <button data-action="resumen-grafico-year" data-dir="-1">&laquo; ${resumenGraficoYear-1}</button>
+    <b>${resumenGraficoYear}</b>
+    <button data-action="resumen-grafico-year" data-dir="1">${resumenGraficoYear+1} &raquo;</button>
   </div>
 
-  ${alertas.length ? `
   <div class="card">
-    <h2><span class="pin"></span>Avisos</h2>
-    ${alertas.map(a=>`<div class="alert-item"><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">- ${a.meta}</span>`:''}</div></div>`).join('')}
+    <h2><span class="pin"></span>Evolucion de ingresos y gastos en ${resumenGraficoYear}</h2>
+    <div class="menu-row"><span class="label">Ingresos ${resumenGraficoYear}</span><span class="dots"></span><span class="value sage">${money(totalesAnio.ingresos)}</span></div>
+    <div class="menu-row" style="margin-bottom:10px;"><span class="label">Gastos ${resumenGraficoYear}</span><span class="dots"></span><span class="value rust">- ${money(totalesAnio.gastos)}</span></div>
+    <div class="chart-legend">
+      <span class="chart-legend-item"><span class="chart-dot ingreso"></span>Ingresos</span>
+      <span class="chart-legend-item"><span class="chart-dot gasto"></span>Gastos</span>
+      <span class="chart-legend-item"><span class="chart-dot balance"></span>Balance</span>
+    </div>
+    ${renderGraficoMensual(resumenGraficoYear)}
+    <div id="chart-tooltip" class="chart-tooltip"></div>
+  </div>
+
+  ${anios.length>1 ? `
+  <div class="card">
+    <h2><span class="pin"></span>Comparativa por anos</h2>
+    <p class="meta" style="margin:0 0 10px;">Para ver como estaba la pena en anos anteriores.</p>
+    ${renderGraficoAnual()}
   </div>` : ''}
 
   <div class="card-grid">
@@ -602,18 +891,21 @@ function renderResumen(){
           ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
         </span>
       </h2>
-      <div class="menu-row"><span class="label">Cuotas cobradas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
+      <div class="menu-row"><span class="label">Cuotas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
       <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
-      <div class="menu-row"><span class="label">Bebidas (recaudado)</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
+      <div class="menu-row"><span class="label">Bebidas</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
+      <div class="menu-row"><span class="label">Ingresos de socios (verificados)</span><span class="dots"></span><span class="value sage">${money(totalIngresosSociosVerificados())}</span></div>
       <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov())}</span></div>
       <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto())}</span></div>
+      <div class="menu-row"><span class="label">Gastos de socios (verificados)</span><span class="dots"></span><span class="value rust">- ${money(totalGastosSociosVerificados())}</span></div>
       <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo neto</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
+      ${pendientesSocios.length ? `<p class="readonly-note" style="margin-top:10px;">${pendientesSocios.length} gasto(s)/ingreso(s) de socios (${money(pendientesSociosTotal)}) pendientes de verificar por el tesorero o el administrador en "Gastos e ingresos". No suman al saldo hasta que se verifiquen.</p>` : ''}
     </div>
     <div class="card">
       <h2><span class="pin"></span>Proxima reunion</h2>
       ${proxima ? `
         
-        <p style="margin:0 0 4px; font-weight:600;">${escapeHtml(proxima.titulo)}</p>
+        <p style="margin:0 0 4px; font-weight:600;">${escapeHtml(proxima.evento)}</p>
         
         <p class="meta" style="margin:0;">${fmtDate(proxima.fecha)}</p>
         
@@ -658,7 +950,7 @@ function renderSocios(){
       <div><label class="f">Foto (opcional)</label><input type="file" name="foto" accept="image/*"></div>
       <div style="flex:none;"><button class="btn" type="submit">Anadir socio</button></div>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona socios es quien anade o da de baja socios.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
   <div class="card">
     ${state.socios.length===0 ? '<p class="empty">Todavia no hay socios.</p>' : state.socios.map(s=>{
       const perfil = state.perfiles[s.id] || {};
@@ -702,37 +994,49 @@ function renderSocios(){
 
 /* ============ CUOTAS ============ */
 function renderCuotas(){
+  if(!can('manage_cuotas')) return '<div class="card"><p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p></div>';
   const admin = can('manage_cuotas');
   const rows = state.socios.map(s=>{
     const cells = MESES.map((m,i)=>{
       const month = i+1;
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===cuotasYear && c.month===month);
       const paid = c && c.pagado;
-      const puedeEditar = admin || s.id===state.current_user;
       const mine = s.id===state.current_user ? 'mine' : '';
-      if(!puedeEditar){
-        
-        return `<td><button class="cuota-cell ${paid?'paid':''}" disabled title="Solo ${s.nombre} o el administrador pueden marcar esto"></button></td>`;
+      if(!admin){
+
+        return `<td><button class="cuota-cell ${paid?'paid':''} ${mine}" disabled title="Solo el tesorero o el administrador pueden marcar cuotas">${paid?'&times;':''}</button></td>`;
       }
-      return `<td><button class="cuota-cell ${paid?'paid':''} ${mine}" data-action="toggle-cuota" data-socio="${s.id}" data-year="${cuotasYear}" data-month="${month}" title="${m} ${cuotasYear}">${paid?'?':''}</button></td>`;
+      return `<td><button class="cuota-cell ${paid?'paid':''} ${mine}" data-action="toggle-cuota" data-socio="${s.id}" data-year="${cuotasYear}" data-month="${month}" title="${m} ${cuotasYear}">${paid?'&times;':''}</button></td>`;
     }).join('');
     return `<tr><td>${escapeHtml(s.nombre)}</td>${cells}</tr>`;
   }).join('');
   return `
   <div class="card">
     <h2><span class="pin"></span>Cuotas mensuales <span style="font-size:0.9rem; color:var(--chalk-dim); font-family:'Work Sans';">(${money(state.config.cuota_mensual)}/mes)</span></h2>
-    <p class="readonly-note">${admin ? 'Con permiso para gestionar cuotas puedes marcar la cuota de cualquier socio.' : 'Solo puedes marcar tu propia cuota (columna resaltada en tu fila).'}</p>
+    <p class="readonly-note">${admin ? 'Solo el tesorero o el administrador pueden marcar una cuota como pagada, previa comprobacion.' : 'Solo lectura: aqui puedes ver quien ha pagado y quien falta. Marcar una cuota como pagada es cosa del tesorero o del administrador.'}</p>
     <div class="year-nav">
       <button data-action="cuota-year" data-dir="-1">&laquo; ${cuotasYear-1}</button>
       <b>${cuotasYear}</b>
       <button data-action="cuota-year" data-dir="1">${cuotasYear+1} &raquo;</button>
     </div>
     ${state.socios.length===0 ? '<p class="empty">Anade socios primero en la pestana Socios.</p>' : `
-    <div style="overflow-x:auto;">
+    <div class="cuotas-table-wrap">
     <table class="cuotas-table">
       <thead><tr><th>Socio</th>${MESES.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    </div>
+    <div class="cuotas-mobile">
+      <div><label class="f">Mes</label><select id="cuota-mes-movil">${MESES.map((m,i)=>`<option value="${i+1}" ${cuotasMesMovil===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
+      ${state.socios.map(s=>{
+        const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===cuotasYear && c.month===cuotasMesMovil);
+        const paid = c && c.pagado;
+        const mine = s.id===state.current_user ? 'mine' : '';
+        const btn = admin
+          ? `<button class="cuota-cell ${paid?'paid':''} ${mine}" data-action="toggle-cuota" data-socio="${s.id}" data-year="${cuotasYear}" data-month="${cuotasMesMovil}">${paid?'&times;':''}</button>`
+          : `<button class="cuota-cell ${paid?'paid':''} ${mine}" disabled title="Solo el tesorero o el administrador pueden marcar cuotas">${paid?'&times;':''}</button>`;
+        return `<div class="list-item"><div>${escapeHtml(s.nombre)}</div>${btn}</div>`;
+      }).join('')}
     </div>
     `}
   </div>`;
@@ -782,7 +1086,7 @@ function renderReservas(){
   </div>
   <div class="card">
     <h2><span class="pin"></span>Calendario de reservas</h2>
-    ${renderMiniCalendario(reservasCalFecha, state.reservas.map(r=>({fecha:r.fecha, label:r.evento+' - '+socioNombre(r.socio_id)})), 'reservas-mes')}
+    ${renderMiniCalendario(reservasCalFecha, state.reservas.map(r=>({fecha:r.fecha, label:r.evento+' - '+socioNombre(r.socio_id), detalle:`${r.evento}\n${fmtDate(r.fecha)} - ${fmtHoras(r)}\nReservado por ${socioNombre(r.socio_id)}${r.notas?'\n'+r.notas:''}`})), 'reservas-mes')}
   </div>
   ${pasadas.length ? `<div class="card">
     <h2><span class="pin"></span>Historial reciente</h2>
@@ -815,41 +1119,57 @@ function renderReuniones(){
       <div class="form-row"><div><label class="f">Notas / orden del dia</label><textarea name="notas" placeholder="De que se va a hablar..."></textarea></div></div>
       <button class="btn" type="submit">Anadir reunion</button>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona eventos es quien convoca reuniones.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
+  <div class="card">
+    <h2><span class="pin"></span>Calendario de reuniones</h2>
+    ${renderMiniCalendario(reunionesCalFecha, state.reuniones.map(r=>({fecha:r.fecha, label:r.evento, detalle:`${r.evento}\n${fmtDate(r.fecha)} - ${fmtHoras(r)}\nConvocada por ${socioNombre(r.socio_id)}${r.notas?'\n'+r.notas:''}`})), 'reuniones-mes')}
+  </div>
   <div class="card">
     <h2><span class="pin"></span>Historial</h2>
     ${ordenadas.length===0 ? '<p class="empty">Aun no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
 
-        <div style="flex:1;">
+        <div style="flex:1; min-width:0;">
 
-          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)}</span></div>
+          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)} - ${fmtHoras(r)}</span></div>
+
+          <div class="meta" style="margin-top:2px;">Convocada por ${escapeHtml(socioNombre(r.socio_id))}</div>
 
           ${r.notas ? `<div class="meta" style="margin-top:2px;">${escapeHtml(r.notas)}</div>` : ''}
 
-          <div style="margin-top:8px;">
-
-            ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'&check; ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
-
-          </div>
+          <details style="margin-top:8px;">
+            <summary>Asistentes (${asistentes.length})</summary>
+            <div class="role-options" style="margin-top:8px;">
+              ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'&check; ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
+            </div>
+          </details>
 
         </div>
 
         ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
       </div>`;
     }).join('')}
-  </div>
-  <div class="card">
-    <h2><span class="pin"></span>Calendario de reuniones</h2>
-    ${renderMiniCalendario(reunionesCalFecha, state.reuniones.map(r=>({fecha:r.fecha, label:r.evento})), 'reuniones-mes')}
   </div>`;
 }
 
-/* ============ REPARTO DE GASTOS (tipo Tricount) ============ */
+/* ============ TRICOUNT (reparto de gastos por evento) ============ */
+function renderNuevoEventoParticipantesWrap(){
+  const disponibles = state.socios.filter(s=>s.activo && !nuevoEventoParticipantes.includes(s.id));
+  return `
+    <div class="role-options" style="margin-bottom:8px;">
+      ${nuevoEventoParticipantes.length ? nuevoEventoParticipantes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="participantes" value="${sid}"><button type="button" data-action="quitar-participante-nuevo-evento" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin participantes anadidos todavia.</span>'}
+    </div>
+    ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
+      <div><select id="nuevo-evento-participante-select">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-nuevo-evento">+</button></div>
+    </div>` : ''}
+  `;
+}
 function renderReparto(){
   const eventos = state.gastos_eventos || [];
-  const activos = state.socios.filter(s=>s.activo);
+  const visibles = eventos.filter(ev=>!ev.oculto);
+  const ocultos = eventos.filter(ev=>ev.oculto);
   return `
   <div class="card">
     <h2><span class="pin"></span>Nuevo evento (cena, quedada...)</h2>
@@ -861,20 +1181,33 @@ function renderReparto(){
         <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
-      <label class="f">Quien participa</label>
-      <div class="role-options" style="margin-bottom:12px;">
-        ${activos.map(s=>`<label class="role-option"><input type="checkbox" name="participantes" value="${s.id}" ${s.id===state.current_user?'checked':''}> ${escapeHtml(s.nombre)}</label>`).join('')}
+      <div style="margin-bottom:12px;">
+        <label class="f">Quien participa (marcate a ti mismo si vas a participar)</label>
+        <div id="nuevo-evento-participantes-wrap">${renderNuevoEventoParticipantesWrap()}</div>
       </div>
       <button class="btn" type="submit">Crear evento</button>
     </form>
   </div>
-  ${eventos.length===0 ? '<div class="card"><p class="empty">Todavia no hay eventos de reparto de gastos.</p></div>' : eventos.map(ev=>renderGastoEvento(ev)).join('')}
+  ${visibles.length===0 ? '<div class="card"><p class="empty">Todavia no hay eventos de Tricount.</p></div>' : visibles.map(ev=>renderGastoEvento(ev)).join('')}
+  ${ocultos.length ? `
+  <div class="card">
+    <details>
+      <summary>Eventos ocultos (${ocultos.length})</summary>
+      ${ocultos.map(ev=>{
+        const puedeGestionar = ev.creado_por===state.current_user || can('manage_finances');
+        return `<div class="list-item">
+          <div><div style="font-weight:600;">${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></div><div class="meta">${money(ev.total)}</div></div>
+          ${puedeGestionar ? `<div style="display:flex; gap:8px;"><button class="btn ghost small" data-action="toggle-ocultar-evento" data-id="${ev.id}">Mostrar de nuevo</button><button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar</button></div>` : ''}
+        </div>`;
+      }).join('')}
+    </details>
+  </div>` : ''}
   `;
 }
 
 function renderGastoEvento(ev){
   const participantesSet = new Set(ev.participantes||[]);
-  const puedeBorrarEvento = ev.creado_por===state.current_user || can('manage_finances');
+  const puedeGestionarEvento = ev.creado_por===state.current_user || can('manage_finances');
   const soyParticipante = participantesSet.has(state.current_user);
   const noParticipantes = state.socios.filter(s=>s.activo && !participantesSet.has(s.id));
   const pagos = ev.pagos||[];
@@ -886,7 +1219,8 @@ function renderGastoEvento(ev){
       <span><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
       <span style="display:flex; align-items:center; gap:10px;">
         <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--amber);">${money(ev.total)}</span>
-        ${puedeBorrarEvento ? `<button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar evento</button>` : ''}
+        ${puedeGestionarEvento ? `<button class="btn ghost small" data-action="toggle-ocultar-evento" data-id="${ev.id}">Ocultar</button>` : ''}
+        ${puedeGestionarEvento ? `<button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar evento</button>` : ''}
       </span>
     </h2>
     ${ev.notas ? `<p class="meta" style="margin:-4px 0 10px;">${escapeHtml(ev.notas)}</p>` : ''}
@@ -920,15 +1254,17 @@ function renderGastoEvento(ev){
 
     <label class="f">Pagos registrados</label>
     ${pagos.length===0 ? '<p class="empty">Sin pagos todavia.</p>' : pagos.map(p=>{
-      const puedeBorrarPago = p.pagador_id===state.current_user || puedeBorrarEvento;
+      const puedeBorrarPago = p.pagador_id===state.current_user || puedeGestionarEvento;
       const beneficiarios = (p.beneficiarios&&p.beneficiarios.length) ? p.beneficiarios.map(socioNombre).join(', ') : 'todos los participantes';
       return `<div class="list-item">
         <div>
           <div style="font-weight:600;">${escapeHtml(p.concepto)}</div>
           <div class="meta">Pago de ${escapeHtml(socioNombre(p.pagador_id))} - ${fmtDate(p.fecha)} - reparte entre: ${escapeHtml(beneficiarios)}</div>
+          ${p.ticket ? `<a href="/static/tickets/pago-${p.id}.jpg?v=${ticketVersion}" target="_blank" rel="noopener noreferrer" class="meta" style="color:var(--amber); display:inline-block; margin-top:2px;">Ver ticket</a>` : ''}
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--sage);">${money(p.importe)}</span>
+          ${puedeBorrarPago ? `<label class="btn ghost small" style="cursor:pointer;">${p.ticket?'Cambiar ticket':'Subir ticket'}<input type="file" accept="image/png,image/jpeg" data-autoupload-ticket-pago="${p.id}" data-evento="${ev.id}" style="display:none;"></label>` : ''}
           ${puedeBorrarPago ? `<button class="btn danger small" data-action="delete-pago-evento" data-evento="${ev.id}" data-id="${p.id}">Borrar</button>` : ''}
         </div>
       </div>`;
@@ -981,7 +1317,7 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">Anadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona inventario es quien anade o borra material. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Solo lectura, para ver consultar con el administrador. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -1006,10 +1342,60 @@ function renderInventario(){
 }
 
 /* ============ CAJA ============ */
+function renderGastoSocioItem(g){
+  const puedeModificar = g.socio_id===state.current_user || can('manage_finances');
+  const esIngreso = g.tipo==='ingreso';
+  const estadoLabel = esIngreso ? 'Entregado' : 'Abonado';
+  if(editandoGastoSocioId===g.id){
+    return `<form data-form="edit-gasto-socio" data-id="${g.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div><label class="f">Tipo</label><select name="tipo"><option value="gasto" ${!esIngreso?'selected':''}>Gasto</option><option value="ingreso" ${esIngreso?'selected':''}>Ingreso</option></select></div>
+        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required value="${escapeHtml(g.concepto)}"></div>
+        <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0.01" required value="${g.importe}"></div>
+        <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${g.fecha}"></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(g.notas||'')}"></div></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-gasto-socio">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item">
+    <div>
+      <div style="font-weight:600;">${escapeHtml(g.concepto)} <span class="tag">${esIngreso?'Ingreso':'Gasto'}</span> ${g.abonado?`<span class="tag ok">${estadoLabel}</span>`:'<span class="tag warn">Pendiente</span>'}</div>
+      <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
+      ${g.ticket ? `<a href="/static/tickets/${g.id}.jpg?v=${ticketVersion}" target="_blank" rel="noopener noreferrer" class="meta" style="color:var(--amber); display:inline-block; margin-top:2px;">Ver ticket</a>` : ''}
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${esIngreso?'var(--sage)':'var(--rust)'};">${esIngreso?'+':'-'} ${money(g.importe)}</span>
+      ${can('manage_finances') ? `<button class="btn ghost small" data-action="toggle-abonado-gasto-socio" data-id="${g.id}">${g.abonado?'Marcar pendiente':'Marcar '+estadoLabel.toLowerCase()}</button>` : ''}
+      ${puedeModificar ? `<label class="btn ghost small" style="cursor:pointer;">${g.ticket?'Cambiar ticket (.jpg/.png)':'Subir ticket (.jpg/.png)'}<input type="file" accept="image/png,image/jpeg" data-autoupload-ticket="${g.id}" style="display:none;"></label>` : ''}
+      ${puedeModificar ? `<button class="btn ghost small" data-action="editar-gasto-socio" data-id="${g.id}">Editar</button>` : ''}
+      ${puedeModificar ? `<button class="btn danger small" data-action="delete-gasto-socio" data-id="${g.id}">Borrar</button>` : ''}
+    </div>
+  </div>`;
+}
 function renderCaja(){
   const admin = can('manage_finances');
   const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const gastosSocios = [...(state.gastos_socios||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
+  <div class="card">
+    <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
+    <p class="meta" style="margin:-4px 0 10px;">Registra aqui un gasto que hayas pagado de tu bolsillo para la pena (para que el tesorero te lo pueda abonar) o un ingreso para que quede registrado y lo pueda comprobar el tesorero.</p>
+    <form data-form="add-gasto-socio">
+      <div class="form-row">
+        <div><label class="f">Tipo</label><select name="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Bombillas para el salon"></div>
+        <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0.01" required></div>
+        <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
+      <button class="btn" type="submit">Registrar</button>
+    </form>
+    ${gastosSocios.length===0 ? '<p class="empty" style="margin-top:12px;">Todavia no hay gastos registrados.</p>' : gastosSocios.map(g=>renderGastoSocioItem(g)).join('')}
+  </div>
   ${admin ? `
   <div class="card">
     <h2><span class="pin"></span>Registrar movimiento</h2>
@@ -1038,7 +1424,7 @@ function renderCaja(){
       </div>
       <button class="btn" type="submit">Guardar movimiento</button>
     </form>
-  </div>` : `<p class="readonly-note">Solo lectura: quien gestiona finanzas es quien registra los gastos e ingresos.</p>`}
+  </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
@@ -1057,7 +1443,7 @@ function renderCaja(){
         
             ${fmtDate(m.fecha)}
         
-            <span class="tag ${m.socio_id ? 'ok' : 'warn'}">${m.socio_id ? `Socio: ${escapeHtml(socioNombre(m.socio_id))}` : 'Sin socio'}</span>
+            ${m.socio_id ? `<span class="tag ok">Socio: ${escapeHtml(socioNombre(m.socio_id))}</span>` : ''}
         
           </div>
         
@@ -1083,7 +1469,10 @@ function renderBebidas(){
       <button class="subtab-btn ${bebidasSubtab==='consumo'?'active':''}" data-action="bebidas-subtab" data-sub="consumo">Consumo del dia a dia</button>
       <button class="subtab-btn ${bebidasSubtab==='fiestas'?'active':''}" data-action="bebidas-subtab" data-sub="fiestas">Fiestas / eventos</button>
     </div>
-    ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+    <span style="display:flex; gap:8px; flex-wrap:wrap;">
+      ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+      ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
+    </span>
   </div>
   ${bebidasSubtab==='consumo' ? renderBebidasConsumo() : renderBebidasFiestas()}
   `;
@@ -1103,7 +1492,7 @@ function renderBebidasConsumo(){
   </div>` : ''}
   ${puedeGestionarBebidas ? `
   <div class="card">
-    <h2><span class="pin"></span>Precios (se paga en el momento)</h2>
+    <h2><span class="pin"></span>Precios</h2>
     <form data-form="add-bebida-precio">
       <div class="form-row">
 
@@ -1128,7 +1517,17 @@ function renderBebidasConsumo(){
 
         <button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>
       </div>`).join('') : '<p class="empty">Anade al menos una bebida con precio.</p>'}
-  </div>
+  </div>` : `
+  <div class="card">
+    <h2><span class="pin"></span>Precios</h2>
+    ${precios.length ? precios.map(p=>`
+      <div class="menu-row">
+        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)}</small></span>
+        <span class="dots"></span>
+        <span class="value">socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</span>
+      </div>`).join('') : '<p class="empty">Todavia no hay precios cargados.</p>'}
+    <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes anaden precios y registran los consumos.</p>
+  </div>`}
   <div class="card">
     <h2><span class="pin"></span>Registrar consumo</h2>
     ${precios.length===0 ? '<p class="empty">Primero anade precios de bebidas arriba.</p>' : `
@@ -1161,11 +1560,12 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
+      <div id="consumo-total" class="meta" style="margin:2px 0 12px; font-weight:600; font-size:0.95rem; color:var(--amber);">Total a pagar: ${money(precios.length ? Number(precios[0].precio_socio) : 0)}</div>
       <label class="role-option" style="margin-bottom:10px;"><input type="checkbox" name="pagado" checked> Pagado en el momento (si no, queda pendiente en la deuda del socio)</label>
       <button class="btn" type="submit">Registrar consumo</button>
     </form>
     `}
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona bebidas es quien registra precios y consumos.</p></div>`}
+  </div>
   <div class="card">
     <h2><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></h2>
     ${consumos.length===0 ? '<p class="empty">Sin consumos todavia.</p>' : consumos.slice(0,40).map(c=>{
@@ -1195,10 +1595,8 @@ function renderBebidasConsumo(){
 }
 
 function renderBebidasFiestas(){
-  const puedeGestionarFinanzas = can('manage_finances');
   const gastos = [...state.fiestas_gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
-  ${puedeGestionarFinanzas ? `
   <div class="card">
     <h2><span class="pin"></span>Gasto en bebida para una fiesta</h2>
     <form data-form="add-fiesta-gasto">
@@ -1216,7 +1614,7 @@ function renderBebidasFiestas(){
       </div>
       <button class="btn" type="submit">Anadir gasto</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura: quien gestiona finanzas es quien registra gastos de fiestas.</p></div>`}
+  </div>
   <div class="card">
     <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- total: ${money(totalFiestasGasto())}</span></h2>
     ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todavia.</p>' : gastos.map(g=>`
@@ -1234,7 +1632,7 @@ function renderBebidasFiestas(){
 
           <span style="font-family:'JetBrains Mono',monospace; color:var(--rust); font-weight:600;">- ${money(g.importe)}</span>
 
-          ${puedeGestionarFinanzas ? `<button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>` : ''}
+          <button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>
 
         </div>
       </div>
@@ -1270,7 +1668,7 @@ function renderMiniCalendario(fechaRef, items, navAction){
     const dia = porDia[d]||[];
     celdas.push(`<div class="cal-day">
       <div class="cal-day-num">${d}</div>
-      ${dia.map(it=>`<div class="cal-ticket ${it.cls||''}" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</div>`).join('')}
+      ${dia.map(it=>`<button type="button" class="cal-ticket ${it.cls||''}" data-action="ver-evento-cal" data-detalle="${escapeHtml(it.detalle||it.label)}" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</button>`).join('')}
     </div>`);
   }
 
@@ -1291,7 +1689,7 @@ function renderEncargados(){
   const activas = tareas.filter(t=>t.estado!=='hecho');
   const historial = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
   const sinFecha = activas.filter(t=>!t.fecha && t.turno);
-  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+(t.responsable_id?': '+socioNombre(t.responsable_id):''), cls:ESTADO_CLASS[t.estado]}));
+  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+(t.responsable_id?': '+socioNombre(t.responsable_id):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}${t.turno?' - '+t.turno:''}\n${t.responsable_id?'Responsable: '+socioNombre(t.responsable_id):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
   return `
   <div class="card">
     <h2><span class="pin"></span>Nueva tarea</h2>
@@ -1437,7 +1835,7 @@ document.addEventListener('click', async (e)=>{
       pendingLoginId = null;
       render();
     }
-    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; await loadState(); render(); }
+    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; loginSearchQuery = ''; alertasAbiertas = false; await loadState(); render(); }
     else if(action==='edit-club-name'){
       const nombre = prompt('Nombre de la pena:', state.config.nombre);
       if(nombre && nombre.trim()){
@@ -1467,6 +1865,19 @@ document.addEventListener('click', async (e)=>{
     else if(action==='switch-tab'){ activeTab = btn.dataset.tab; render(); }
     else if(action==='bebidas-subtab'){ bebidasSubtab = btn.dataset.sub; render(); }
     else if(action==='cuota-year'){ cuotasYear += Number(btn.dataset.dir); render(); }
+    else if(action==='resumen-grafico-year'){ resumenGraficoYear += Number(btn.dataset.dir); render(); }
+    else if(action==='export-log-eventos'){ exportarLogEventos(); }
+    else if(action==='toggle-ayuda'){ ayudaAbierta = !ayudaAbierta; render(); }
+    else if(action==='toggle-alertas'){ alertasAbiertas = !alertasAbiertas; render(); }
+    else if(action==='cerrar-alertas'){ alertasAbiertas = false; render(); }
+    else if(action==='ask-faq'){
+      const entry = FAQ_ENTRIES.find(e=>e.id===btn.dataset.id);
+      if(entry){
+        ayudaTranscript.push({pregunta: entry.pregunta, respuesta: entry.respuesta});
+        ayudaQuery = '';
+      }
+      render();
+    }
 
     else if(action==='toggle-cuota'){
       await apiPost('/api/cuota/toggle', {socio_id: btn.dataset.socio, year: btn.dataset.year, month: btn.dataset.month});
@@ -1495,6 +1906,7 @@ document.addEventListener('click', async (e)=>{
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
       await loadState(); render();
     }
+    else if(action==='ver-evento-cal'){ alert(btn.dataset.detalle); }
     else if(action==='tareas-mes'){ tareasCalFecha.setMonth(tareasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
     else if(action==='reservas-mes'){ reservasCalFecha.setMonth(reservasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
     else if(action==='reuniones-mes'){ reunionesCalFecha.setMonth(reunionesCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
@@ -1520,6 +1932,25 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-movimiento'){
       if(confirm('Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='toggle-abonado-gasto-socio'){
+      await apiPost(`/api/gastos-socios/${btn.dataset.id}/abonado`);
+      await loadState(); render();
+    }
+    else if(action==='editar-gasto-socio'){
+      editandoGastoSocioId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-gasto-socio'){
+      editandoGastoSocioId = null;
+      render();
+    }
+    else if(action==='delete-gasto-socio'){
+      if(confirm('Borrar este gasto?')){
+        editandoGastoSocioId = null;
+        await apiDelete(`/api/gastos-socios/${btn.dataset.id}`);
+        await loadState(); render();
+      }
+    }
     else if(action==='delete-bebida-precio'){
       if(confirm('Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
     }
@@ -1539,6 +1970,10 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-gasto-evento'){
       if(confirm('Borrar este evento y todos sus pagos?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='toggle-ocultar-evento'){
+      await apiPost(`/api/gastos-eventos/${btn.dataset.id}/ocultar`);
+      await loadState(); render();
+    }
     else if(action==='quitar-participante-evento'){
       await apiPost(`/api/gastos-eventos/${btn.dataset.evento}/participantes/toggle`, {socio_id: btn.dataset.socio});
       await loadState(); render();
@@ -1548,6 +1983,18 @@ document.addEventListener('click', async (e)=>{
       if(!select || !select.value) return;
       await apiPost(`/api/gastos-eventos/${btn.dataset.evento}/participantes/toggle`, {socio_id: select.value});
       await loadState(); render();
+    }
+    else if(action==='anadir-participante-nuevo-evento'){
+      const select = document.getElementById('nuevo-evento-participante-select');
+      if(!select || !select.value) return;
+      if(!nuevoEventoParticipantes.includes(select.value)) nuevoEventoParticipantes.push(select.value);
+      const wrap = document.getElementById('nuevo-evento-participantes-wrap');
+      if(wrap) wrap.innerHTML = renderNuevoEventoParticipantesWrap();
+    }
+    else if(action==='quitar-participante-nuevo-evento'){
+      nuevoEventoParticipantes = nuevoEventoParticipantes.filter(id=>id!==btn.dataset.socio);
+      const wrap = document.getElementById('nuevo-evento-participantes-wrap');
+      if(wrap) wrap.innerHTML = renderNuevoEventoParticipantesWrap();
     }
     else if(action==='delete-pago-evento'){
       if(confirm('Borrar este pago?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.evento}/pagos/${btn.dataset.id}`); await loadState(); render(); }
@@ -1593,12 +2040,79 @@ document.addEventListener('click', async (e)=>{
   }catch(err){ alert(err.message || 'Ha ocurrido un error'); }
 });
 
+function mostrarChartTooltip(hit, x, y){
+  const tip = document.getElementById('chart-tooltip');
+  if(!tip || !hit) return;
+  tip.textContent = hit.dataset.tooltip;
+  tip.style.display = 'block';
+  const pad = 14;
+  let left = x + pad, top = y + pad;
+  const rect = tip.getBoundingClientRect();
+  if(left + rect.width > window.innerWidth - 8) left = x - rect.width - pad;
+  if(top + rect.height > window.innerHeight - 8) top = y - rect.height - pad;
+  tip.style.left = Math.max(8, left) + 'px';
+  tip.style.top = Math.max(8, top) + 'px';
+}
+function ocultarChartTooltip(){
+  const tip = document.getElementById('chart-tooltip');
+  if(tip) tip.style.display = 'none';
+}
+document.addEventListener('mousemove', (e)=>{
+  const hit = e.target.closest('[data-tooltip]');
+  if(hit) mostrarChartTooltip(hit, e.clientX, e.clientY);
+  else ocultarChartTooltip();
+});
+document.addEventListener('mouseleave', ()=>ocultarChartTooltip());
+document.addEventListener('touchstart', (e)=>{
+  const hit = e.target.closest('[data-tooltip]');
+  const t = e.touches[0];
+  if(hit && t) mostrarChartTooltip(hit, t.clientX, t.clientY - 60);
+  else ocultarChartTooltip();
+}, {passive:true});
+document.addEventListener('touchmove', (e)=>{
+  const t = e.touches[0];
+  if(!t) return;
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const hit = el && el.closest('[data-tooltip]');
+  if(hit) mostrarChartTooltip(hit, t.clientX, t.clientY - 60);
+  else ocultarChartTooltip();
+}, {passive:true});
+
+document.addEventListener('input', (e)=>{
+  if(e.target.id==='login-search-input'){
+    loginSearchQuery = e.target.value;
+    const socios = state.socios.filter(s=>s.activo);
+    const query = loginSearchQuery.trim().toLowerCase();
+    const matches = query.length>=2 ? socios.filter(s=>s.nombre.toLowerCase().includes(query)) : [];
+    const results = document.getElementById('login-search-results');
+    if(results) results.innerHTML = renderLoginSearchResults(matches, query);
+  }
+  else if(e.target.id==='help-search-input'){
+    ayudaQuery = e.target.value;
+    const suggestions = document.getElementById('help-suggestions');
+    if(suggestions) suggestions.innerHTML = renderHelpSuggestions(buscarFaq(ayudaQuery));
+  }
+  else if(e.target.name==='cantidad' && e.target.form && e.target.form.dataset.form==='add-consumo'){
+    actualizarTotalConsumo(e.target.form);
+  }
+});
+
 document.addEventListener('change', async (e)=>{
+  if(e.target.id==='cuota-mes-movil'){
+    cuotasMesMovil = Number(e.target.value);
+    render();
+    return;
+  }
   if(e.target.name==='consumidorTipo'){
     const form = e.target.closest('form');
     const isInvitado = e.target.value==='invitado';
     form.querySelector('[name=socio_id]').style.display = isInvitado ? 'none' : '';
     form.querySelector('[name=nombre_invitado]').style.display = isInvitado ? '' : 'none';
+    actualizarTotalConsumo(form);
+    return;
+  }
+  if(e.target.name==='bebida_id' && e.target.form && e.target.form.dataset.form==='add-consumo'){
+    actualizarTotalConsumo(e.target.form);
     return;
   }
   if(e.target.matches('[data-autoupload-foto]')){
@@ -1608,6 +2122,22 @@ document.addEventListener('change', async (e)=>{
       await uploadFoto(e.target.dataset.autouploadFoto, file);
       await loadState(); render();
     }catch(err){ alert(err.message || 'No se pudo subir la foto'); }
+  }
+  if(e.target.matches('[data-autoupload-ticket]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      await uploadTicketGasto(e.target.dataset.autouploadTicket, file);
+      await loadState(); render();
+    }catch(err){ alert(err.message || 'No se pudo subir el ticket'); }
+  }
+  if(e.target.matches('[data-autoupload-ticket-pago]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      await uploadTicketPago(e.target.dataset.evento, e.target.dataset.autouploadTicketPago, file);
+      await loadState(); render();
+    }catch(err){ alert(err.message || 'No se pudo subir el ticket'); }
   }
   if(e.target.matches('[data-import-excel]')){
     const file = e.target.files[0];
@@ -1674,6 +2204,11 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
     else if(type==='add-inventario'){ await apiPost('/api/inventario', data); }
     else if(type==='add-movimiento'){ await apiPost('/api/movimientos', data); }
+    else if(type==='add-gasto-socio'){ await apiPost('/api/gastos-socios', data); }
+    else if(type==='edit-gasto-socio'){
+      await apiPost(`/api/gastos-socios/${form.dataset.id}`, data);
+      editandoGastoSocioId = null;
+    }
     else if(type==='add-bebida-precio'){ await apiPost('/api/bebidas/precios', data); }
     else if(type==='add-consumo'){
       data.es_socio = data.consumidorTipo==='socio';
@@ -1685,6 +2220,7 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='add-gasto-evento'){
       const participantes = new FormData(form).getAll('participantes');
       await apiPost('/api/gastos-eventos', {nombre: data.nombre, fecha: data.fecha, notas: data.notas, participantes});
+      nuevoEventoParticipantes = [];
     }
     else if(type==='add-pago-evento'){
       const eid = form.dataset.evento;
@@ -1714,13 +2250,18 @@ document.addEventListener('submit', async (e)=>{
 /* ============ actualizacion en segundo plano (casi tiempo real) ============ */
 function isTyping(){
   const el = document.activeElement;
-  return el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT');
+  if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT')) return true;
+  // Si hay un desplegable abierto (elegir permisos, eventos ocultos...) no
+  // refresques: el refresco automatico reconstruye el HTML y lo cerraria,
+  // haciendo perder lo que se estuviera rellenando.
+  if(document.querySelector('details[open]')) return true;
+  return false;
 }
 setInterval(async ()=>{
   if(document.hidden || isTyping()) return;
   await loadState();
   render();
-}, 8000);
+}, 30000);
 
 /* ============ INIT ============ */
 (async function init(){

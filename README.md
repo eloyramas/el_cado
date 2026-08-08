@@ -14,11 +14,14 @@ VS Code.
 - **Solo el administrador puede**: anadir socios nuevos, dar de baja o
   reactivar a un socio, renombrar la pena, y anadir/borrar movimientos de
   caja (gastos e ingresos).
-- **Cualquier socio puede**: marcar **su propia** cuota (el administrador
-  puede marcar la de cualquiera), reservar la pena, apuntarse a tareas de
-  "Encargados", editar su propio perfil (incluido su nombre), y ver todo
-  lo demas en modo lectura (socios y caja son de solo lectura para el
-  resto).
+- **Marcar una cuota como pagada** solo lo pueden hacer el **tesorero** y
+  el **administrador**, previa comprobacion. El resto de socios ve las
+  cuotas en modo lectura (quien ha pagado y quien falta).
+- **Cualquier socio puede**: reservar la pena, apuntarse a tareas de
+  "Encargados", crear eventos de "Tricount" (reparto de gastos) y
+  participar en ellos marcandose a si mismo, editar su propio perfil
+  (incluido su nombre), y ver todo lo demas en modo lectura (socios y
+  caja son de solo lectura para el resto).
 - Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia
   a reuniones, etc.)  -  simplemente deja de aparecer en la pantalla de
   login y se marca como "de baja" en la lista de socios.
@@ -108,9 +111,13 @@ guarda, y el formulario/HTML en `app.js`.
   nombre si lo pusiste mal, sin tocar la base de datos a mano.
 - **Reservas con horario**: al reservar puedes poner hora de inicio y
   fin (opcional). Si las dejas en blanco, se entiende "todo el dia".
-- **Alertas** (pestana Resumen): avisa si algun socio activo no ha
-  pagado la cuota del mes pasados 5 dias, y muestra un pequeno resumen de
-  reservas/reuniones creadas recientemente.
+- **Log de eventos** (pestana Resumen): los avisos (cuotas pendientes,
+  bebidas por pagar, reservas/reuniones recientes...) ya no se muestran
+  en pantalla; se descargan como archivo de texto con el boton
+  "Exportar log de eventos" cuando se necesiten.
+- **Graficas de ingresos y gastos** (pestana Resumen): evolucion mes a
+  mes de un ano (con navegador de anos) y comparativa del total de
+  ingresos/gastos entre anos, para ver como estaba la pena antes.
 - **Dar de baja a un socio** en vez de borrarlo (mantiene su historial).
 - **Exportar a Excel**: boton " Exportar a Excel" en Gastos e ingresos,
   Inventario y Bebidas. Descarga siempre el mismo `.xlsx` completo, con

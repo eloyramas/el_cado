@@ -9,9 +9,12 @@ Roles:
 - Solo el administrador puede: anadir socios, dar de baja/reactivar
   socios, renombrar la pena, y anadir/borrar movimientos de caja
   (gastos e ingresos).
-- Cualquier socio puede: marcar SU PROPIA cuota (el admin puede marcar
-  cualquiera), reservar la pena, apuntarse a tareas, editar su propio
-  perfil (incluido su nombre), y ver todo en modo lectura.
+- Marcar una cuota como pagada solo lo pueden hacer el tesorero y el
+  administrador (permiso manage_cuotas), previa comprobacion. El resto
+  de socios ve las cuotas en modo lectura (quien ha pagado y quien no).
+- Cualquier socio puede: reservar la pena, apuntarse a tareas, crear
+  eventos de Tricount y participar en ellos, editar su propio perfil
+  (incluido su nombre), y ver todo lo demas en modo lectura.
 
 Para arrancar en local:
     pip install -r requirements.txt
@@ -45,6 +48,7 @@ except ImportError:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "pena.db")))
 AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
+TICKETS_DIR = os.path.abspath(os.environ.get("TICKETS_DIR", os.path.join(BASE_DIR, "static", "tickets")))
 
 app = Flask(__name__)
 # En produccion, define la variable de entorno SECRET_KEY con un valor propio.
@@ -54,17 +58,17 @@ TAREAS_FIJAS = ["Compras", "Limpieza", "Tesoreria", "Carrozas", "Concursos", "Co
 ESTADOS_TICKET = ["pendiente", "en_curso", "hecho"]
 
 PERMISSIONS = {
-    "manage_roles": "Manage roles and permissions",
-    "manage_socios": "Manage members",
-    "manage_config": "Manage club configuration",
-    "view_finances": "View finances",
-    "manage_finances": "Manage income and expenses",
-    "manage_cuotas": "Manage all fees",
-    "manage_bebidas": "Manage drinks and prices",
-    "manage_inventory": "Manage inventory",
-    "manage_events": "Manage meetings and reservations",
-    "manage_tasks": "Assign tasks",
-    "export_data": "Export data",
+    "manage_roles": "Gestionar roles y permisos",
+    "manage_socios": "Gestionar socios",
+    "manage_config": "Gestionar configuracion de la pena",
+    "view_finances": "Ver finanzas",
+    "manage_finances": "Gestionar ingresos y gastos",
+    "manage_cuotas": "Gestionar cuotas",
+    "manage_bebidas": "Gestionar bebidas y precios",
+    "manage_inventory": "Gestionar inventario",
+    "manage_events": "Gestionar reuniones y reservas",
+    "manage_tasks": "Asignar tareas",
+    "export_data": "Exportar datos",
 }
 ALL_PERMISSIONS = list(PERMISSIONS)
 DEFAULT_ROLES = [
@@ -218,7 +222,8 @@ CREATE TABLE IF NOT EXISTS gastos_eventos (
     fecha TEXT NOT NULL,
     notas TEXT DEFAULT '',
     creado_por TEXT,
-    creado_en TEXT
+    creado_en TEXT,
+    oculto INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS gastos_evento_participantes (
     evento_id TEXT NOT NULL,
@@ -235,6 +240,18 @@ CREATE TABLE IF NOT EXISTS gastos_evento_pagos (
     fecha TEXT NOT NULL,
     beneficiarios TEXT NOT NULL DEFAULT '[]',
     FOREIGN KEY (evento_id) REFERENCES gastos_eventos(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS gastos_socios (
+    id TEXT PRIMARY KEY,
+    socio_id TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'gasto',
+    concepto TEXT NOT NULL,
+    importe REAL NOT NULL,
+    fecha TEXT NOT NULL,
+    notas TEXT DEFAULT '',
+    ticket INTEGER NOT NULL DEFAULT 0,
+    abonado INTEGER NOT NULL DEFAULT 0,
+    creado_en TEXT
 );
 """
 
@@ -280,6 +297,18 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE tareas_tickets ADD COLUMN completado_en TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE gastos_eventos ADD COLUMN oculto INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE gastos_evento_pagos ADD COLUMN ticket INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE gastos_socios ADD COLUMN tipo TEXT NOT NULL DEFAULT 'gasto'")
         except sqlite3.OperationalError:
             pass
         # Migracion: actualizar tabla reuniones si existe con estructura antigua
@@ -584,13 +613,13 @@ def state():
         "SELECT bc.*, bp.nombre AS bebida_nombre FROM bebidas_consumos bc "
         "LEFT JOIN bebidas_precios bp ON bp.id = bc.bebida_id "
     )
+    bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
+    fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
     if can_view_finances or has_permission(sid, "manage_finances"):
         movimientos = [dict(r) for r in db.execute("SELECT m.*, s.nombre AS socio_nombre FROM movimientos m LEFT JOIN socios s ON s.id = m.socio_id ORDER BY fecha DESC")]
-        bebidas_precios = [dict(r) for r in db.execute("SELECT * FROM bebidas_precios ORDER BY nombre")]
         bebidas_consumos = [dict(r) for r in db.execute(consumo_cols + "ORDER BY bc.fecha DESC LIMIT 80")]
-        fiestas_gastos = [dict(r) for r in db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha DESC")]
     else:
-        movimientos, bebidas_precios, fiestas_gastos = [], [], []
+        movimientos = []
         bebidas_consumos = (
             [dict(r) for r in db.execute(consumo_cols + "WHERE bc.socio_id = ? ORDER BY bc.fecha DESC", (sid,))]
             if sid else []
@@ -626,6 +655,13 @@ def state():
 
     tareas_tickets = [dict(r) for r in db.execute("SELECT * FROM tareas_tickets ORDER BY (fecha IS NULL), fecha, tipo")]
 
+    gastos_socios = [
+        dict(r) for r in db.execute(
+            "SELECT gs.*, s.nombre AS socio_nombre FROM gastos_socios gs "
+            "LEFT JOIN socios s ON s.id = gs.socio_id ORDER BY gs.fecha DESC"
+        )
+    ]
+
     return jsonify(
         {
             "config": config,
@@ -643,6 +679,7 @@ def state():
             "fiestas_gastos": fiestas_gastos,
             "reservas": reservas,
             "gastos_eventos": gastos_eventos,
+            "gastos_socios": gastos_socios,
             "tareas_tickets": tareas_tickets,
             "tareas_fijas": TAREAS_FIJAS,
             "estados_ticket": ESTADOS_TICKET,
@@ -992,8 +1029,8 @@ def toggle_cuota():
     data = request.get_json(force=True)
     socio_id, year, month = data.get("socio_id"), int(data.get("year")), int(data.get("month"))
 
-    if socio_id != sid and not has_permission(sid, "manage_cuotas"):
-        return err("Solo puedes marcar tu propia cuota. Pideselo al administrador si es de otro socio.")
+    if not has_permission(sid, "manage_cuotas"):
+        return err("Solo el tesorero o el administrador pueden marcar una cuota como pagada, previa comprobacion.")
 
     db = get_db()
     row = db.execute(
@@ -1171,8 +1208,8 @@ def delete_bebida_precio(bid):
 # -------------------------------------------------------------- bebidas: consumos --
 @app.route("/api/bebidas/consumos", methods=["POST"])
 def add_consumo():
-    if not require_permission("manage_bebidas"):
-        return err("No tienes permiso para gestionar bebidas.")
+    if not require_login():
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     db = get_db()
     bebida = db.execute("SELECT * FROM bebidas_precios WHERE id = ?", (data.get("bebida_id"),)).fetchone()
@@ -1228,8 +1265,8 @@ def toggle_consumo_pagado(cid):
 # -------------------------------------------------------------- fiestas (gasto bebida evento) --
 @app.route("/api/fiestas", methods=["POST"])
 def add_fiesta_gasto():
-    if not require_permission("manage_finances"):
-        return err("No tienes permiso para registrar gastos.")
+    if not require_login():
+        return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     db = get_db()
     fid = new_id()
@@ -1249,8 +1286,8 @@ def add_fiesta_gasto():
 
 @app.route("/api/fiestas/<fid>", methods=["DELETE"])
 def delete_fiesta_gasto(fid):
-    if not require_permission("manage_finances"):
-        return err("No tienes permiso para borrar gastos.")
+    if not require_login():
+        return err("No has iniciado sesion.", 401)
     db = get_db()
     db.execute("DELETE FROM fiestas_gastos WHERE id = ?", (fid,))
     db.commit()
@@ -1272,9 +1309,9 @@ def add_gasto_evento():
     participantes = data.get("participantes") or []
     if not isinstance(participantes, list):
         participantes = []
+    # Quien crea el evento no participa automaticamente: se anade a la lista
+    # de participantes solo si el se ha marcado a si mismo, igual que el resto.
     participantes = [p for p in participantes if p in validos]
-    if sid not in participantes:
-        participantes.append(sid)
     eid = new_id()
     db.execute(
         "INSERT INTO gastos_eventos (id, nombre, fecha, notas, creado_por, creado_en) VALUES (?,?,?,?,?,?)",
@@ -1304,6 +1341,23 @@ def delete_gasto_evento(eid):
     db.execute("DELETE FROM gastos_eventos WHERE id = ?", (eid,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-eventos/<eid>/ocultar", methods=["POST"])
+def toggle_gasto_evento_oculto(eid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT creado_por, oculto FROM gastos_eventos WHERE id = ?", (eid,)).fetchone()
+    if not row:
+        return err("Evento no encontrado", 404)
+    if row["creado_por"] != sid and not has_permission(sid, "manage_finances"):
+        return err("Solo quien creo el evento (o quien gestiona finanzas) puede ocultarlo.")
+    nuevo = 0 if row["oculto"] else 1
+    db.execute("UPDATE gastos_eventos SET oculto = ? WHERE id = ?", (nuevo, eid))
+    db.commit()
+    return jsonify({"ok": True, "oculto": bool(nuevo)})
 
 
 @app.route("/api/gastos-eventos/<eid>/participantes/toggle", methods=["POST"])
@@ -1387,6 +1441,196 @@ def delete_gasto_evento_pago(eid, pid):
     if not puede:
         return err("Solo quien pago, quien creo el evento o quien gestiona finanzas puede borrar este pago.")
     db.execute("DELETE FROM gastos_evento_pagos WHERE id = ?", (pid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- gastos de socios --
+def _gasto_socio_o_error(sid, gid):
+    db = get_db()
+    row = db.execute("SELECT * FROM gastos_socios WHERE id = ?", (gid,)).fetchone()
+    if not row:
+        return None, err("Gasto no encontrado", 404)
+    if row["socio_id"] != sid and not has_permission(sid, "manage_finances"):
+        return None, err("Solo quien registro este gasto o quien gestiona finanzas puede modificarlo.")
+    return row, None
+
+
+@app.route("/api/gastos-socios", methods=["POST"])
+def add_gasto_socio():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    db = get_db()
+    socio_id = sid
+    concepto = (data.get("concepto") or "").strip()
+    if not concepto:
+        return err("El concepto es obligatorio.", 400)
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    if importe <= 0:
+        return err("El importe debe ser mayor que 0.", 400)
+    tipo = data.get("tipo") if data.get("tipo") in ("gasto", "ingreso") else "gasto"
+    gid = new_id()
+    db.execute(
+        "INSERT INTO gastos_socios (id, socio_id, tipo, concepto, importe, fecha, notas, creado_en) VALUES (?,?,?,?,?,?,?,?)",
+        (
+            gid,
+            socio_id,
+            tipo,
+            concepto,
+            importe,
+            data.get("fecha") or date.today().isoformat(),
+            (data.get("notas") or "").strip(),
+            now_iso(),
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": gid})
+
+
+@app.route("/api/gastos-socios/<gid>", methods=["POST"])
+def update_gasto_socio(gid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    row, error = _gasto_socio_o_error(sid, gid)
+    if error:
+        return error
+    data = request.get_json(force=True)
+    concepto = (data.get("concepto") or "").strip()
+    if not concepto:
+        return err("El concepto es obligatorio.", 400)
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    if importe <= 0:
+        return err("El importe debe ser mayor que 0.", 400)
+    tipo = data.get("tipo") if data.get("tipo") in ("gasto", "ingreso") else row["tipo"]
+    db = get_db()
+    db.execute(
+        "UPDATE gastos_socios SET tipo=?, concepto=?, importe=?, fecha=?, notas=? WHERE id=?",
+        (tipo, concepto, importe, data.get("fecha") or date.today().isoformat(), (data.get("notas") or "").strip(), gid),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-socios/<gid>/abonado", methods=["POST"])
+def toggle_abonado_gasto_socio(gid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    if not has_permission(sid, "manage_finances"):
+        return err("Solo el tesorero o el administrador pueden marcarlo, una vez comprobado.")
+    db = get_db()
+    row = db.execute("SELECT abonado FROM gastos_socios WHERE id = ?", (gid,)).fetchone()
+    if not row:
+        return err("Gasto no encontrado", 404)
+    db.execute("UPDATE gastos_socios SET abonado = ? WHERE id = ?", (0 if row["abonado"] else 1, gid))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-socios/<gid>", methods=["DELETE"])
+def delete_gasto_socio(gid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    row, error = _gasto_socio_o_error(sid, gid)
+    if error:
+        return error
+    db = get_db()
+    db.execute("DELETE FROM gastos_socios WHERE id = ?", (gid,))
+    db.commit()
+    ticket_path = os.path.join(TICKETS_DIR, f"{gid}.jpg")
+    if os.path.exists(ticket_path):
+        try:
+            os.remove(ticket_path)
+        except OSError:
+            pass
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos-socios/<gid>/ticket", methods=["POST"])
+def upload_ticket_gasto_socio(gid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    row, error = _gasto_socio_o_error(sid, gid)
+    if error:
+        return error
+    if not PIL_OK:
+        return err(
+            "Falta instalar una dependencia en el servidor: ejecuta "
+            "'pip install -r requirements.txt' (o 'pip install Pillow') "
+            "y reinicia la aplicacion.",
+            500,
+        )
+    if "ticket" not in request.files or request.files["ticket"].filename == "":
+        return err("No se ha recibido ninguna imagen.", 400)
+    guardado, error = _guardar_ticket(request.files["ticket"], os.path.join(TICKETS_DIR, f"{gid}.jpg"))
+    if error:
+        return error
+    db = get_db()
+    db.execute("UPDATE gastos_socios SET ticket = 1 WHERE id = ?", (gid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+def _guardar_ticket(file, dest_path):
+    try:
+        raw = file.read()
+        try:
+            im = Image.open(BytesIO(raw))
+            im.load()
+        except Exception:
+            return False, err(
+                "No se pudo leer esa imagen. Prueba con un archivo .jpg o .png "
+                "(si es una foto de iPhone en formato HEIC, conviertela a JPG antes de subirla).",
+                400,
+            )
+        im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail((1600, 1600), Image.LANCZOS)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        im.save(dest_path, "JPEG", quality=85)
+    except Exception as e:
+        return False, err(f"No se pudo procesar la imagen: {e}", 400)
+    return True, None
+
+
+@app.route("/api/gastos-eventos/<eid>/pagos/<pid>/ticket", methods=["POST"])
+def upload_ticket_gasto_evento_pago(eid, pid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    pago = db.execute(
+        "SELECT pagador_id FROM gastos_evento_pagos WHERE id = ? AND evento_id = ?", (pid, eid)
+    ).fetchone()
+    if not pago:
+        return err("Pago no encontrado", 404)
+    evento = db.execute("SELECT creado_por FROM gastos_eventos WHERE id = ?", (eid,)).fetchone()
+    puede = sid == pago["pagador_id"] or (evento and sid == evento["creado_por"]) or has_permission(sid, "manage_finances")
+    if not puede:
+        return err("Solo quien pago, quien creo el evento o quien gestiona finanzas puede subir el ticket de este pago.")
+    if not PIL_OK:
+        return err(
+            "Falta instalar una dependencia en el servidor: ejecuta "
+            "'pip install -r requirements.txt' (o 'pip install Pillow') "
+            "y reinicia la aplicacion.",
+            500,
+        )
+    if "ticket" not in request.files or request.files["ticket"].filename == "":
+        return err("No se ha recibido ninguna imagen.", 400)
+    guardado, error = _guardar_ticket(request.files["ticket"], os.path.join(TICKETS_DIR, f"pago-{pid}.jpg"))
+    if error:
+        return error
+    db.execute("UPDATE gastos_evento_pagos SET ticket = 1 WHERE id = ?", (pid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1700,21 +1944,22 @@ def _build_excel():
         ] for t in tareas],
     )
 
-    ws9 = wb.create_sheet("Reparto-Eventos")
+    ws9 = wb.create_sheet("Tricount-Eventos")
     eventos = db.execute("SELECT * FROM gastos_eventos ORDER BY fecha").fetchall()
     participantes_de = {}
     for p in db.execute("SELECT * FROM gastos_evento_participantes"):
         participantes_de.setdefault(p["evento_id"], []).append(p["socio_id"])
     write_sheet(
         ws9,
-        ["ID", "Nombre", "Fecha", "Notas", "Participantes", "Creado por"],
+        ["ID", "Nombre", "Fecha", "Notas", "Participantes", "Creado por", "Oculto"],
         [[
             e["id"], e["nombre"], e["fecha"], e["notas"] or "",
             nombres(participantes_de.get(e["id"], [])), nombre_de.get(e["creado_por"], ""),
+            "Si" if e["oculto"] else "No",
         ] for e in eventos],
     )
 
-    ws10 = wb.create_sheet("Reparto-Pagos")
+    ws10 = wb.create_sheet("Tricount-Pagos")
     pagos = db.execute("SELECT * FROM gastos_evento_pagos ORDER BY fecha").fetchall()
     nombre_evento = {e["id"]: e["nombre"] for e in eventos}
     write_sheet(
@@ -1734,22 +1979,31 @@ def _build_excel():
     gastos_fiestas = sum(f["importe"] for f in fiestas)
     saldo = ingresos_cuotas + ingresos_mov + ingresos_bebidas - gastos_mov - gastos_fiestas
 
+    ingresos_por_categoria = {}
+    gastos_por_categoria = {}
+    for m in movs:
+        destino = ingresos_por_categoria if m["tipo"] == "ingreso" else gastos_por_categoria
+        destino[m["categoria"]] = destino.get(m["categoria"], 0) + m["importe"]
+
     ws5 = wb.create_sheet("Resumen")
     ws5.append(["Concepto", "Importe (EUR)"])
     for cell in ws5[1]:
         cell.fill = header_fill
         cell.font = header_font
-    for concepto, importe in [
-        ("Cuotas cobradas", ingresos_cuotas),
-        ("Otros ingresos", ingresos_mov),
-        ("Bebidas cobradas", ingresos_bebidas),
-        ("Bebidas pendientes de cobro", pendiente_bebidas),
-        ("Gastos generales", -gastos_mov),
-        ("Gastos de fiestas", -gastos_fiestas),
-        ("SALDO TOTAL (solo lo cobrado)", saldo),
-    ]:
+    filas = [("Cuotas cobradas", ingresos_cuotas)]
+    filas.append(("Otros ingresos (total)", ingresos_mov))
+    for categoria, importe in sorted(ingresos_por_categoria.items()):
+        filas.append((f"  - {categoria}", importe))
+    filas.append(("Bebidas cobradas", ingresos_bebidas))
+    filas.append(("Bebidas pendientes de cobro", pendiente_bebidas))
+    filas.append(("Gastos generales (total)", -gastos_mov))
+    for categoria, importe in sorted(gastos_por_categoria.items()):
+        filas.append((f"  - {categoria}", -importe))
+    filas.append(("Gastos de fiestas", -gastos_fiestas))
+    filas.append(("SALDO TOTAL (solo lo cobrado)", saldo))
+    for concepto, importe in filas:
         ws5.append([concepto, importe])
-    ws5.column_dimensions["A"].width = 28
+    ws5.column_dimensions["A"].width = 32
     ws5.column_dimensions["B"].width = 16
     wb.move_sheet("Resumen", offset=-(len(wb.sheetnames) - 1))  # dejarla la primera
 
@@ -1935,30 +2189,31 @@ def _import_excel(wb, sid):
         bebidas_by_id.add(target_id)
         bebidas_by_name[nombre.lower()] = target_id
 
-    # ---- Reparto-Eventos ----
+    # ---- Tricount-Eventos ----
     eventos_by_id = {e["id"] for e in db.execute("SELECT id FROM gastos_eventos")}
     eventos_by_key = {(e["nombre"].strip().lower(), e["fecha"]): e["id"] for e in db.execute("SELECT id, nombre, fecha FROM gastos_eventos")}
     eventos_by_name_import = {}
-    for row in _sheet_rows(wb, "Reparto-Eventos"):
-        rid, nombre, fecha, notas, participantes_txt, creado_por_txt = (list(row) + [None] * 6)[:6]
+    for row in _sheet_rows(wb, "Tricount-Eventos"):
+        rid, nombre, fecha, notas, participantes_txt, creado_por_txt, oculto_txt = (list(row) + [None] * 7)[:7]
         nombre = _cell_str(nombre)
         fecha = _cell_str(fecha) or date.today().isoformat()
         if not nombre:
-            marcar("Reparto-Eventos", error="Fila sin nombre, omitida.")
+            marcar("Tricount-Eventos", error="Fila sin nombre, omitida.")
             continue
         rid = _cell_str(rid)
         target_id = rid if rid in eventos_by_id else eventos_by_key.get((nombre.lower(), fecha))
         creado_por = resolver_socio(None, creado_por_txt) or sid
+        oculto_val = 1 if _cell_bool(oculto_txt) else 0
         if target_id:
-            db.execute("UPDATE gastos_eventos SET nombre=?, fecha=?, notas=? WHERE id=?", (nombre, fecha, _cell_str(notas), target_id))
-            marcar("Reparto-Eventos", actualizado=True)
+            db.execute("UPDATE gastos_eventos SET nombre=?, fecha=?, notas=?, oculto=? WHERE id=?", (nombre, fecha, _cell_str(notas), oculto_val, target_id))
+            marcar("Tricount-Eventos", actualizado=True)
         else:
             target_id = new_id()
             db.execute(
-                "INSERT INTO gastos_eventos (id, nombre, fecha, notas, creado_por, creado_en) VALUES (?,?,?,?,?,?)",
-                (target_id, nombre, fecha, _cell_str(notas), creado_por, now_iso()),
+                "INSERT INTO gastos_eventos (id, nombre, fecha, notas, creado_por, creado_en, oculto) VALUES (?,?,?,?,?,?,?)",
+                (target_id, nombre, fecha, _cell_str(notas), creado_por, now_iso(), oculto_val),
             )
-            marcar("Reparto-Eventos", creado=True)
+            marcar("Tricount-Eventos", creado=True)
         participantes = resolver_socios(participantes_txt)
         if creado_por and creado_por not in participantes:
             participantes.append(creado_por)
@@ -2152,23 +2407,23 @@ def _import_excel(wb, sid):
             tareas_by_id.add(target_id)
             marcar("Tareas", creado=True)
 
-    # ---- Reparto-Pagos ----
+    # ---- Tricount-Pagos ----
     pagos_by_id = {p["id"] for p in db.execute("SELECT id FROM gastos_evento_pagos")}
-    for row in _sheet_rows(wb, "Reparto-Pagos"):
+    for row in _sheet_rows(wb, "Tricount-Pagos"):
         rid, evento_id_txt, evento_txt, pagador_id_txt, pagador_txt, concepto, importe, fecha, beneficiarios_txt = (list(row) + [None] * 9)[:9]
         evento_id = _cell_str(evento_id_txt)
         if evento_id not in eventos_by_id:
             evento_id = eventos_by_name_import.get(_cell_str(evento_txt).lower()) or eventos_by_key.get((_cell_str(evento_txt).lower(), _cell_str(fecha)))
         pagador_id = resolver_socio(pagador_id_txt, pagador_txt)
         if not evento_id or not pagador_id:
-            marcar("Reparto-Pagos", error=f"No se pudo resolver evento/pagador en una fila (evento={_cell_str(evento_txt)}).")
+            marcar("Tricount-Pagos", error=f"No se pudo resolver evento/pagador en una fila (evento={_cell_str(evento_txt)}).")
             continue
         beneficiarios = resolver_socios(beneficiarios_txt)
         rid = _cell_str(rid)
         valores = (evento_id, pagador_id, _cell_str(concepto), _cell_float(importe), _cell_str(fecha) or date.today().isoformat(), json.dumps(beneficiarios))
         if rid in pagos_by_id:
             db.execute("UPDATE gastos_evento_pagos SET evento_id=?, pagador_id=?, concepto=?, importe=?, fecha=?, beneficiarios=? WHERE id=?", valores + (rid,))
-            marcar("Reparto-Pagos", actualizado=True)
+            marcar("Tricount-Pagos", actualizado=True)
         else:
             target_id = rid or new_id()
             db.execute(
@@ -2176,7 +2431,7 @@ def _import_excel(wb, sid):
                 (target_id,) + valores,
             )
             pagos_by_id.add(target_id)
-            marcar("Reparto-Pagos", creado=True)
+            marcar("Tricount-Pagos", creado=True)
 
     db.commit()
     return resumen
