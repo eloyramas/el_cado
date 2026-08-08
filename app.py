@@ -1163,6 +1163,34 @@ def add_movimiento():
     return jsonify({"ok": True, "id": mid})
 
 
+@app.route("/api/movimientos/<mid>", methods=["POST"])
+def update_movimiento(mid):
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden modificar gastos o ingresos.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM movimientos WHERE id = ?", (mid,)).fetchone():
+        return err("Movimiento no encontrado", 404)
+    data = request.get_json(force=True)
+    socio_id = data.get("socio_id") or None
+    if socio_id:
+        if not db.execute("SELECT 1 FROM socios WHERE id = ?", (socio_id,)).fetchone():
+            return err("Socio no encontrado", 404)
+    db.execute(
+        "UPDATE movimientos SET tipo=?, categoria=?, concepto=?, importe=?, fecha=?, socio_id=? WHERE id=?",
+        (
+            data.get("tipo", "gasto"),
+            data.get("categoria", "Otros"),
+            (data.get("concepto") or "").strip(),
+            float(data.get("importe") or 0),
+            data.get("fecha"),
+            socio_id,
+            mid,
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/movimientos/<mid>", methods=["DELETE"])
 def delete_movimiento(mid):
     if not require_permission("manage_finances"):
