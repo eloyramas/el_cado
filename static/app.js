@@ -685,7 +685,8 @@ function construirAlertas(){
   const now = new Date();
   const hoy = now.getDate();
 
-  if(hoy >= DIA_LIMITE_CUOTA){
+  const MES_SIN_AVISO_CUOTA = 7; // agosto (0-indexado): la cuota queda cubierta por el gasto de fiestas (100EUR socio / 50EUR no socio)
+  if(hoy >= DIA_LIMITE_CUOTA && now.getMonth() !== MES_SIN_AVISO_CUOTA){
     const activos = state.socios.filter(s=>s.activo);
     activos.forEach(s=>{
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===now.getFullYear() && c.month===now.getMonth()+1);
