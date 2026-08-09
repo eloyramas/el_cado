@@ -25,16 +25,18 @@ const FAQ_ENTRIES = [
     respuesta:'Ve a la pestana Reservas, rellena la fecha y el evento (las horas son opcionales) y pulsa "Reservar a mi nombre". Puedes cancelar tu propia reserva desde la lista de proximas reservas. En los calendarios (Reservas, Reuniones, Tareas) puedes pulsar la etiqueta de un dia para ver los detalles de ese evento, muy util desde el movil.'},
   {id:'tricount', pregunta:'Como funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
     respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
-  {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket'],
-    respuesta:'En la pestana Tareas cualquier socio puede crear una tarea. En "Quien la hace" puedes anadir con el boton "+" a tantos socios como haga falta (no tiene por que ser uno solo), o dejarla sin nadie y que alguien se apunte despues con "+ Apuntarme". Una vez creada, cualquier socio puede anadir o quitar gente, editarla, cambiarle el estado o borrarla. Tambien puedes enviar el listado de tareas activas al grupo de WhatsApp con un boton.'},
+  {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket','estado','pendiente','hecha'],
+    respuesta:'En la pestana Tareas cualquier socio puede crear una tarea. En "Quien la hace" puedes anadir con el boton "+" a tantos socios como haga falta (no tiene por que ser uno solo), o dejarla sin nadie y que alguien se apunte despues con "+ Apuntarme". Una vez creada, cualquier socio puede anadir o quitar gente, editarla, cambiarle el estado o borrarla: el estado (Pendiente / En curso / Hecha) se elige directamente en un desplegable, no hace falta ir pasando por los tres en orden. La tarea nunca se borra sola al cambiar de estado: cuando la marcas como "Hecha" simplemente pasa de "Tareas activas" al "Historial de tareas completadas" mas abajo en la misma pestana, y solo desaparece de verdad si alguien pulsa "Borrar". Tambien puedes enviar el listado de tareas activas al grupo de WhatsApp con un boton.'},
   {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
     respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lapiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
   {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
     respuesta:'Cualquier socio puede consultar los precios en Bebidas > Consumo del dia a dia, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos o registrar consumos es cosa del administrador o el tesorero.'},
-  {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso'],
-    respuesta:'En Gastos e ingresos, tarjeta "Gastos de socios para la pena", rellena el concepto, el importe y la fecha. Una vez creado, puedes subir una foto del ticket (.jpg o .png) desde el propio gasto de la lista. Cuando el tesorero te lo abone, marcalo como "Abonado" (puedes hacerlo tu mismo o el administrador/tesorero). Solo tu o el administrador/tesorero podeis editar o borrar ese gasto; no los de otros socios.'},
+  {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
+    respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tu como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tu o el administrador/tesorero podeis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional: sirve para ir apuntando lo que falta por revisar. Cuando el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automaticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habias subido, se copia tambien alli). A partir de ese momento, aunque borres o se borre la solicitud de esta lista provisional para dejarla limpia, el Movimiento generado NO se borra: se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en anos posteriores. Si el tesorero desmarca el "Abonado" por error (porque en realidad no estaba pagado/verificado), entonces si se quita el Movimiento generado, ya que no era real.'},
   {id:'excel', pregunta:'Como exporto los datos a Excel?', palabras:['excel','exportar','descargar','xlsx','cuentas'],
     respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario o Bebidas. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.'},
+  {id:'whatsapp', pregunta:'Como envio informacion al grupo de WhatsApp?', palabras:['whatsapp','enviar','compartir','grupo','mensaje'],
+    respuesta:'Veras un boton "Enviar por WhatsApp" en varias pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Bebidas (deuda pendiente), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial, a diferencia de "Exportar a Excel" que si esta restringido.'},
   {id:'roles', pregunta:'Que son los roles y quien los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
     respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignarselos a los socios, desde la pestana Roles.'},
   {id:'avisos', pregunta:'Que es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
@@ -42,7 +44,9 @@ const FAQ_ENTRIES = [
   {id:'baja', pregunta:'Que pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
     respuesta:'Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia a reuniones, etc): simplemente deja de aparecer en el buscador de la pantalla de inicio y se marca como "de baja" en la lista de socios.'},
   {id:'lista-compra', pregunta:'Como funciona la Lista de la compra?', palabras:['compra','lista','listas','producto','productos','supermercado'],
-    respuesta:'En la pestana Lista compra cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad. Todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado (queda tachado y se mueve al desplegable "Comprados"). Los cambios de cualquier socio se ven en el resto de moviles en unos segundos, sin tener que avisaros por otro lado.'},
+    respuesta:'En la pestana Lista compra cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad. Todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado (queda tachado y se mueve al desplegable "Comprados"). Los cambios de cualquier socio se ven en el resto de moviles en unos segundos, sin tener que avisaros por otro lado. Cada lista tiene ademas su propio boton "Enviar por WhatsApp" con lo que queda pendiente de comprar.'},
+  {id:'inventario', pregunta:'Quien puede anadir o editar el material del inventario?', palabras:['inventario','material','estado','revision','comprar'],
+    respuesta:'Todos los socios ven el inventario. Anadir material nuevo es cosa de quien tiene el permiso de gestionar inventario, pero una vez que un material ya esta creado, cualquier socio puede editarlo (nombre, categoria, cantidad, estado o notas) y tambien borrarlo, por ejemplo para actualizar su estado a "Necesita revision" o "Hay que comprar". Hay un boton para enviar por WhatsApp solo lo que esta pendiente de revisar o comprar, sin tener que mandar el inventario entero.'},
 ];
 function buscarFaq(query){
   const q = query.toLowerCase().trim();
@@ -272,6 +276,7 @@ function roleNames(socio){
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' EUR'; }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+function enviarWhatsapp(texto){ window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); }
 function fmtDate(iso){
   if(!iso) return '';
   const [y,m,d] = iso.split('-');
@@ -844,8 +849,8 @@ function renderRoleRow(role, labels){
 }
 /* ============ calculos ============ */
 function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
-function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso' && !m.gasto_socio_id).reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto' && !m.gasto_socio_id).reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
@@ -950,7 +955,7 @@ function movimientosPorMes(){
     map[key][campo] += Number(importe||0);
   }
   state.cuotas.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
-  state.movimientos.forEach(m=>add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe));
+  state.movimientos.forEach(m=>{ if(!m.gasto_socio_id) add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe); });
   state.bebidas_consumos.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
   state.fiestas_gastos.forEach(f=>add(f.fecha, 'gastos', f.importe));
   (state.gastos_socios||[]).forEach(g=>{ if(g.abonado) add(g.fecha, g.tipo==='ingreso' ? 'ingresos' : 'gastos', g.importe); });
@@ -1104,6 +1109,7 @@ function renderResumen(){
         <span><span class="pin"></span>Cuentas</span>
 
         <span style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn ghost small" data-action="export-cuentas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
           ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
           ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
         </span>
@@ -1284,7 +1290,10 @@ function renderReservas(){
     </form>
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Proximas reservas</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Proximas reservas</span>
+      ${proximas.length ? `<button class="btn ghost small" data-action="export-reservas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+    </h2>
     ${proximas.length===0 ? '<p class="empty">La pena esta libre por ahora.</p>' : proximas.map(r=>`
       <div class="list-item">
         
@@ -1341,7 +1350,10 @@ function renderReuniones(){
     ${renderMiniCalendario(reunionesCalFecha, state.reuniones.map(r=>({fecha:r.fecha, label:r.evento, detalle:`${r.evento}\n${fmtDate(r.fecha)} - ${fmtHoras(r)}\nConvocada por ${socioNombre(r.socio_id)}${r.notas?'\n'+r.notas:''}`})), 'reuniones-mes')}
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Historial</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Historial</span>
+      ${ordenadas.length ? `<button class="btn ghost small" data-action="export-reuniones-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+    </h2>
     ${ordenadas.length===0 ? '<p class="empty">Aun no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
@@ -1377,7 +1389,7 @@ function renderNuevoEventoParticipantesWrap(){
       ${nuevoEventoParticipantes.length ? nuevoEventoParticipantes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="participantes" value="${sid}"><button type="button" data-action="quitar-participante-nuevo-evento" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin participantes anadidos todavia.</span>'}
     </div>
     ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
-      <div><select id="nuevo-evento-participante-select">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div><select id="nuevo-evento-participante-select"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
       <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-nuevo-evento">+</button></div>
     </div>` : ''}
   `;
@@ -1447,7 +1459,7 @@ function renderGastoEvento(ev){
     </div>
     ${noParticipantes.length ? `
     <div class="form-row" style="align-items:flex-end; margin-bottom:14px;">
-      <div><label class="f">Anadir participante</label><select data-nuevo-participante="${ev.id}">${noParticipantes.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div><label class="f">Anadir participante</label><select data-nuevo-participante="${ev.id}"><option value="" selected>Elige un socio...</option>${noParticipantes.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
       <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-evento" data-evento="${ev.id}">+ Anadir</button></div>
     </div>` : ''}
 
@@ -1514,7 +1526,10 @@ function renderInventario(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Anadir material</span>
-      ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+      <span style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+        ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+      </span>
     </h2>
     <form data-form="add-inventario">
       <div class="form-row">
@@ -1533,7 +1548,7 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">Anadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -1602,7 +1617,10 @@ function renderListaCompraCard(lista){
   return `<div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>${escapeHtml(lista.nombre)} <span class="meta">- creada por ${escapeHtml(socioNombre(lista.creado_por))}</span></span>
-      <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
+      <span style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${pendientes.length ? `<button class="btn ghost small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+        <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
+      </span>
     </h2>
     ${items.length===0 ? '<p class="empty">Todavia no hay productos en esta lista.</p>' : ''}
     ${pendientes.map(i=>renderItemCompra(i)).join('')}
@@ -1736,7 +1754,10 @@ function renderCaja(){
   const gastosSocios = [...(state.gastos_socios||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   return `
   <div class="card">
-    <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Gastos e ingresos de socios</span>
+      ${gastosSocios.length ? `<button class="btn ghost small" data-action="export-gastos-socios-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+    </h2>
     <p class="meta" style="margin:-4px 0 10px;">Registra aqui un gasto que hayas pagado de tu bolsillo para la pena (para que el tesorero te lo pueda abonar) o un ingreso para que quede registrado y lo pueda comprobar el tesorero.</p>
     <form data-form="add-gasto-socio">
       <div class="form-row">
@@ -1787,6 +1808,7 @@ function renderCaja(){
           <option value="todos" ${cajaMesFiltro==='todos'?'selected':''}>Todos los meses</option>
           ${mesesDisponibles(state.movimientos.map(m=>m.fecha ? m.fecha.slice(0,7) : null)).map(k=>`<option value="${k}" ${cajaMesFiltro===k?'selected':''}>${labelMes(k)}</option>`).join('')}
         </select>
+        ${ordenados.length ? `<button class="btn ghost small" data-action="export-movimientos-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
         ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
       </span>
     </h2>
@@ -1885,7 +1907,7 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Nombre</label>
 
-          <select name="socio_id">${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select>
+          <select name="socio_id" required><option value="" selected>Elige un socio...</option>${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select>
 
           <input type="text" name="nombre_invitado" placeholder="Nombre del invitado" style="display:none; margin-top:6px;">
 
@@ -1904,7 +1926,10 @@ function renderBebidasConsumo(){
     `}
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></span>
+      ${consumos.some(c=>!c.pagado) ? `<button class="btn ghost small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+    </h2>
     ${consumos.length===0 ? '<p class="empty">Sin consumos todavia.</p>' : consumos.slice(0,40).map(c=>{
       const nombreBebida = c.bebida_nombre || '-';
       return `<div class="list-item">
@@ -1980,7 +2005,6 @@ function renderBebidasFiestas(){
 /* ============ TAREAS ============ */
 const ESTADO_LABELS = {pendiente:'Pendiente', en_curso:'En curso', hecho:'Hecho'};
 const ESTADO_CLASS = {pendiente:'warn', en_curso:'', hecho:'ok'};
-const ESTADO_CICLO = {pendiente:'en_curso', en_curso:'hecho', hecho:'pendiente'};
 const ROTACION_OPCIONES = ['', 'Semanal', 'Quincenal', 'Mensual'];
 let tareasCalFecha = new Date();
 
@@ -2028,7 +2052,7 @@ function renderNuevaTareaSociosWrap(){
       ${nuevaTareaSocios.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="socios" value="${sid}"><button type="button" data-action="quitar-socio-nueva-tarea" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('')}
     </div>
     ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
-      <div><select id="nueva-tarea-socio-select">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div><select id="nueva-tarea-socio-select"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
       <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-nueva-tarea">+</button></div>
     </div>` : ''}
   `;
@@ -2105,7 +2129,7 @@ function renderTicketRow(t){
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${!yoAsignado ? `<button class="btn ghost small" data-action="asignarme-ticket" data-id="${t.id}">+ Apuntarme</button>` : ''}
-        <button class="btn ghost small" data-action="ciclar-estado-ticket" data-id="${t.id}" data-estado="${t.estado}">Cambiar estado</button>
+        <select data-estado-tarea="${t.id}">${Object.keys(ESTADO_LABELS).map(k=>`<option value="${k}" ${k===t.estado?'selected':''}>${ESTADO_LABELS[k]}</option>`).join('')}</select>
         <button class="btn ghost small" data-action="editar-tarea" data-id="${t.id}">Editar</button>
         <button class="btn danger small" data-action="delete-tarea-ticket" data-id="${t.id}">Borrar</button>
       </div>
@@ -2116,7 +2140,7 @@ function renderTicketRow(t){
         ${asignados.length ? asignados.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<button type="button" data-action="quitar-socio-tarea" data-id="${t.id}" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin asignar</span>'}
       </div>
       ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
-        <div><select data-nuevo-socio-tarea="${t.id}">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+        <div><select data-nuevo-socio-tarea="${t.id}"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
         <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-tarea" data-id="${t.id}">+ Anadir</button></div>
       </div>` : ''}
     </div>
@@ -2362,12 +2386,6 @@ document.addEventListener('click', async (e)=>{
       const wrap = document.getElementById('nueva-tarea-socios-wrap');
       if(wrap) wrap.innerHTML = renderNuevaTareaSociosWrap();
     }
-    else if(action==='ciclar-estado-ticket'){
-      const siguiente = ESTADO_CICLO[btn.dataset.estado] || 'pendiente';
-      const r = await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {estado: siguiente});
-      await loadState(); render();
-      if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotacion, se ha creado la siguiente automaticamente.'); }
-    }
     else if(action==='delete-tarea-ticket'){
       if(confirm('Borrar esta tarea?')){
         editandoTareaId = null;
@@ -2391,7 +2409,88 @@ document.addEventListener('click', async (e)=>{
       if(porEstado.pendiente && porEstado.pendiente.length){ texto += `\n*Pendientes:*\n${porEstado.pendiente.map(linea).join('\n')}\n`; }
       if(porEstado.en_curso && porEstado.en_curso.length){ texto += `\n*En curso:*\n${porEstado.en_curso.map(linea).join('\n')}\n`; }
       if(tareas.length===0){ texto += '\nNo hay tareas activas.'; }
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-reservas-whatsapp'){
+      const proximas = state.reservas.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      let texto = `*Reservas de la pena* - ${fmtDate(todayISO())}\n\n`;
+      texto += proximas.length ? proximas.map(r=>`- ${fmtDate(r.fecha)} (${fmtHoras(r)}): ${r.evento} - ${socioNombre(r.socio_id)}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reservas proximas.';
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-reuniones-whatsapp'){
+      const proximas = state.reuniones.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      let texto = `*Reuniones de la pena* - ${fmtDate(todayISO())}\n\n`;
+      texto += proximas.length ? proximas.map(r=>`- ${fmtDate(r.fecha)} (${fmtHoras(r)}): ${r.evento}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reuniones proximas.';
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-inventario-whatsapp'){
+      const pendientes = state.inventario.filter(i=>i.estado!=='Bien');
+      let texto = `*Inventario de la pena* - ${fmtDate(todayISO())}\n\n`;
+      if(pendientes.length){
+        texto += '*Pendiente de revisar o comprar:*\n' + pendientes.map(i=>`- ${i.nombre} (${i.cantidad}) - ${i.estado}${i.notas?' - '+i.notas:''}`).join('\n');
+      } else {
+        texto += 'Todo el material esta bien, no hay nada pendiente.';
+      }
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-lista-compra-whatsapp'){
+      const lista = (state.listas_compra||[]).find(l=>l.id===btn.dataset.id);
+      if(!lista) return;
+      const pendientes = (lista.items||[]).filter(i=>!i.comprado);
+      let texto = `*Lista de la compra: ${lista.nombre}* - ${fmtDate(todayISO())}\n\n`;
+      texto += pendientes.length ? pendientes.map(i=>`- ${i.nombre}${i.cantidad?' ('+i.cantidad+')':''}`).join('\n') : 'No queda nada pendiente por comprar.';
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-bebidas-whatsapp'){
+      const pendientes = (state.bebidas_consumos||[]).filter(c=>!c.pagado);
+      const porConsumidor = {};
+      pendientes.forEach(c=>{ porConsumidor[c.consumidor] = (porConsumidor[c.consumidor]||0) + Number(c.importe||0); });
+      const nombres = Object.keys(porConsumidor).sort((a,b)=>porConsumidor[b]-porConsumidor[a]);
+      let texto = `*Deuda de bebidas pendiente* - ${fmtDate(todayISO())}\n\n`;
+      if(nombres.length){
+        texto += nombres.map(n=>`- ${n}: ${money(porConsumidor[n])}`).join('\n');
+        texto += `\n\n*Total pendiente: ${money(pendientes.reduce((a,c)=>a+Number(c.importe||0),0))}*`;
+      } else {
+        texto += 'No hay deuda pendiente, todo esta pagado.';
+      }
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-gastos-socios-whatsapp'){
+      const pendientes = gastosSociosPendientes();
+      let texto = `*Gastos e ingresos de socios* - ${fmtDate(todayISO())}\n\n`;
+      if(pendientes.length){
+        texto += '*Pendientes de verificar:*\n' + pendientes.map(g=>`- ${g.tipo==='ingreso'?'Ingreso':'Gasto'}: ${g.concepto} - ${money(g.importe)} - ${g.socio_nombre||'-'} (${fmtDate(g.fecha)})`).join('\n');
+        texto += `\n\n*Total pendiente: ${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}*`;
+      } else {
+        texto += 'No hay gastos ni ingresos de socios pendientes de verificar.';
+      }
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-movimientos-whatsapp'){
+      const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const filtrados = cajaMesFiltro==='todos' ? ordenados : ordenados.filter(m=>m.fecha && m.fecha.slice(0,7)===cajaMesFiltro);
+      let texto = `*Movimientos${cajaMesFiltro==='todos'?'':' - '+labelMes(cajaMesFiltro)}* - ${fmtDate(todayISO())}\n\n`;
+      texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}${money(m.importe)} - ${m.concepto} (${m.categoria})${m.socio_id?' - '+socioNombre(m.socio_id):''} - ${fmtDate(m.fecha)}`).join('\n') : 'Sin movimientos.';
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-cuentas-whatsapp'){
+      const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
+      const gastosTotales = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
+      const saldo = ingresosTotales - gastosTotales;
+      let texto = `*Cuentas de la pena* - ${fmtDate(todayISO())}\n\n`;
+      texto += `Cuotas: ${money(totalIngresosCuotas())}\n`;
+      texto += `Otros ingresos: ${money(totalIngresosMov())}\n`;
+      texto += `Bebidas: ${money(totalBebidasIngreso())}\n`;
+      texto += `Ingresos de socios (verificados): ${money(totalIngresosSociosVerificados())}\n`;
+      texto += `Gastos generales: -${money(totalGastosMov())}\n`;
+      texto += `Gastos de fiestas: -${money(totalFiestasGasto())}\n`;
+      texto += `Gastos de socios (verificados): -${money(totalGastosSociosVerificados())}\n\n`;
+      texto += `*Saldo neto: ${saldo<0?'-':'+'}${money(Math.abs(saldo))}*`;
+      const pendientes = gastosSociosPendientes();
+      if(pendientes.length){
+        texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavia al saldo.`;
+      }
+      enviarWhatsapp(texto);
     }
     else if(action==='delete-reunion'){
       if(confirm('Borrar esta reunion?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
@@ -2456,7 +2555,11 @@ document.addEventListener('click', async (e)=>{
       render();
     }
     else if(action==='delete-gasto-socio'){
-      if(confirm('Borrar este gasto?')){
+      const g = (state.gastos_socios||[]).find(x=>x.id===btn.dataset.id);
+      const aviso = g && g.abonado
+        ? 'Borrar esta solicitud de la lista? Ya esta pagado/verificado, asi que el movimiento correspondiente se queda igualmente en el historial de Movimientos.'
+        : 'Borrar este gasto?';
+      if(confirm(aviso)){
         editandoGastoSocioId = null;
         await apiDelete(`/api/gastos-socios/${btn.dataset.id}`);
         await loadState(); render();
@@ -2637,6 +2740,13 @@ document.addEventListener('change', async (e)=>{
   }
   if(e.target.name==='bebida_id' && e.target.form && e.target.form.dataset.form==='add-consumo'){
     actualizarTotalConsumo(e.target.form);
+    return;
+  }
+  if(e.target.matches('[data-estado-tarea]')){
+    const tid = e.target.dataset.estadoTarea;
+    const r = await apiPost(`/api/tareas-tickets/${tid}`, {estado: e.target.value});
+    await loadState(); render();
+    if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotacion, se ha creado la siguiente automaticamente.'); }
     return;
   }
   if(e.target.matches('[data-autoupload-foto]')){

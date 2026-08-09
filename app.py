@@ -24,6 +24,7 @@ Para arrancar en local:
 """
 import os
 import random
+import shutil
 import sqlite3
 import uuid
 import json
@@ -349,6 +350,10 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE gastos_socios ADD COLUMN ticket_ext TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE movimientos ADD COLUMN gasto_socio_id TEXT")
         except sqlite3.OperationalError:
             pass
         # Migracion: actualizar tabla reuniones si existe con estructura antigua
@@ -1700,10 +1705,15 @@ def update_gasto_socio(gid):
     if importe <= 0:
         return err("El importe debe ser mayor que 0.", 400)
     tipo = data.get("tipo") if data.get("tipo") in ("gasto", "ingreso") else row["tipo"]
+    fecha = data.get("fecha") or date.today().isoformat()
     db = get_db()
     db.execute(
         "UPDATE gastos_socios SET tipo=?, concepto=?, importe=?, fecha=?, notas=? WHERE id=?",
-        (tipo, concepto, importe, data.get("fecha") or date.today().isoformat(), (data.get("notas") or "").strip(), gid),
+        (tipo, concepto, importe, fecha, (data.get("notas") or "").strip(), gid),
+    )
+    db.execute(
+        "UPDATE movimientos SET tipo=?, concepto=?, importe=?, fecha=? WHERE gasto_socio_id=?",
+        (tipo, concepto, importe, fecha, gid),
     )
     db.commit()
     return jsonify({"ok": True})
@@ -1717,10 +1727,26 @@ def toggle_abonado_gasto_socio(gid):
     if not has_permission(sid, "manage_finances"):
         return err("Solo el tesorero o el administrador pueden marcarlo, una vez comprobado.")
     db = get_db()
-    row = db.execute("SELECT abonado FROM gastos_socios WHERE id = ?", (gid,)).fetchone()
+    row = db.execute("SELECT * FROM gastos_socios WHERE id = ?", (gid,)).fetchone()
     if not row:
         return err("Gasto no encontrado", 404)
-    db.execute("UPDATE gastos_socios SET abonado = ? WHERE id = ?", (0 if row["abonado"] else 1, gid))
+    nuevo_abonado = 0 if row["abonado"] else 1
+    db.execute("UPDATE gastos_socios SET abonado = ? WHERE id = ?", (nuevo_abonado, gid))
+    if nuevo_abonado:
+        if not db.execute("SELECT 1 FROM movimientos WHERE gasto_socio_id = ?", (gid,)).fetchone():
+            mid = new_id()
+            db.execute(
+                "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha, socio_id, gasto_socio_id, ticket, ticket_ext) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    mid, row["tipo"], "Socios", row["concepto"], row["importe"], row["fecha"], row["socio_id"], gid,
+                    row["ticket"], row["ticket_ext"],
+                ),
+            )
+            if row["ticket"]:
+                _copiar_ticket(gid, f"mov-{mid}", row["ticket_ext"])
+    else:
+        db.execute("DELETE FROM movimientos WHERE gasto_socio_id = ?", (gid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1734,6 +1760,9 @@ def delete_gasto_socio(gid):
     if error:
         return error
     db = get_db()
+    # El movimiento generado al verificarlo se queda como registro permanente del historial,
+    # aunque la solicitud provisional del socio se borre de esta lista.
+    db.execute("UPDATE movimientos SET gasto_socio_id = NULL WHERE gasto_socio_id = ?", (gid,))
     db.execute("DELETE FROM gastos_socios WHERE id = ?", (gid,))
     db.commit()
     for ext in ("jpg", "pdf"):
@@ -1761,6 +1790,10 @@ def upload_ticket_gasto_socio(gid):
         return error
     db = get_db()
     db.execute("UPDATE gastos_socios SET ticket = 1, ticket_ext = ? WHERE id = ?", (ext, gid))
+    mov = db.execute("SELECT id FROM movimientos WHERE gasto_socio_id = ?", (gid,)).fetchone()
+    if mov:
+        db.execute("UPDATE movimientos SET ticket = 1, ticket_ext = ? WHERE id = ?", (ext, mov["id"]))
+        _copiar_ticket(gid, f"mov-{mov['id']}", ext)
     db.commit()
     return jsonify({"ok": True, "ext": ext})
 
@@ -1805,6 +1838,20 @@ def _guardar_ticket(file, dest_path):
     except Exception as e:
         return False, err(f"No se pudo procesar la imagen: {e}", 400)
     return True, None
+
+
+def _copiar_ticket(base_name_origen, base_name_destino, ext):
+    """Copia el ticket/factura ya guardado de un registro a otro (p.ej. de un gasto de
+    socio al movimiento permanente que se genera al verificarlo)."""
+    if not ext:
+        return
+    origen = os.path.join(TICKETS_DIR, f"{base_name_origen}.{ext}")
+    destino = os.path.join(TICKETS_DIR, f"{base_name_destino}.{ext}")
+    try:
+        if os.path.exists(origen):
+            shutil.copyfile(origen, destino)
+    except OSError:
+        pass
 
 
 def _guardar_ticket_o_factura(file, dest_dir, base_name):
