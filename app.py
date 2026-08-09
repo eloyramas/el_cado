@@ -561,7 +561,14 @@ def index():
 
 @app.route("/static/<path:path>")
 def static_files(path):
-    return send_from_directory(os.path.join(BASE_DIR, "static"), path)
+    response = send_from_directory(os.path.join(BASE_DIR, "static"), path)
+    if path.startswith("avatars/") or path.startswith("tickets/"):
+        # Estos archivos se sobrescriben con el mismo nombre al cambiar la foto
+        # o el ticket. Algunos navegadores moviles (sobre todo Safari/iOS en
+        # apps instaladas) reutilizan la imagen en cache aunque cambie el
+        # parametro ?v= de la URL, asi que se fuerza a no guardarlas nunca.
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+    return response
 
 
 def valid_pin(pin):
