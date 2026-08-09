@@ -24,7 +24,7 @@ const FAQ_ENTRIES = [
   {id:'reservar', pregunta:'Como reservo la pena?', palabras:['reservar','reserva','reservas','calendario'],
     respuesta:'Ve a la pestana Reservas, rellena la fecha y el evento (las horas son opcionales) y pulsa "Reservar a mi nombre". Puedes cancelar tu propia reserva desde la lista de proximas reservas. En los calendarios (Reservas, Reuniones, Tareas) puedes pulsar la etiqueta de un dia para ver los detalles de ese evento, muy util desde el movil.'},
   {id:'tricount', pregunta:'Como funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
-    respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
+    respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cada evento tiene su boton "Enviar por WhatsApp" para mandar al grupo los saldos y quien tiene que pagar a quien, sin tener que explicarlo a mano. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
   {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket','estado','pendiente','hecha'],
     respuesta:'En la pestana Tareas cualquier socio puede crear una tarea. En "Quien la hace" puedes anadir con el boton "+" a tantos socios como haga falta (no tiene por que ser uno solo), o dejarla sin nadie y que alguien se apunte despues con "+ Apuntarme". Una vez creada, cualquier socio puede anadir o quitar gente, editarla, cambiarle el estado o borrarla: el estado (Pendiente / En curso / Hecha) se elige directamente en un desplegable, no hace falta ir pasando por los tres en orden. La tarea nunca se borra sola al cambiar de estado: cuando la marcas como "Hecha" simplemente pasa de "Tareas activas" al "Historial de tareas completadas" mas abajo en la misma pestana, y solo desaparece de verdad si alguien pulsa "Borrar". Tambien puedes enviar el listado de tareas activas al grupo de WhatsApp con un boton.'},
   {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
@@ -32,11 +32,13 @@ const FAQ_ENTRIES = [
   {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
     respuesta:'Cualquier socio puede consultar los precios en Bebidas > Consumo del dia a dia, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos o registrar consumos es cosa del administrador o el tesorero.'},
   {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
-    respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tu como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tu o el administrador/tesorero podeis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional: sirve para ir apuntando lo que falta por revisar. Cuando el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automaticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habias subido, se copia tambien alli). A partir de ese momento, aunque borres o se borre la solicitud de esta lista provisional para dejarla limpia, el Movimiento generado NO se borra: se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en anos posteriores. Si el tesorero desmarca el "Abonado" por error (porque en realidad no estaba pagado/verificado), entonces si se quita el Movimiento generado, ya que no era real.'},
-  {id:'excel', pregunta:'Como exporto los datos a Excel?', palabras:['excel','exportar','descargar','xlsx','cuentas'],
-    respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario o Bebidas. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.'},
+    respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tu como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tu o el administrador/tesorero podeis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavia esta pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automaticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habias subido, se copia tambien alli) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahi, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en anos posteriores; no depende ya de la solicitud original.'},
+  {id:'duplicados', pregunta:'Que pasa si registro un gasto que ya estaba apuntado?', palabras:['duplicado','duplicar','repetido','repetir','ya existe','aviso'],
+    respuesta:'Al anadir o editar un movimiento (Caja > Registrar movimiento) o un gasto/ingreso de socio, la app comprueba si ya hay algo con la misma fecha y el mismo concepto (mirando tanto en Movimientos como en Gastos e ingresos de socios) y te avisa por si es un duplicado antes de guardarlo. No te lo bloquea del todo -si de verdad son dos cosas distintas el mismo dia con el mismo nombre, puedes confirmar igualmente y se guarda-, es solo un aviso para evitar que se apunte dos veces lo mismo por error.'},
+  {id:'excel', pregunta:'Como exporto o importo datos con Excel?', palabras:['excel','exportar','importar','descargar','subir','xlsx','cuentas'],
+    respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario, Bebidas y Caja > Movimientos. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.\n\nEl boton "Importar Excel" (al lado del de exportar) lo puede usar cualquier socio, no hace falta ser administrador. Al subir un archivo, la app aplica cada hoja segun los permisos que ya tengas en esa parte de la app: si por ejemplo no gestionas cuotas ni finanzas, esas hojas del Excel se ignoran (se avisa en el resumen que aparece despues de importar cuantas filas se han omitido y por que), pero si puedes editar tareas, inventario, reservas o Tricount (que estan abiertos a todos), esas filas si se aplican. Asi cualquiera puede reutilizar el importador para corregir o cargar datos en lo que ya tiene permiso de tocar, sin arriesgarse a tocar roles, socios o finanzas sin querer.'},
   {id:'whatsapp', pregunta:'Como envio informacion al grupo de WhatsApp?', palabras:['whatsapp','enviar','compartir','grupo','mensaje'],
-    respuesta:'Veras un boton "Enviar por WhatsApp" en varias pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Bebidas (deuda pendiente), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial, a diferencia de "Exportar a Excel" que si esta restringido.'},
+    respuesta:'Veras un boton "Enviar por WhatsApp" en casi todas las pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Tricount (uno por cada evento, con los saldos y quien paga a quien), Bebidas (tanto en "Consumo del dia a dia", con la deuda pendiente, como en "Fiestas / eventos", con el gasto por fiesta), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial.'},
   {id:'roles', pregunta:'Que son los roles y quien los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
     respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignarselos a los socios, desde la pestana Roles.'},
   {id:'avisos', pregunta:'Que es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
@@ -277,6 +279,21 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' EUR'; }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function enviarWhatsapp(texto){ window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); }
+function encontrarPosibleDuplicado(concepto, fecha, excluirId){
+  const norm = s=>(s||'').trim().toLowerCase();
+  const c = norm(concepto);
+  if(!c || !fecha) return null;
+  const candidatos = [
+    ...state.movimientos.map(m=>({origen:'un movimiento', concepto:m.concepto, fecha:m.fecha, importe:m.importe, id:m.id})),
+    ...(state.gastos_socios||[]).map(g=>({origen:'un gasto/ingreso de socio', concepto:g.concepto, fecha:g.fecha, importe:g.importe, id:g.id})),
+  ];
+  return candidatos.find(x=>x.id!==excluirId && x.fecha===fecha && norm(x.concepto)===c) || null;
+}
+function confirmarSiPosibleDuplicado(concepto, fecha, excluirId){
+  const dup = encontrarPosibleDuplicado(concepto, fecha, excluirId);
+  if(!dup) return true;
+  return confirm(`Ya existe ${dup.origen} el ${fmtDate(dup.fecha)} con el mismo concepto ("${dup.concepto}", ${money(dup.importe)}). Puede que ya este registrado. Quieres anadirlo/guardarlo de todas formas?`);
+}
 function fmtDate(iso){
   if(!iso) return '';
   const [y,m,d] = iso.split('-');
@@ -849,8 +866,8 @@ function renderRoleRow(role, labels){
 }
 /* ============ calculos ============ */
 function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
-function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso' && !m.gasto_socio_id).reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto' && !m.gasto_socio_id).reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
@@ -955,7 +972,7 @@ function movimientosPorMes(){
     map[key][campo] += Number(importe||0);
   }
   state.cuotas.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
-  state.movimientos.forEach(m=>{ if(!m.gasto_socio_id) add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe); });
+  state.movimientos.forEach(m=>add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe));
   state.bebidas_consumos.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
   state.fiestas_gastos.forEach(f=>add(f.fecha, 'gastos', f.importe));
   (state.gastos_socios||[]).forEach(g=>{ if(g.abonado) add(g.fecha, g.tipo==='ingreso' ? 'ingresos' : 'gastos', g.importe); });
@@ -1111,7 +1128,7 @@ function renderResumen(){
         <span style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn ghost small" data-action="export-cuentas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
           ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-          ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
+          <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
         </span>
       </h2>
       <div class="menu-row"><span class="label">Cuotas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
@@ -1445,8 +1462,9 @@ function renderGastoEvento(ev){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
-      <span style="display:flex; align-items:center; gap:10px;">
+      <span style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--amber);">${money(ev.total)}</span>
+        <button class="btn ghost small" data-action="export-evento-whatsapp" data-id="${ev.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         ${puedeGestionarEvento ? `<button class="btn ghost small" data-action="toggle-ocultar-evento" data-id="${ev.id}">Ocultar</button>` : ''}
         ${puedeGestionarEvento ? `<button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar evento</button>` : ''}
       </span>
@@ -1529,6 +1547,7 @@ function renderInventario(){
       <span style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+        <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
     <form data-form="add-inventario">
@@ -1548,7 +1567,7 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">Anadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -1618,7 +1637,7 @@ function renderListaCompraCard(lista){
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>${escapeHtml(lista.nombre)} <span class="meta">- creada por ${escapeHtml(socioNombre(lista.creado_por))}</span></span>
       <span style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${pendientes.length ? `<button class="btn ghost small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+        <button class="btn ghost small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
       </span>
     </h2>
@@ -1810,6 +1829,7 @@ function renderCaja(){
         </select>
         ${ordenados.length ? `<button class="btn ghost small" data-action="export-movimientos-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
         ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+        <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
     ${(()=>{
@@ -1830,7 +1850,7 @@ function renderBebidas(){
     </div>
     <span style="display:flex; gap:8px; flex-wrap:wrap;">
       ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-      ${isAdmin() ? `<label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>` : ''}
+      <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
     </span>
   </div>
   ${bebidasSubtab==='consumo' ? renderBebidasConsumo() : renderBebidasFiestas()}
@@ -1928,7 +1948,7 @@ function renderBebidasConsumo(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></span>
-      ${consumos.some(c=>!c.pagado) ? `<button class="btn ghost small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+      <button class="btn ghost small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
     </h2>
     ${consumos.length===0 ? '<p class="empty">Sin consumos todavia.</p>' : consumos.slice(0,40).map(c=>{
       const nombreBebida = c.bebida_nombre || '-';
@@ -1978,7 +1998,10 @@ function renderBebidasFiestas(){
     </form>
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- total: ${money(totalFiestasGasto())}</span></h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- total: ${money(totalFiestasGasto())}</span></span>
+      <button class="btn ghost small" data-action="export-fiestas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+    </h2>
     ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todavia.</p>' : gastos.map(g=>`
       <div class="list-item">
 
@@ -2455,6 +2478,19 @@ document.addEventListener('click', async (e)=>{
       }
       enviarWhatsapp(texto);
     }
+    else if(action==='export-fiestas-whatsapp'){
+      const gastos = [...(state.fiestas_gastos||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const porEvento = {};
+      gastos.forEach(g=>{ porEvento[g.evento] = (porEvento[g.evento]||0) + Number(g.importe||0); });
+      let texto = `*Gastos de bebida en fiestas* - ${fmtDate(todayISO())}\n\n`;
+      if(gastos.length){
+        texto += Object.keys(porEvento).map(ev=>`- ${ev}: ${money(porEvento[ev])}`).join('\n');
+        texto += `\n\n*Total: ${money(totalFiestasGasto())}*`;
+      } else {
+        texto += 'Todavia no hay gastos de fiestas registrados.';
+      }
+      enviarWhatsapp(texto);
+    }
     else if(action==='export-gastos-socios-whatsapp'){
       const pendientes = gastosSociosPendientes();
       let texto = `*Gastos e ingresos de socios* - ${fmtDate(todayISO())}\n\n`;
@@ -2490,6 +2526,25 @@ document.addEventListener('click', async (e)=>{
       if(pendientes.length){
         texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavia al saldo.`;
       }
+      enviarWhatsapp(texto);
+    }
+    else if(action==='export-evento-whatsapp'){
+      const ev = (state.gastos_eventos||[]).find(e=>e.id===btn.dataset.id);
+      if(!ev) return;
+      const balances = ev.balances||{};
+      const transferencias = ev.transferencias||[];
+      let texto = `*Tricount: ${ev.nombre}* - ${fmtDate(ev.fecha)}\n\n`;
+      texto += `Total del evento: ${money(ev.total)}\n\n`;
+      if((ev.participantes||[]).length){
+        texto += '*Saldos:*\n' + ev.participantes.map(sid=>{
+          const b = balances[sid]||0;
+          const texto2 = b>0.005 ? `le deben ${money(b)}` : (b<-0.005 ? `debe ${money(-b)}` : 'en paz');
+          return `- ${socioNombre(sid)}: ${texto2}`;
+        }).join('\n') + '\n\n';
+      }
+      texto += transferencias.length
+        ? '*Quien paga a quien:*\n' + transferencias.map(t=>`- ${socioNombre(t.de)} -> ${socioNombre(t.a)}: ${money(t.importe)}`).join('\n')
+        : 'No queda ningun pago pendiente entre los participantes.';
       enviarWhatsapp(texto);
     }
     else if(action==='delete-reunion'){
@@ -2794,7 +2849,8 @@ document.addEventListener('change', async (e)=>{
       for(const hoja of Object.keys(resumen)){
         const r = resumen[hoja];
         msg += `- ${hoja}: ${r.creados} creados, ${r.actualizados} actualizados`;
-        msg += r.errores.length ? `, ${r.errores.length} con error\n` : '\n';
+        msg += r.errores.length ? `, ${r.errores.length} aviso(s)\n` : '\n';
+        r.errores.forEach(e=>{ msg += `   · ${e}\n`; });
       }
       await loadState(); render();
       alert(msg);
@@ -2848,13 +2904,21 @@ document.addEventListener('submit', async (e)=>{
       await apiPost(`/api/inventario/${form.dataset.id}`, data);
       editandoInventarioId = null;
     }
-    else if(type==='add-movimiento'){ await apiPost('/api/movimientos', data); }
-    else if(type==='add-gasto-socio'){ await apiPost('/api/gastos-socios', data); }
+    else if(type==='add-movimiento'){
+      if(!confirmarSiPosibleDuplicado(data.concepto, data.fecha)) return;
+      await apiPost('/api/movimientos', data);
+    }
+    else if(type==='add-gasto-socio'){
+      if(!confirmarSiPosibleDuplicado(data.concepto, data.fecha)) return;
+      await apiPost('/api/gastos-socios', data);
+    }
     else if(type==='edit-gasto-socio'){
+      if(!confirmarSiPosibleDuplicado(data.concepto, data.fecha, form.dataset.id)) return;
       await apiPost(`/api/gastos-socios/${form.dataset.id}`, data);
       editandoGastoSocioId = null;
     }
     else if(type==='edit-movimiento'){
+      if(!confirmarSiPosibleDuplicado(data.concepto, data.fecha, form.dataset.id)) return;
       await apiPost(`/api/movimientos/${form.dataset.id}`, data);
       editandoMovimientoId = null;
     }
