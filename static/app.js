@@ -41,6 +41,8 @@ const FAQ_ENTRIES = [
     respuesta:'La campanita de la cabecera avisa de cuotas pendientes, bebidas por pagar y actividad reciente (reservas y reuniones). El numero indica cuantos avisos hay ahora mismo; desde ahi tambien puedes exportarlos como un log de texto. Para cerrar el desplegable, pulsa la campanita otra vez o toca en cualquier otro sitio de la pantalla.'},
   {id:'baja', pregunta:'Que pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
     respuesta:'Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia a reuniones, etc): simplemente deja de aparecer en el buscador de la pantalla de inicio y se marca como "de baja" en la lista de socios.'},
+  {id:'lista-compra', pregunta:'Como funciona la Lista de la compra?', palabras:['compra','lista','listas','producto','productos','supermercado'],
+    respuesta:'En la pestana Lista compra cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad. Todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado (queda tachado y se mueve al desplegable "Comprados"). Los cambios de cualquier socio se ven en el resto de moviles en unos segundos, sin tener que avisaros por otro lado.'},
 ];
 function buscarFaq(query){
   const q = query.toLowerCase().trim();
@@ -201,6 +203,9 @@ let reunionesCalFecha = new Date();
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let editandoMovimientoId = null;
+let editandoItemCompraId = null;
+let viendoSocioId = null; // si esta a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
+let adjuntoAbierto = null; // {url, tipo} del ticket/factura abierto en el visor interno
 let ticketVersion = Date.now();
 let loaded = false;
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
@@ -318,6 +323,17 @@ async function uploadTicketPago(eventoId, pagoId, file){
   }
   ticketVersion = Date.now();
 }
+async function uploadTicketMovimiento(movId, file){
+  const fd = new FormData();
+  fd.append('ticket', file);
+  const res = await fetch(`/api/movimientos/${movId}/ticket`, {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el ticket o factura.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  ticketVersion = Date.now();
+}
 function escapeHtml(str){
   return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -333,6 +349,7 @@ function timeAgoEs(iso){
 /* ============ RENDER ROOT ============ */
 function render(){
   updateBackgroundVisibility();
+  document.body.classList.toggle('no-scroll', !!adjuntoAbierto);
   const app = document.getElementById('app');
   if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la pena</div>`; return; }
   if(!state.current_user){
@@ -346,8 +363,17 @@ function render(){
   }
   const me = state.socios.find(s=>s.id===state.current_user);
   if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me) + renderAyuda(); scrollHelpTranscript(); return; }
-  app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel();
+  app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel() + renderAdjuntoViewer();
   scrollHelpTranscript();
+}
+function renderAdjuntoViewer(){
+  if(!adjuntoAbierto) return '';
+  const {url, tipo} = adjuntoAbierto;
+  return `<div class="adjunto-backdrop" data-action="cerrar-adjunto"></div>
+  <div class="adjunto-viewer">
+    <button type="button" class="adjunto-close" data-action="cerrar-adjunto" title="Cerrar">&times;</button>
+    ${tipo==='pdf' ? `<iframe src="${url}" class="adjunto-frame"></iframe>` : `<img src="${url}" class="adjunto-img" alt="Ticket o factura">`}
+  </div>`;
 }
 function scrollHelpTranscript(){
   const t = document.getElementById('help-transcript');
@@ -496,7 +522,7 @@ function renderAlertasPanel(){
         <button class="help-close" data-action="cerrar-alertas" title="Cerrar">&times;</button>
       </div>
     </div>
-    ${alertas.length ? alertas.map(a=>`<div class="alert-item"><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">- ${a.meta}</span>`:''}</div></div>`).join('') : '<p class="empty">Sin avisos por ahora.</p>'}
+    ${alertas.length ? alertas.map(a=>`<div class="alert-item"${a.tab?` data-action="ir-a-alerta" data-tab="${a.tab}" style="cursor:pointer;" title="Ir a la pestana"`:''}><span class="dot ${a.tipo}"></span><div>${a.texto}${a.meta?` <span class="meta">- ${a.meta}</span>`:''}</div></div>`).join('') : '<p class="empty">Sin avisos por ahora.</p>'}
   </div>`;
 }
 function renderApp(){
@@ -531,6 +557,7 @@ function renderApp(){
         ${tabBtn('reservas','Reservas','calendar-check')}
         ${tabBtn('reuniones','Reuniones','calendar')}
         ${tabBtn('inventario','Inventario','box')}
+        ${tabBtn('compra','Lista compra','cart')}
         ${tabBtn('caja','Gastos e ingresos','wallet')}
         ${tabBtn('bebidas','Bebidas','cup')}
         ${tabBtn('encargados','Tareas','check')}
@@ -555,6 +582,7 @@ const TAB_ICON_PATHS = {
   'key': '<circle cx="8" cy="15" r="4.2"/><path d="M11 12l9-9"/><path d="M16 6l3 3"/><path d="M13.5 8.5l2.3 2.3"/>',
   'user': '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
   'split': '<path d="M4 7h13"/><path d="M13 3l4 4-4 4"/><path d="M20 17H7"/><path d="M11 21l-4-4 4-4"/>',
+  'cart': '<circle cx="9" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/><path d="M2 3h2.2l2.2 12.1a2 2 0 0 0 2 1.65h8.4a2 2 0 0 0 2-1.62L21 8H6.1"/>',
 };
 function tabIcon(name){
   const path = TAB_ICON_PATHS[name] || '';
@@ -572,6 +600,7 @@ function renderTab(){
     case 'reuniones': return renderReuniones();
     case 'reparto': return renderReparto();
     case 'inventario': return renderInventario();
+    case 'compra': return renderListaCompra();
     case 'caja': return renderCaja();
     case 'bebidas': return renderBebidas();
     case 'encargados': return renderEncargados();
@@ -698,7 +727,7 @@ function construirAlertas(){
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===now.getFullYear() && c.month===now.getMonth()+1);
       if(!c || !c.pagado){
 
-        alertas.push({tipo:'warn', texto:`${s.nombre} todavia no ha pagado la cuota de ${MESES[now.getMonth()]}`});
+        alertas.push({tipo:'warn', texto:`${s.nombre} todavia no ha pagado la cuota de ${MESES[now.getMonth()]}`, tab:'cuotas'});
       }
     });
   }
@@ -706,24 +735,24 @@ function construirAlertas(){
   const gastosPendientes = gastosSociosPendientes();
   if(gastosPendientes.length){
     const total = gastosPendientes.reduce((a,g)=>a+Number(g.importe||0),0);
-    alertas.push({tipo:'warn', texto:`Hay ${gastosPendientes.length} gasto(s)/ingreso(s) de socios (${money(total)}) pendientes de verificar por el tesorero (pestana Gastos e ingresos).`});
+    alertas.push({tipo:'warn', texto:`Hay ${gastosPendientes.length} gasto(s)/ingreso(s) de socios (${money(total)}) pendientes de verificar por el tesorero (pestana Gastos e ingresos).`, tab:'caja'});
   }
 
   const misPendientes = misBebidasPendientes();
   if(misPendientes.length){
     const total = misPendientes.reduce((a,c)=>a+Number(c.importe||0),0);
-    alertas.push({tipo:'warn', texto:`Tienes ${money(total)} pendientes de pagar en bebidas (pestana Bebidas).`});
+    alertas.push({tipo:'warn', texto:`Tienes ${money(total)} pendientes de pagar en bebidas (pestana Bebidas).`, tab:'bebidas'});
   }
 
   const recientes = [];
   state.reservas.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservo la pena para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservo la pena para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`, tab:'reservas'});
   });
   state.reuniones.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoco una reunion para el ${fmtDate(r.fecha)}: ${escapeHtml(r.evento)}`});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoco una reunion para el ${fmtDate(r.fecha)}: ${escapeHtml(r.evento)}`, tab:'reuniones'});
   });
   recientes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  recientes.slice(0,5).forEach(r=>alertas.push({tipo:'info', texto:r.texto, meta:timeAgoEs(r.fecha)}));
+  recientes.slice(0,5).forEach(r=>alertas.push({tipo:'info', texto:r.texto, meta:timeAgoEs(r.fecha), tab:r.tab}));
 
   return alertas;
 }
@@ -984,7 +1013,7 @@ function renderSocios(){
       const puedeCambiarFoto = puedeGestionarSocios || s.id===state.current_user;
       return `<div class="list-item">
 
-        <div class="socio-row-avatar">
+        <div class="socio-row-avatar" data-action="ver-socio" data-id="${s.id}" style="cursor:pointer;" title="Ver perfil de ${escapeHtml(s.nombre)}">
 
           ${avatarHtml(s,'sm')}
 
@@ -1076,10 +1105,10 @@ function renderReservas(){
     <h2><span class="pin"></span>Reservar la pena</h2>
     <form data-form="add-reserva">
       <div class="form-row">
-        
-        <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
-        
-        <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleanos, comida familiar..."></div>
+
+        <div style="flex:0 0 160px;"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+
+        <div style="flex:2; min-width:180px;"><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleanos, comida familiar..."></div>
       </div>
       <div class="form-row">
         
@@ -1131,9 +1160,9 @@ function renderReuniones(){
     <form data-form="add-reunion">
       <div class="form-row">
 
-        <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+        <div style="flex:0 0 160px;"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
 
-        <div><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
+        <div style="flex:2; min-width:180px;"><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
       </div>
       <div class="form-row">
 
@@ -1285,7 +1314,7 @@ function renderGastoEvento(ev){
         <div>
           <div style="font-weight:600;">${escapeHtml(p.concepto)}</div>
           <div class="meta">Pago de ${escapeHtml(socioNombre(p.pagador_id))} - ${fmtDate(p.fecha)} - reparte entre: ${escapeHtml(beneficiarios)}</div>
-          ${p.ticket ? `<a href="/static/tickets/pago-${p.id}.jpg?v=${ticketVersion}" target="_blank" rel="noopener noreferrer" class="meta" style="color:var(--amber); display:inline-block; margin-top:2px;">Ver ticket</a>` : ''}
+          ${p.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/pago-${p.id}.jpg?v=${ticketVersion}" data-tipo="jpg">Ver ticket</button>` : ''}
         </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--sage);">${money(p.importe)}</span>
@@ -1366,6 +1395,78 @@ function renderInventario(){
   `;
 }
 
+/* ============ LISTA DE LA COMPRA ============ */
+function renderListaCompra(){
+  const listas = state.listas_compra || [];
+  return `
+  <div class="card">
+    <h2><span class="pin"></span>Nueva lista</h2>
+    <form data-form="add-lista-compra">
+      <div class="form-row">
+        <div><label class="f">Nombre de la lista</label><input type="text" name="nombre" required placeholder="Ej: Supermercado, Fiesta mayor..."></div>
+      </div>
+      <button class="btn" type="submit">Crear lista</button>
+    </form>
+    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas y anadir o quitar productos. Se actualiza para todos automaticamente.</p>
+  </div>
+  ${listas.length===0 ? '<div class="card"><p class="empty">Todavia no hay listas de la compra. Crea la primera arriba.</p></div>' : ''}
+  ${listas.map(renderListaCompraCard).join('')}
+  `;
+}
+
+function renderListaCompraCard(lista){
+  const items = lista.items || [];
+  const pendientes = items.filter(i=>!i.comprado);
+  const comprados = items.filter(i=>i.comprado);
+  return `<div class="card">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>${escapeHtml(lista.nombre)} <span class="meta">- creada por ${escapeHtml(socioNombre(lista.creado_por))}</span></span>
+      <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
+    </h2>
+    ${items.length===0 ? '<p class="empty">Todavia no hay productos en esta lista.</p>' : ''}
+    ${pendientes.map(i=>renderItemCompra(i)).join('')}
+    ${comprados.length ? `<details style="margin-top:8px;">
+      <summary>Comprados (${comprados.length})</summary>
+      ${comprados.map(i=>renderItemCompra(i)).join('')}
+    </details>` : ''}
+    <form data-form="add-item-compra" data-lista="${lista.id}" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);">
+      <div class="form-row">
+        <div style="flex:2;"><label class="f">Producto</label><input type="text" name="nombre" required placeholder="Ej: Leche, pan, hielo..."></div>
+        <div><label class="f">Cantidad</label><input type="text" name="cantidad" placeholder="opcional"></div>
+      </div>
+      <button class="btn ghost small" type="submit">Anadir producto</button>
+    </form>
+  </div>`;
+}
+
+function renderItemCompra(i){
+  if(editandoItemCompraId===i.id){
+    return `<form data-form="edit-item-compra" data-id="${i.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div style="flex:2;"><label class="f">Producto</label><input type="text" name="nombre" required value="${escapeHtml(i.nombre)}"></div>
+        <div><label class="f">Cantidad</label><input type="text" name="cantidad" value="${escapeHtml(i.cantidad||'')}" placeholder="opcional"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-item-compra">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item">
+    <label style="display:flex; align-items:flex-start; gap:10px; flex:1; cursor:pointer;">
+      <input type="checkbox" data-action="toggle-item-compra" data-id="${i.id}" ${i.comprado?'checked':''} style="margin-top:4px;">
+      <span>
+        <div style="font-weight:600; ${i.comprado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.cantidad ? `<span class="meta">- ${escapeHtml(i.cantidad)}</span>` : ''}</div>
+        <div class="meta">${i.comprado ? `Comprado por ${escapeHtml(socioNombre(i.comprado_por))}` : `Anadido por ${escapeHtml(socioNombre(i.anadido_por))}`}</div>
+      </span>
+    </label>
+    <div style="display:flex; gap:8px;">
+      <button class="btn ghost small" data-action="editar-item-compra" data-id="${i.id}">Editar</button>
+      <button class="btn danger small" data-action="delete-item-compra" data-id="${i.id}">Quitar</button>
+    </div>
+  </div>`;
+}
+
 /* ============ CAJA ============ */
 function renderGastoSocioItem(g){
   const puedeModificar = g.socio_id===state.current_user || can('manage_finances');
@@ -1390,12 +1491,15 @@ function renderGastoSocioItem(g){
     <div>
       <div style="font-weight:600;">${escapeHtml(g.concepto)} <span class="tag">${esIngreso?'Ingreso':'Gasto'}</span> ${g.abonado?`<span class="tag ok">${estadoLabel}</span>`:'<span class="tag warn">Pendiente</span>'}</div>
       <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
-      ${g.ticket ? `<a href="/static/tickets/${g.id}.jpg?v=${ticketVersion}" target="_blank" rel="noopener noreferrer" class="meta" style="color:var(--amber); display:inline-block; margin-top:2px;">Ver ticket</a>` : ''}
+      ${g.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/${g.id}.${g.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${g.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
       <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${esIngreso?'var(--sage)':'var(--rust)'};">${esIngreso?'+':'-'} ${money(g.importe)}</span>
       ${can('manage_finances') ? `<button class="btn ghost small" data-action="toggle-abonado-gasto-socio" data-id="${g.id}">${g.abonado?'Marcar pendiente':'Marcar como pagado'}</button>` : ''}
-      ${puedeModificar ? `<label class="btn ghost small" style="cursor:pointer;">${g.ticket?'Cambiar ticket (.jpg/.png)':'Subir ticket (.jpg/.png)'}<input type="file" accept="image/png,image/jpeg" data-autoupload-ticket="${g.id}" style="display:none;"></label>` : ''}
+      ${puedeModificar ? `<span class="ticket-upload-wrap">
+        ${g.ticket ? `<button type="button" class="ticket-remove-x" data-action="delete-ticket-gasto-socio" data-id="${g.id}" title="Quitar ticket o factura">&times;</button>` : ''}
+        <label class="btn ghost small" style="cursor:pointer;">${g.ticket?'Cambiar ticket o factura':'Subir ticket o factura'}<input type="file" accept="image/png,image/jpeg,application/pdf" data-autoupload-ticket="${g.id}" style="display:none;"></label>
+      </span>` : ''}
       ${puedeModificar ? `<button class="btn ghost small" data-action="editar-gasto-socio" data-id="${g.id}">Editar</button>` : ''}
       ${puedeModificar ? `<button class="btn danger small" data-action="delete-gasto-socio" data-id="${g.id}">Borrar</button>` : ''}
     </div>
@@ -1424,7 +1528,7 @@ function renderMovimientoItem(m){
       </div>
     </form>`;
   }
-  return `<div class="list-item">
+  return `<div class="list-item" style="flex-wrap:wrap;">
     <div>
       <div style="font-weight:600;">${escapeHtml(m.concepto)}</div>
       <div class="meta">
@@ -1432,9 +1536,14 @@ function renderMovimientoItem(m){
         ${fmtDate(m.fecha)}
         ${m.socio_id ? `<span class="tag ok">Socio: ${escapeHtml(socioNombre(m.socio_id))}</span>` : ''}
       </div>
+      ${m.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/mov-${m.id}.${m.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${m.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${m.tipo==='ingreso'?'var(--sage)':'var(--rust)'};">${m.tipo==='ingreso'?'+':'-'} ${money(m.importe)}</span>
+      ${admin ? `<span class="ticket-upload-wrap">
+        ${m.ticket ? `<button type="button" class="ticket-remove-x" data-action="delete-ticket-movimiento" data-id="${m.id}" title="Quitar ticket o factura">&times;</button>` : ''}
+        <label class="btn ghost small" style="cursor:pointer;">${m.ticket?'Cambiar ticket o factura':'Subir ticket o factura'}<input type="file" accept="image/png,image/jpeg,application/pdf" data-autoupload-ticket-mov="${m.id}" style="display:none;"></label>
+      </span>` : ''}
       ${admin ? `<button class="btn ghost small" data-action="editar-movimiento" data-id="${m.id}">Editar</button>` : ''}
       ${admin ? `<button class="btn danger small" data-action="delete-movimiento" data-id="${m.id}">Borrar</button>` : ''}
     </div>
@@ -1794,6 +1903,7 @@ function renderTicketRow(t){
 
 /* ============ PERFIL ============ */
 function renderPerfil(){
+  if(viendoSocioId && viendoSocioId!==state.current_user) return renderPerfilSocio(viendoSocioId);
   const me = state.socios.find(s=>s.id===state.current_user) || {nombre:''};
   const perfil = state.perfiles[state.current_user] || {telefono:'', notas:'', familia:[]};
   const familia = perfil.familia || [];
@@ -1855,14 +1965,43 @@ function renderPerfil(){
     ${state.socios.filter(s=>s.id!==state.current_user).map(s=>{
       const p = state.perfiles[s.id]||{};
       const fam = p.familia||[];
-      return `<div class="list-item"><div>
-        
+      return `<div class="list-item" data-action="ver-socio" data-id="${s.id}" style="cursor:pointer;" title="Ver perfil de ${escapeHtml(s.nombre)}"><div>
+
         <div style="font-weight:600;">${escapeHtml(s.nombre)}</div>
-        
+
         <div class="meta">${p.telefono?'?? '+escapeHtml(p.telefono):'Sin telefono'} ${fam.length?'- '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
       </div></div>`;
     }).join('') || '<p class="empty">No hay mas socios.</p>'}
   </div>
+  `;
+}
+function renderPerfilSocio(sid){
+  const s = state.socios.find(x=>x.id===sid);
+  if(!s){
+    viendoSocioId = null;
+    return renderPerfil();
+  }
+  const perfil = state.perfiles[sid] || {telefono:'', notas:'', familia:[]};
+  const familia = perfil.familia || [];
+  return `
+  <div class="card">
+    <button class="btn ghost small" data-action="volver-mi-perfil" style="margin-bottom:14px;">&laquo; Volver a mi perfil</button>
+    <div class="foto-upload-row">
+      ${avatarHtml(s,'lg')}
+      <div>
+        <div style="font-weight:600;">${escapeHtml(s.nombre)} ${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}</div>
+        <p class="meta" style="margin-top:6px;">${perfil.telefono ? 'Telefono: '+escapeHtml(perfil.telefono) : 'Sin telefono'}</p>
+      </div>
+    </div>
+    ${perfil.notas ? `<p class="meta" style="margin-top:10px;"><b>Notas:</b> ${escapeHtml(perfil.notas)}</p>` : ''}
+  </div>
+  <div class="card">
+    <h2><span class="pin"></span>Familia de ${escapeHtml(s.nombre)}</h2>
+    ${familia.length===0 ? '<p class="empty">No ha anadido a nadie.</p>' : familia.map(f=>`
+      <div class="familia-item"><span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'- '+escapeHtml(String(f.edad))+' anos':''}</span></div>
+    `).join('')}
+  </div>
+  <p class="readonly-note">Solo lectura: para cambiar estos datos tiene que hacerlo ${escapeHtml(s.nombre)} desde su propio "Mi perfil".</p>
   `;
 }
 
@@ -1882,7 +2021,9 @@ document.addEventListener('click', async (e)=>{
       pendingLoginId = null;
       render();
     }
-    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; loginSearchQuery = ''; alertasAbiertas = false; await loadState(); render(); }
+    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; loginSearchQuery = ''; alertasAbiertas = false; viendoSocioId = null; await loadState(); render(); }
+    else if(action==='ver-socio'){ viendoSocioId = btn.dataset.id; activeTab = 'perfil'; render(); }
+    else if(action==='volver-mi-perfil'){ viendoSocioId = null; render(); }
     else if(action==='edit-club-name'){
       const nombre = prompt('Nombre de la pena:', state.config.nombre);
       if(nombre && nombre.trim()){
@@ -1909,7 +2050,7 @@ document.addEventListener('click', async (e)=>{
         await loadState(); render();
       }
     }
-    else if(action==='switch-tab'){ activeTab = btn.dataset.tab; render(); }
+    else if(action==='switch-tab'){ activeTab = btn.dataset.tab; viendoSocioId = null; render(); }
     else if(action==='bebidas-subtab'){ bebidasSubtab = btn.dataset.sub; render(); }
     else if(action==='cuota-year'){ cuotasYear += Number(btn.dataset.dir); render(); }
     else if(action==='resumen-grafico-year'){ resumenGraficoYear += Number(btn.dataset.dir); render(); }
@@ -1917,6 +2058,9 @@ document.addEventListener('click', async (e)=>{
     else if(action==='toggle-ayuda'){ ayudaAbierta = !ayudaAbierta; render(); }
     else if(action==='toggle-alertas'){ alertasAbiertas = !alertasAbiertas; render(); }
     else if(action==='cerrar-alertas'){ alertasAbiertas = false; render(); }
+    else if(action==='ir-a-alerta'){ activeTab = btn.dataset.tab; alertasAbiertas = false; viendoSocioId = null; render(); }
+    else if(action==='ver-adjunto'){ adjuntoAbierto = {url: btn.dataset.url, tipo: btn.dataset.tipo}; render(); }
+    else if(action==='cerrar-adjunto'){ adjuntoAbierto = null; render(); }
     else if(action==='ask-faq'){
       const entry = FAQ_ENTRIES.find(e=>e.id===btn.dataset.id);
       if(entry){
@@ -1976,8 +2120,30 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-inventario'){
       if(confirm('Borrar este material?')){ await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='delete-lista-compra'){
+      if(confirm('Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='toggle-item-compra'){
+      await apiPost(`/api/listas-compra/items/${btn.dataset.id}/toggle`);
+      await loadState(); render();
+    }
+    else if(action==='delete-item-compra'){
+      await apiDelete(`/api/listas-compra/items/${btn.dataset.id}`);
+      await loadState(); render();
+    }
+    else if(action==='editar-item-compra'){
+      editandoItemCompraId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-item-compra'){
+      editandoItemCompraId = null;
+      render();
+    }
     else if(action==='delete-movimiento'){
       if(confirm('Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='delete-ticket-movimiento'){
+      if(confirm('Quitar el ticket o factura de este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}/ticket`); await loadState(); render(); }
     }
     else if(action==='editar-movimiento'){
       editandoMovimientoId = btn.dataset.id;
@@ -2005,6 +2171,9 @@ document.addEventListener('click', async (e)=>{
         await apiDelete(`/api/gastos-socios/${btn.dataset.id}`);
         await loadState(); render();
       }
+    }
+    else if(action==='delete-ticket-gasto-socio'){
+      if(confirm('Quitar el ticket o factura de este gasto?')){ await apiDelete(`/api/gastos-socios/${btn.dataset.id}/ticket`); await loadState(); render(); }
     }
     else if(action==='delete-bebida-precio'){
       if(confirm('Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
@@ -2204,6 +2373,14 @@ document.addEventListener('change', async (e)=>{
       await loadState(); render();
     }catch(err){ alert(err.message || 'No se pudo subir el ticket'); }
   }
+  if(e.target.matches('[data-autoupload-ticket-mov]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      await uploadTicketMovimiento(e.target.dataset.autouploadTicketMov, file);
+      await loadState(); render();
+    }catch(err){ alert(err.message || 'No se pudo subir el ticket o factura'); }
+  }
   if(e.target.matches('[data-import-excel]')){
     const file = e.target.files[0];
     if(!file) return;
@@ -2286,6 +2463,15 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='add-fiesta-gasto'){ await apiPost('/api/fiestas', data); }
     else if(type==='add-reserva'){ await apiPost('/api/reservas', data); }
+    else if(type==='add-lista-compra'){ await apiPost('/api/listas-compra', data); }
+    else if(type==='add-item-compra'){
+      await apiPost(`/api/listas-compra/${form.dataset.lista}/items`, data);
+      form.reset();
+    }
+    else if(type==='edit-item-compra'){
+      await apiPost(`/api/listas-compra/items/${form.dataset.id}`, data);
+      editandoItemCompraId = null;
+    }
     else if(type==='add-gasto-evento'){
       const participantes = new FormData(form).getAll('participantes');
       await apiPost('/api/gastos-eventos', {nombre: data.nombre, fecha: data.fecha, notas: data.notas, participantes});
@@ -2332,11 +2518,84 @@ setInterval(async ()=>{
   render();
 }, 30000);
 
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && adjuntoAbierto){ adjuntoAbierto = null; render(); }
+});
+
+/* ============ boton flotante "subir arriba" ============ */
+function initScrollTopButton(){
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'scroll-top-btn';
+  btn.title = 'Subir arriba';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>';
+  btn.addEventListener('click', ()=>window.scrollTo({top:0, behavior:'smooth'}));
+  document.body.appendChild(btn);
+  window.addEventListener('scroll', ()=>{
+    btn.classList.toggle('visible', window.scrollY > 300);
+  }, {passive:true});
+}
+
+/* ============ deslizar hacia abajo para actualizar (la app instalada no tiene boton de recargar) ============ */
+function initPullToRefresh(){
+  const el = document.createElement('div');
+  el.className = 'pull-refresh-indicator';
+  el.innerHTML = '<span class="pull-refresh-spinner" style="display:none;"></span><span class="pull-refresh-text">Desliza hacia abajo para actualizar</span>';
+  document.body.appendChild(el);
+  const textEl = el.querySelector('.pull-refresh-text');
+  const spinEl = el.querySelector('.pull-refresh-spinner');
+
+  const THRESHOLD = 70;
+  let startY = 0, pulling = false, dy = 0, refreshing = false;
+
+  document.addEventListener('touchstart', (e)=>{
+    if(refreshing || document.body.classList.contains('no-scroll')) return;
+    if(window.scrollY > 0 || e.touches.length !== 1) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    dy = 0;
+  }, {passive:true});
+
+  document.addEventListener('touchmove', (e)=>{
+    if(!pulling || refreshing) return;
+    dy = e.touches[0].clientY - startY;
+    if(dy <= 0 || window.scrollY > 0){
+      pulling = false;
+      el.classList.remove('visible');
+      return;
+    }
+    el.classList.add('visible');
+    textEl.textContent = dy > THRESHOLD ? 'Suelta para actualizar' : 'Desliza hacia abajo para actualizar';
+  }, {passive:true});
+
+  document.addEventListener('touchend', async ()=>{
+    if(!pulling) return;
+    pulling = false;
+    if(dy > THRESHOLD && !refreshing){
+      refreshing = true;
+      textEl.textContent = 'Actualizando...';
+      spinEl.style.display = '';
+      el.classList.add('visible');
+      try{ await loadState(); render(); }
+      finally{
+        refreshing = false;
+        spinEl.style.display = 'none';
+        el.classList.remove('visible');
+      }
+    } else {
+      el.classList.remove('visible');
+    }
+    dy = 0;
+  }, {passive:true});
+}
+
 /* ============ INIT ============ */
 (async function init(){
   render();
   await loadBackgroundImages();
   initBackgroundSlideshow();
+  initScrollTopButton();
+  initPullToRefresh();
   await loadState();
   render();
 })();

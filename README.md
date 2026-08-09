@@ -19,7 +19,9 @@ VS Code.
   cuotas en modo lectura (quien ha pagado y quien falta).
 - **Cualquier socio puede**: reservar la pena, apuntarse a tareas de
   "Encargados", crear eventos de "Tricount" (reparto de gastos) y
-  participar en ellos marcandose a si mismo, editar su propio perfil
+  participar en ellos marcandose a si mismo, crear y gestionar listas de
+  la compra compartidas (anadir, editar, marcar como comprado o quitar
+  cualquier producto, no solo el suyo), editar su propio perfil
   (incluido su nombre), y ver todo lo demas en modo lectura (socios y
   caja son de solo lectura para el resto).
 - Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia
@@ -138,6 +140,12 @@ guarda, y el formulario/HTML en `app.js`.
   tambien puede anadir/cambiar la foto de cualquiera desde "Socios". Se
   usa como avatar en la pantalla de login, asi que entrar es tan facil
   como tocar tu cara en vez de leer una lista de nombres.
+- **Lista de la compra** (pestana nueva): cualquier socio puede crear
+  listas compartidas (por ejemplo "Supermercado" o "Fiesta mayor") y
+  anadir productos con su cantidad. Todos los socios ven las mismas
+  listas y pueden anadir, editar, marcar como comprado o quitar
+  cualquier producto  -  no hace falta ser quien lo anadio. Se actualiza
+  para todos igual que el resto de la app (ver punto 5).
 
 >  **Privacidad**: las fotos de perfil (`static/avatars/`) se guardan
 > en el servidor pero **no se suben a GitHub** (estan excluidas en

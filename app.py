@@ -13,8 +13,10 @@ Roles:
   administrador (permiso manage_cuotas), previa comprobacion. El resto
   de socios ve las cuotas en modo lectura (quien ha pagado y quien no).
 - Cualquier socio puede: reservar la pena, apuntarse a tareas, crear
-  eventos de Tricount y participar en ellos, editar su propio perfil
-  (incluido su nombre), y ver todo lo demas en modo lectura.
+  eventos de Tricount y participar en ellos, crear y gestionar listas de
+  la compra compartidas (anadir o quitar productos de cualquiera), editar
+  su propio perfil (incluido su nombre), y ver todo lo demas en modo
+  lectura.
 
 Para arrancar en local:
     pip install -r requirements.txt
@@ -147,7 +149,9 @@ CREATE TABLE IF NOT EXISTS movimientos (
     concepto TEXT NOT NULL,
     importe REAL NOT NULL,
     fecha TEXT NOT NULL,
-    socio_id TEXT
+    socio_id TEXT,
+    ticket INTEGER NOT NULL DEFAULT 0,
+    ticket_ext TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS bebidas_precios (
     id TEXT PRIMARY KEY,
@@ -250,8 +254,26 @@ CREATE TABLE IF NOT EXISTS gastos_socios (
     fecha TEXT NOT NULL,
     notas TEXT DEFAULT '',
     ticket INTEGER NOT NULL DEFAULT 0,
+    ticket_ext TEXT DEFAULT '',
     abonado INTEGER NOT NULL DEFAULT 0,
     creado_en TEXT
+);
+CREATE TABLE IF NOT EXISTS listas_compra (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    creado_por TEXT,
+    creado_en TEXT
+);
+CREATE TABLE IF NOT EXISTS lista_compra_items (
+    id TEXT PRIMARY KEY,
+    lista_id TEXT NOT NULL,
+    nombre TEXT NOT NULL,
+    cantidad TEXT DEFAULT '',
+    comprado INTEGER NOT NULL DEFAULT 0,
+    anadido_por TEXT,
+    comprado_por TEXT,
+    creado_en TEXT,
+    FOREIGN KEY (lista_id) REFERENCES listas_compra(id) ON DELETE CASCADE
 );
 """
 
@@ -309,6 +331,18 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE gastos_socios ADD COLUMN tipo TEXT NOT NULL DEFAULT 'gasto'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE movimientos ADD COLUMN ticket INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE movimientos ADD COLUMN ticket_ext TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE gastos_socios ADD COLUMN ticket_ext TEXT DEFAULT ''")
         except sqlite3.OperationalError:
             pass
         # Migracion: actualizar tabla reuniones si existe con estructura antigua
@@ -626,6 +660,17 @@ def state():
         )
     reservas = [dict(r) for r in db.execute("SELECT * FROM reservas ORDER BY fecha")]
 
+    listas_compra = []
+    for r in db.execute("SELECT * FROM listas_compra ORDER BY creado_en DESC"):
+        lista = dict(r)
+        lista["items"] = [
+            dict(i) for i in db.execute(
+                "SELECT * FROM lista_compra_items WHERE lista_id = ? ORDER BY comprado, creado_en",
+                (lista["id"],),
+            )
+        ]
+        listas_compra.append(lista)
+
     gastos_eventos = []
     for r in db.execute("SELECT * FROM gastos_eventos ORDER BY fecha DESC"):
         evento = dict(r)
@@ -678,6 +723,7 @@ def state():
             "bebidas_consumos": bebidas_consumos,
             "fiestas_gastos": fiestas_gastos,
             "reservas": reservas,
+            "listas_compra": listas_compra,
             "gastos_eventos": gastos_eventos,
             "gastos_socios": gastos_socios,
             "tareas_tickets": tareas_tickets,
@@ -1198,6 +1244,49 @@ def delete_movimiento(mid):
     db = get_db()
     db.execute("DELETE FROM movimientos WHERE id = ?", (mid,))
     db.commit()
+    for ext in ("jpg", "pdf"):
+        ticket_path = os.path.join(TICKETS_DIR, f"mov-{mid}.{ext}")
+        try:
+            if os.path.exists(ticket_path):
+                os.remove(ticket_path)
+        except OSError:
+            pass
+    return jsonify({"ok": True})
+
+
+@app.route("/api/movimientos/<mid>/ticket", methods=["POST"])
+def upload_ticket_movimiento(mid):
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden subir el ticket o factura.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM movimientos WHERE id = ?", (mid,)).fetchone():
+        return err("Movimiento no encontrado", 404)
+    if "ticket" not in request.files or request.files["ticket"].filename == "":
+        return err("No se ha recibido ningun archivo.", 400)
+    ext, error = _guardar_ticket_o_factura(request.files["ticket"], TICKETS_DIR, f"mov-{mid}")
+    if error:
+        return error
+    db.execute("UPDATE movimientos SET ticket = 1, ticket_ext = ? WHERE id = ?", (ext, mid))
+    db.commit()
+    return jsonify({"ok": True, "ext": ext})
+
+
+@app.route("/api/movimientos/<mid>/ticket", methods=["DELETE"])
+def delete_ticket_movimiento(mid):
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden quitar el ticket o factura.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM movimientos WHERE id = ?", (mid,)).fetchone():
+        return err("Movimiento no encontrado", 404)
+    for ext in ("jpg", "pdf"):
+        ticket_path = os.path.join(TICKETS_DIR, f"mov-{mid}.{ext}")
+        try:
+            if os.path.exists(ticket_path):
+                os.remove(ticket_path)
+        except OSError:
+            pass
+    db.execute("UPDATE movimientos SET ticket = 0, ticket_ext = '' WHERE id = ?", (mid,))
+    db.commit()
     return jsonify({"ok": True})
 
 
@@ -1575,10 +1664,11 @@ def delete_gasto_socio(gid):
     db = get_db()
     db.execute("DELETE FROM gastos_socios WHERE id = ?", (gid,))
     db.commit()
-    ticket_path = os.path.join(TICKETS_DIR, f"{gid}.jpg")
-    if os.path.exists(ticket_path):
+    for ext in ("jpg", "pdf"):
+        ticket_path = os.path.join(TICKETS_DIR, f"{gid}.{ext}")
         try:
-            os.remove(ticket_path)
+            if os.path.exists(ticket_path):
+                os.remove(ticket_path)
         except OSError:
             pass
     return jsonify({"ok": True})
@@ -1592,20 +1682,34 @@ def upload_ticket_gasto_socio(gid):
     row, error = _gasto_socio_o_error(sid, gid)
     if error:
         return error
-    if not PIL_OK:
-        return err(
-            "Falta instalar una dependencia en el servidor: ejecuta "
-            "'pip install -r requirements.txt' (o 'pip install Pillow') "
-            "y reinicia la aplicacion.",
-            500,
-        )
     if "ticket" not in request.files or request.files["ticket"].filename == "":
-        return err("No se ha recibido ninguna imagen.", 400)
-    guardado, error = _guardar_ticket(request.files["ticket"], os.path.join(TICKETS_DIR, f"{gid}.jpg"))
+        return err("No se ha recibido ningun archivo.", 400)
+    ext, error = _guardar_ticket_o_factura(request.files["ticket"], TICKETS_DIR, gid)
     if error:
         return error
     db = get_db()
-    db.execute("UPDATE gastos_socios SET ticket = 1 WHERE id = ?", (gid,))
+    db.execute("UPDATE gastos_socios SET ticket = 1, ticket_ext = ? WHERE id = ?", (ext, gid))
+    db.commit()
+    return jsonify({"ok": True, "ext": ext})
+
+
+@app.route("/api/gastos-socios/<gid>/ticket", methods=["DELETE"])
+def delete_ticket_gasto_socio(gid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    row, error = _gasto_socio_o_error(sid, gid)
+    if error:
+        return error
+    db = get_db()
+    for ext in ("jpg", "pdf"):
+        ticket_path = os.path.join(TICKETS_DIR, f"{gid}.{ext}")
+        try:
+            if os.path.exists(ticket_path):
+                os.remove(ticket_path)
+        except OSError:
+            pass
+    db.execute("UPDATE gastos_socios SET ticket = 0, ticket_ext = '' WHERE id = ?", (gid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1629,6 +1733,49 @@ def _guardar_ticket(file, dest_path):
     except Exception as e:
         return False, err(f"No se pudo procesar la imagen: {e}", 400)
     return True, None
+
+
+def _guardar_ticket_o_factura(file, dest_dir, base_name):
+    """Como _guardar_ticket, pero admite tambien PDF (facturas), sin convertirlo.
+    Devuelve (extension_guardada, None) o (None, respuesta_de_error)."""
+    filename = (file.filename or "").lower()
+    content_type = (file.mimetype or "").lower()
+    es_pdf = filename.endswith(".pdf") or content_type == "application/pdf"
+    raw = file.read()
+    os.makedirs(dest_dir, exist_ok=True)
+    for ext_previa in ("jpg", "pdf"):
+        try:
+            os.remove(os.path.join(dest_dir, f"{base_name}.{ext_previa}"))
+        except OSError:
+            pass
+    if es_pdf:
+        if raw[:4] != b"%PDF":
+            return None, err("El archivo no parece ser un PDF valido.", 400)
+        if len(raw) > 15 * 1024 * 1024:
+            return None, err("El PDF es demasiado grande (maximo 15 MB).", 400)
+        with open(os.path.join(dest_dir, f"{base_name}.pdf"), "wb") as f:
+            f.write(raw)
+        return "pdf", None
+    if not PIL_OK:
+        return None, err(
+            "Falta instalar una dependencia en el servidor: ejecuta "
+            "'pip install -r requirements.txt' (o 'pip install Pillow') "
+            "y reinicia la aplicacion.",
+            500,
+        )
+    try:
+        im = Image.open(BytesIO(raw))
+        im.load()
+    except Exception:
+        return None, err(
+            "No se pudo leer ese archivo. Sube una imagen (.jpg, .png) o un PDF "
+            "(si es una foto de iPhone en formato HEIC, conviertela antes a JPG).",
+            400,
+        )
+    im = ImageOps.exif_transpose(im).convert("RGB")
+    im.thumbnail((1600, 1600), Image.LANCZOS)
+    im.save(os.path.join(dest_dir, f"{base_name}.jpg"), "JPEG", quality=85)
+    return "jpg", None
 
 
 @app.route("/api/gastos-eventos/<eid>/pagos/<pid>/ticket", methods=["POST"])
@@ -1701,6 +1848,111 @@ def delete_reserva(rid):
     if row["socio_id"] != sid and not has_permission(sid, "manage_events"):
         return err("No puedes cancelar la reserva de otro socio.")
     db.execute("DELETE FROM reservas WHERE id = ?", (rid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- listas de la compra --
+@app.route("/api/listas-compra", methods=["POST"])
+def add_lista_compra():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre de la lista es obligatorio.", 400)
+    db = get_db()
+    lid = new_id()
+    db.execute(
+        "INSERT INTO listas_compra (id, nombre, creado_por, creado_en) VALUES (?,?,?,?)",
+        (lid, nombre, sid, now_iso()),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": lid})
+
+
+@app.route("/api/listas-compra/<lid>", methods=["DELETE"])
+def delete_lista_compra(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_compra WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    db.execute("DELETE FROM lista_compra_items WHERE lista_id = ?", (lid,))
+    db.execute("DELETE FROM listas_compra WHERE id = ?", (lid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/listas-compra/<lid>/items", methods=["POST"])
+def add_item_compra(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_compra WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre del producto es obligatorio.", 400)
+    iid = new_id()
+    db.execute(
+        "INSERT INTO lista_compra_items (id, lista_id, nombre, cantidad, comprado, anadido_por, creado_en) "
+        "VALUES (?,?,?,?,0,?,?)",
+        (iid, lid, nombre, (data.get("cantidad") or "").strip(), sid, now_iso()),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": iid})
+
+
+@app.route("/api/listas-compra/items/<iid>", methods=["POST"])
+def update_item_compra(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM lista_compra_items WHERE id = ?", (iid,)).fetchone():
+        return err("Producto no encontrado", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre del producto es obligatorio.", 400)
+    db.execute(
+        "UPDATE lista_compra_items SET nombre = ?, cantidad = ? WHERE id = ?",
+        (nombre, (data.get("cantidad") or "").strip(), iid),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/listas-compra/items/<iid>/toggle", methods=["POST"])
+def toggle_item_compra(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT comprado FROM lista_compra_items WHERE id = ?", (iid,)).fetchone()
+    if not row:
+        return err("Producto no encontrado", 404)
+    nuevo = 0 if row["comprado"] else 1
+    db.execute(
+        "UPDATE lista_compra_items SET comprado = ?, comprado_por = ? WHERE id = ?",
+        (nuevo, sid if nuevo else None, iid),
+    )
+    db.commit()
+    return jsonify({"ok": True, "comprado": bool(nuevo)})
+
+
+@app.route("/api/listas-compra/items/<iid>", methods=["DELETE"])
+def delete_item_compra(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    db.execute("DELETE FROM lista_compra_items WHERE id = ?", (iid,))
     db.commit()
     return jsonify({"ok": True})
 
