@@ -477,6 +477,28 @@ body.no-scroll{overflow:hidden;}
 .adjunto-img{max-width:100%; max-height:100%; border-radius:8px; object-fit:contain; box-shadow:0 20px 60px rgba(0,0,0,0.5);}
 .adjunto-frame{width:100%; height:100%; max-width:900px; border:none; border-radius:8px; background:#fff;}
 
+/* recorte manual de foto de perfil */
+.crop-modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:90;}
+.crop-modal{
+  position:fixed; inset:0; z-index:91; display:flex; align-items:center; justify-content:center;
+  padding:20px; pointer-events:none;
+}
+.crop-modal > *{pointer-events:auto;}
+.crop-panel{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:14px; padding:18px;
+  width:340px; max-width:92vw; box-shadow:0 20px 60px rgba(0,0,0,0.5); text-align:center;
+}
+.crop-panel h3{margin:0 0 12px; color:var(--chalk); font-size:1.05rem;}
+.crop-viewport{
+  position:relative; width:260px; height:260px; margin:0 auto; border-radius:50%; overflow:hidden;
+  background:var(--bg-deep); border:2px solid var(--amber-dim); cursor:grab; touch-action:none;
+}
+.crop-viewport.dragging{cursor:grabbing;}
+.crop-viewport img{position:absolute; top:0; left:0; transform-origin:0 0; -webkit-user-drag:none;}
+.crop-zoom-row{display:flex; align-items:center; gap:10px; margin-top:14px;}
+.crop-zoom-row input[type=range]{flex:1; accent-color:var(--amber);}
+.crop-actions{display:flex; gap:10px; justify-content:center; margin-top:16px;}
+
 .ticket-upload-wrap{position:relative; display:inline-block;}
 .ticket-remove-x{
   position:absolute; top:-7px; left:-7px; z-index:1; background:var(--rust); color:#fff;
@@ -549,6 +571,18 @@ body.no-scroll{overflow:hidden;}
 .avatar-lg .avatar-fallback{font-size:2.4rem;}
 .avatar-clickable{background:none; border:none; padding:0; margin:0; cursor:pointer; display:inline-flex; border-radius:50%;}
 .avatar-clickable:hover .avatar{filter:brightness(1.1); border-color:var(--amber-dim);}
+.avatar-wrap{position:relative; display:inline-flex;}
+.avatar-edit-btn{
+  position:absolute; left:-2px; bottom:-2px; z-index:2;
+  border-radius:50%; border:2px solid var(--bg-panel);
+  background:var(--amber); color:#20160a; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; padding:0; box-shadow:0 2px 6px rgba(0,0,0,0.4);
+}
+.avatar-edit-btn:hover{filter:brightness(1.08);}
+.avatar-edit-btn-sm{width:14px; height:14px; left:-4px; bottom:-4px; border-width:1.5px;}
+.avatar-edit-btn-sm svg{width:7px; height:7px; stroke-width:2.5;}
+.avatar-edit-btn-lg{width:28px; height:28px;}
+.avatar-edit-btn-lg svg{width:15px; height:15px;}
 
 .user-chip-photo{
   background:var(--bg-panel); border:1px solid var(--line); color:var(--chalk);

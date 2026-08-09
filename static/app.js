@@ -28,7 +28,7 @@ const FAQ_ENTRIES = [
   {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket'],
     respuesta:'En la pestana Tareas puedes crear un ticket para ti mismo, o asignarte uno existente que no tenga responsable. Quien gestiona tareas puede ademas asignar cualquier ticket a cualquier socio.'},
   {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
-    respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se recorta sola en cuadrado. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
+    respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lapiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
   {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
     respuesta:'Cualquier socio puede consultar los precios en Bebidas > Consumo del dia a dia, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos o registrar consumos es cosa del administrador o el tesorero.'},
   {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso'],
@@ -283,18 +283,23 @@ function socioNombre(id){ const s = state.socios.find(s=>s.id===id); return s ? 
 function initials(name){
   return (name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
 }
-function avatarHtml(socio, size, clickable){
+const PENCIL_ICON_PATH = '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>';
+function avatarHtml(socio, size, mode){
   size = size || 'sm';
-  const inner = `<div class="avatar avatar-${size}">
+  const inner = `<div class="avatar avatar-${size}" data-avatar-for="${socio.id}">
     <img src="/static/avatars/${socio.id}.jpg?v=${avatarVersion}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
     <span class="avatar-fallback" style="display:none;">${escapeHtml(initials(socio.nombre))}</span>
   </div>`;
-  if(!clickable) return inner;
-  return `<button type="button" class="avatar-clickable" data-action="ver-foto-grande" title="Ver foto en grande">${inner}</button>`;
+  if(!mode) return inner;
+  const viewBtn = `<button type="button" class="avatar-clickable" data-action="ver-foto-grande" title="Ver foto en grande">${inner}</button>`;
+  if(mode!=='edit') return viewBtn;
+  const editSize = size==='lg' ? 'lg' : 'sm';
+  const editBtn = `<button type="button" class="avatar-edit-btn avatar-edit-btn-${editSize}" data-action="editar-foto-existente" data-id="${socio.id}" title="Editar foto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PENCIL_ICON_PATH}</svg></button>`;
+  return `<span class="avatar-wrap">${viewBtn}${editBtn}</span>`;
 }
 async function uploadFoto(socioId, file){
   const fd = new FormData();
-  fd.append('foto', file);
+  fd.append('foto', file, file.name || 'foto.jpg');
   const res = await fetch(`/api/socios/${socioId}/foto`, {method:'POST', body:fd});
   if(!res.ok){
     let msg = 'No se pudo subir la foto.';
@@ -303,6 +308,148 @@ async function uploadFoto(socioId, file){
   }
   avatarVersion = Date.now();
 }
+
+/* ============ recorte de foto de perfil (encuadre manual, arrastrar y hacer zoom) ============ */
+function openFotoCropModal(file, socioId){
+  const objectUrl = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = ()=>buildCropModal(img, objectUrl, socioId);
+  img.onerror = ()=>{
+    URL.revokeObjectURL(objectUrl);
+    alert('No se pudo leer esa imagen. Prueba con un archivo .jpg o .png.');
+  };
+  img.src = objectUrl;
+}
+
+function editExistingFoto(url, socioId){
+  const img = new Image();
+  img.onload = ()=>buildCropModal(img, null, socioId);
+  img.onerror = ()=>alert('No se pudo cargar la foto actual para reencuadrarla.');
+  img.src = url;
+}
+
+function buildCropModal(img, objectUrl, socioId){
+  const VIEWPORT = 260;
+  const natW = img.naturalWidth, natH = img.naturalHeight;
+  const baseScale = VIEWPORT / Math.min(natW, natH);
+  let zoom = 1, panX = 0, panY = 0;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'crop-modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'crop-modal';
+  modal.innerHTML = `
+    <div class="crop-panel">
+      <h3>Encuadra tu foto</h3>
+      <div class="crop-viewport"></div>
+      <p class="meta">Arrastra para mover, usa el control para acercar o alejar.</p>
+      <div class="crop-zoom-row">
+        <span class="meta">Zoom</span>
+        <input type="range" min="100" max="300" value="100" class="crop-zoom-input">
+      </div>
+      <div class="crop-actions">
+        <button type="button" class="btn ghost" data-crop-cancel>Cancelar</button>
+        <button type="button" class="btn" data-crop-confirm>Usar esta foto</button>
+      </div>
+    </div>`;
+  const viewport = modal.querySelector('.crop-viewport');
+  img.style.position = 'absolute';
+  img.style.top = '0';
+  img.style.left = '0';
+  img.style.transformOrigin = '0 0';
+  img.draggable = false;
+  viewport.appendChild(img);
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+  document.body.classList.add('no-scroll');
+
+  function clampPan(){
+    const scale = baseScale * zoom;
+    const dispW = natW * scale, dispH = natH * scale;
+    const centeredLeft = (VIEWPORT - dispW) / 2, centeredTop = (VIEWPORT - dispH) / 2;
+    let left = centeredLeft + panX, top = centeredTop + panY;
+    left = Math.min(0, Math.max(VIEWPORT - dispW, left));
+    top = Math.min(0, Math.max(VIEWPORT - dispH, top));
+    panX = left - centeredLeft;
+    panY = top - centeredTop;
+    return {left, top, scale};
+  }
+  function applyTransform(){
+    const {left, top, scale} = clampPan();
+    img.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+  }
+  applyTransform();
+
+  let dragging = false, startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+  viewport.addEventListener('pointerdown', (e)=>{
+    dragging = true;
+    viewport.classList.add('dragging');
+    startX = e.clientX; startY = e.clientY;
+    startPanX = panX; startPanY = panY;
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    panX = startPanX + (e.clientX - startX);
+    panY = startPanY + (e.clientY - startY);
+    applyTransform();
+  });
+  function stopDrag(){ dragging = false; viewport.classList.remove('dragging'); }
+  viewport.addEventListener('pointerup', stopDrag);
+  viewport.addEventListener('pointercancel', stopDrag);
+
+  modal.querySelector('.crop-zoom-input').addEventListener('input', (e)=>{
+    zoom = Number(e.target.value) / 100;
+    applyTransform();
+  });
+
+  function cleanup(){
+    document.body.classList.remove('no-scroll');
+    backdrop.remove();
+    modal.remove();
+    if(objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+  modal.querySelector('[data-crop-cancel]').addEventListener('click', cleanup);
+  backdrop.addEventListener('click', cleanup);
+
+  modal.querySelector('[data-crop-confirm]').addEventListener('click', async ()=>{
+    const confirmBtn = modal.querySelector('[data-crop-confirm]');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Procesando...';
+    let blob;
+    try{
+      const {left, top, scale} = clampPan();
+      const sx = -left / scale, sy = -top / scale, sSize = VIEWPORT / scale;
+      const OUT = 640;
+      const canvas = document.createElement('canvas');
+      canvas.width = OUT; canvas.height = OUT;
+      canvas.getContext('2d').drawImage(img, sx, sy, sSize, sSize, 0, 0, OUT, OUT);
+      blob = await new Promise(resolve=>canvas.toBlob(resolve, 'image/jpeg', 0.9));
+      if(!blob) throw new Error('No se pudo recortar la imagen.');
+    }catch(err){
+      alert(err.message || 'No se pudo recortar la imagen.');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Usar esta foto';
+      return;
+    }
+    const previewUrl = URL.createObjectURL(blob);
+    document.querySelectorAll(`[data-avatar-for="${socioId}"] img`).forEach(im=>{
+      im.src = previewUrl;
+      im.style.display = '';
+      if(im.nextElementSibling) im.nextElementSibling.style.display = 'none';
+    });
+    cleanup();
+    try{
+      await uploadFoto(socioId, blob);
+      await loadState();
+      render();
+    }catch(err){
+      alert(err.message || 'No se pudo subir la foto.');
+    }
+  });
+}
+
 async function uploadTicketGasto(gastoId, file){
   const fd = new FormData();
   fd.append('ticket', file);
@@ -1027,7 +1174,7 @@ function renderSocios(){
 
         <div class="socio-row-avatar" data-action="ver-socio" data-id="${s.id}" style="cursor:pointer;" title="Ver perfil de ${escapeHtml(s.nombre)}">
 
-          ${avatarHtml(s,'sm',true)}
+          ${avatarHtml(s,'sm', puedeCambiarFoto ? 'edit' : 'view')}
 
           <div>
 
@@ -1923,12 +2070,10 @@ function renderPerfil(){
   <div class="card">
     <h2><span class="pin"></span>Mis datos</h2>
     <div class="foto-upload-row">
-      ${avatarHtml(me,'lg',true)}
+      ${avatarHtml(me,'lg','edit')}
       <div>
 
         <label class="btn ghost small" style="cursor:pointer;">Cambiar foto<input type="file" accept="image/*" data-autoupload-foto="${state.current_user}" style="display:none;"></label>
-        
-        <p class="meta" style="margin-top:6px;">Se recorta en cuadrado automaticamente.</p>
       </div>
     </div>
     <form data-form="save-perfil">
@@ -1999,7 +2144,7 @@ function renderPerfilSocio(sid){
   <div class="card">
     <button class="btn ghost small" data-action="volver-mi-perfil" style="margin-bottom:14px;">&laquo; Volver a mi perfil</button>
     <div class="foto-upload-row">
-      ${avatarHtml(s,'lg')}
+      ${avatarHtml(s,'lg','view')}
       <div>
         <div style="font-weight:600;">${escapeHtml(s.nombre)} ${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}</div>
         <p class="meta" style="margin-top:6px;">${perfil.telefono ? 'Telefono: '+escapeHtml(perfil.telefono) : 'Sin telefono'}</p>
@@ -2075,6 +2220,17 @@ document.addEventListener('click', async (e)=>{
     else if(action==='ver-foto-grande'){
       const img = btn.querySelector('img');
       if(img && img.style.display !== 'none'){ adjuntoAbierto = {url: img.src, tipo:'jpg'}; render(); }
+    }
+    else if(action==='editar-foto-existente'){
+      const sid = btn.dataset.id;
+      const wrap = btn.closest('.avatar-wrap');
+      const img = wrap ? wrap.querySelector('img') : null;
+      if(img && img.style.display !== 'none'){
+        editExistingFoto(img.src, sid);
+      } else {
+        const input = document.querySelector(`[data-autoupload-foto="${sid}"]`);
+        if(input) input.click();
+      }
     }
     else if(action==='cerrar-adjunto'){ adjuntoAbierto = null; render(); }
     else if(action==='ask-faq'){
@@ -2367,11 +2523,10 @@ document.addEventListener('change', async (e)=>{
   }
   if(e.target.matches('[data-autoupload-foto]')){
     const file = e.target.files[0];
+    const socioId = e.target.dataset.autouploadFoto;
+    e.target.value = '';
     if(!file) return;
-    try{
-      await uploadFoto(e.target.dataset.autouploadFoto, file);
-      await loadState(); render();
-    }catch(err){ alert(err.message || 'No se pudo subir la foto'); }
+    openFotoCropModal(file, socioId);
   }
   if(e.target.matches('[data-autoupload-ticket]')){
     const file = e.target.files[0];
@@ -2526,6 +2681,7 @@ function isTyping(){
   // refresques: el refresco automatico reconstruye el HTML y lo cerraria,
   // haciendo perder lo que se estuviera rellenando.
   if(document.querySelector('details[open]')) return true;
+  if(document.querySelector('.crop-modal')) return true;
   return false;
 }
 setInterval(async ()=>{
