@@ -283,12 +283,14 @@ function socioNombre(id){ const s = state.socios.find(s=>s.id===id); return s ? 
 function initials(name){
   return (name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
 }
-function avatarHtml(socio, size){
+function avatarHtml(socio, size, clickable){
   size = size || 'sm';
-  return `<div class="avatar avatar-${size}">
+  const inner = `<div class="avatar avatar-${size}">
     <img src="/static/avatars/${socio.id}.jpg?v=${avatarVersion}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
     <span class="avatar-fallback" style="display:none;">${escapeHtml(initials(socio.nombre))}</span>
   </div>`;
+  if(!clickable) return inner;
+  return `<button type="button" class="avatar-clickable" data-action="ver-foto-grande" title="Ver foto en grande">${inner}</button>`;
 }
 async function uploadFoto(socioId, file){
   const fd = new FormData();
@@ -336,6 +338,16 @@ async function uploadTicketMovimiento(movId, file){
 }
 function escapeHtml(str){
   return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function linkify(str){
+  const escaped = escapeHtml(str);
+  return escaped.replace(/(\bhttps?:\/\/[^\s<]+|\bwww\.[^\s<]+)/gi, (match)=>{
+    const trailMatch = match.match(/[.,;:!?)\]}'"]+$/);
+    const trail = trailMatch ? trailMatch[0] : '';
+    const core = trail ? match.slice(0, -trail.length) : match;
+    const href = /^https?:\/\//i.test(core) ? core : 'https://'+core;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${core}</a>${trail}`;
+  });
 }
 function timeAgoEs(iso){
   if(!iso) return '';
@@ -1015,13 +1027,13 @@ function renderSocios(){
 
         <div class="socio-row-avatar" data-action="ver-socio" data-id="${s.id}" style="cursor:pointer;" title="Ver perfil de ${escapeHtml(s.nombre)}">
 
-          ${avatarHtml(s,'sm')}
+          ${avatarHtml(s,'sm',true)}
 
           <div>
 
             <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
 
-            <div class="meta">${perfil.telefono ? '?? '+escapeHtml(perfil.telefono) : 'Sin telefono'} ${familia.length? '- '+familia.length+' familiar(es)':''}</div>
+            <div class="meta">${perfil.telefono ? 'Tel: '+escapeHtml(perfil.telefono) : 'Sin telefono'} ${familia.length? '- '+familia.length+' familiar(es)':''}</div>
 
           </div>
 
@@ -1911,9 +1923,9 @@ function renderPerfil(){
   <div class="card">
     <h2><span class="pin"></span>Mis datos</h2>
     <div class="foto-upload-row">
-      ${avatarHtml(me,'lg')}
+      ${avatarHtml(me,'lg',true)}
       <div>
-        
+
         <label class="btn ghost small" style="cursor:pointer;">Cambiar foto<input type="file" accept="image/*" data-autoupload-foto="${state.current_user}" style="display:none;"></label>
         
         <p class="meta" style="margin-top:6px;">Se recorta en cuadrado automaticamente.</p>
@@ -1969,7 +1981,7 @@ function renderPerfil(){
 
         <div style="font-weight:600;">${escapeHtml(s.nombre)}</div>
 
-        <div class="meta">${p.telefono?'?? '+escapeHtml(p.telefono):'Sin telefono'} ${fam.length?'- '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
+        <div class="meta">${p.telefono?'Tel: '+escapeHtml(p.telefono):'Sin telefono'} ${fam.length?'- '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
       </div></div>`;
     }).join('') || '<p class="empty">No hay mas socios.</p>'}
   </div>
@@ -1993,7 +2005,7 @@ function renderPerfilSocio(sid){
         <p class="meta" style="margin-top:6px;">${perfil.telefono ? 'Telefono: '+escapeHtml(perfil.telefono) : 'Sin telefono'}</p>
       </div>
     </div>
-    ${perfil.notas ? `<p class="meta" style="margin-top:10px;"><b>Notas:</b> ${escapeHtml(perfil.notas)}</p>` : ''}
+    ${perfil.notas ? `<p class="meta" style="margin-top:10px;"><b>Notas:</b> ${linkify(perfil.notas)}</p>` : ''}
   </div>
   <div class="card">
     <h2><span class="pin"></span>Familia de ${escapeHtml(s.nombre)}</h2>
@@ -2060,6 +2072,10 @@ document.addEventListener('click', async (e)=>{
     else if(action==='cerrar-alertas'){ alertasAbiertas = false; render(); }
     else if(action==='ir-a-alerta'){ activeTab = btn.dataset.tab; alertasAbiertas = false; viendoSocioId = null; render(); }
     else if(action==='ver-adjunto'){ adjuntoAbierto = {url: btn.dataset.url, tipo: btn.dataset.tipo}; render(); }
+    else if(action==='ver-foto-grande'){
+      const img = btn.querySelector('img');
+      if(img && img.style.display !== 'none'){ adjuntoAbierto = {url: img.src, tipo:'jpg'}; render(); }
+    }
     else if(action==='cerrar-adjunto'){ adjuntoAbierto = null; render(); }
     else if(action==='ask-faq'){
       const entry = FAQ_ENTRIES.find(e=>e.id===btn.dataset.id);

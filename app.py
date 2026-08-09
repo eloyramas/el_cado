@@ -540,9 +540,23 @@ def err(msg, code=403):
 
 
 # ---------------------------------------------------------------- paginas --
+def asset_version():
+    """Cambia cada vez que se edita app.js o style.css, para que el movil
+    (sobre todo la app instalada como PWA) no se quede con una copia vieja
+    en cache y siga viendo comportamiento antiguo tras una actualizacion."""
+    try:
+        mtimes = [
+            os.path.getmtime(os.path.join(BASE_DIR, "static", "app.js")),
+            os.path.getmtime(os.path.join(BASE_DIR, "static", "style.css")),
+        ]
+        return str(int(max(mtimes)))
+    except OSError:
+        return "1"
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", asset_version=asset_version())
 
 
 @app.route("/static/<path:path>")
