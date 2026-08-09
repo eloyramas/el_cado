@@ -160,6 +160,8 @@ input,select,textarea{font-family:inherit; font-size:0.95rem;}
   border-radius:10px;
   padding:18px;
   margin-bottom:16px;
+  max-width:100%;
+  overflow-wrap:break-word;
 }
 .card h2{
   font-family:'Caveat', cursive; font-weight:700; font-size:1.7rem;
@@ -243,10 +245,11 @@ textarea{resize:vertical; min-height:60px;}
 /* lists */
 .list-item{
   display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:10px;
-  padding:10px 0; border-bottom:1px solid var(--line);
+  padding:10px 0; border-bottom:1px solid var(--line); max-width:100%;
 }
 .list-item:last-child{border-bottom:none;}
 .list-item .meta{font-size:0.76rem; color:var(--chalk-dim); margin-top:2px;}
+.list-item > div:first-child{min-width:0; overflow-wrap:anywhere;}
 .tag{
   display:inline-block; font-size:0.68rem; padding:2px 8px; border-radius:20px;
   background:var(--bg-raised); color:var(--chalk-dim); margin-right:4px;
@@ -254,6 +257,12 @@ textarea{resize:vertical; min-height:60px;}
 .tag.ok{background:rgba(127,168,140,0.18); color:var(--sage);}
 .tag.warn{background:rgba(193,85,58,0.18); color:var(--rust);}
 .empty{color:var(--chalk-dim); font-size:0.86rem; font-style:italic; padding:8px 0;}
+
+@media(max-width:520px){
+  .list-item{flex-direction:column; align-items:stretch;}
+  .list-item > div:last-child{width:100%; justify-content:flex-start;}
+  .list-item > div:last-child .btn{flex:1 1 auto; text-align:center;}
+}
 
 /* login screen */
 .login-wrap{

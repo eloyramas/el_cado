@@ -26,7 +26,7 @@ const FAQ_ENTRIES = [
   {id:'tricount', pregunta:'Como funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
     respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
   {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket'],
-    respuesta:'En la pestana Tareas puedes crear un ticket para ti mismo, o asignarte uno existente que no tenga responsable. Quien gestiona tareas puede ademas asignar cualquier ticket a cualquier socio.'},
+    respuesta:'En la pestana Tareas cualquier socio puede crear una tarea. En "Quien la hace" puedes anadir con el boton "+" a tantos socios como haga falta (no tiene por que ser uno solo), o dejarla sin nadie y que alguien se apunte despues con "+ Apuntarme". Una vez creada, cualquier socio puede anadir o quitar gente, editarla, cambiarle el estado o borrarla. Tambien puedes enviar el listado de tareas activas al grupo de WhatsApp con un boton.'},
   {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
     respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lapiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
   {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
@@ -204,6 +204,9 @@ let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let editandoMovimientoId = null;
 let editandoItemCompraId = null;
+let editandoTareaId = null;
+let editandoInventarioId = null;
+let nuevaTareaSocios = [];
 let viendoSocioId = null; // si esta a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
 let adjuntoAbierto = null; // {url, tipo} del ticket/factura abierto en el visor interno
 let ticketVersion = Date.now();
@@ -1530,28 +1533,47 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">Anadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Solo lectura, para ver consultar con el administrador. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}</p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
     return `<div class="card">
       <h2><span class="pin"></span>${cat}</h2>
-      ${items.map(i=>`<div class="list-item">
-
-        <div>
-
-          <div style="font-weight:600;">${escapeHtml(i.nombre)} <span class="meta">- ${i.cantidad}</span></div>
-
-          <div class="meta">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
-
-        </div>
-
-        ${puedeGestionarInventario ? `<button class="btn danger small" data-action="delete-inventario" data-id="${i.id}">Borrar</button>` : ''}
-      </div>`).join('')}
+      ${items.map(i=>renderInventarioItem(i)).join('')}
     </div>`;
   }).join('')}
   ${state.inventario.length===0 ? '<div class="card"><p class="empty">Todavia no hay material registrado.</p></div>' : ''}
   `;
+}
+
+function renderInventarioItem(i){
+  if(editandoInventarioId===i.id){
+    return `<form data-form="edit-inventario" data-id="${i.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div><label class="f">Nombre</label><input type="text" name="nombre" required value="${escapeHtml(i.nombre)}"></div>
+        <div><label class="f">Categoria</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}" ${i.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="${i.cantidad}" min="0"></div>
+        <div><label class="f">Estado</label><select name="estado"><option ${i.estado==='Bien'?'selected':''}>Bien</option><option ${i.estado==='Necesita revision'?'selected':''}>Necesita revision</option><option ${i.estado==='Hay que comprar'?'selected':''}>Hay que comprar</option></select></div>
+        <div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(i.notas||'')}" placeholder="opcional"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-inventario">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item">
+    <div>
+      <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta">- ${i.cantidad}</span></div>
+      <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <button class="btn ghost small" data-action="editar-inventario" data-id="${i.id}">Editar</button>
+      <button class="btn danger small" data-action="delete-inventario" data-id="${i.id}">Borrar</button>
+    </div>
+  </div>`;
 }
 
 /* ============ LISTA DE LA COMPRA ============ */
@@ -1999,38 +2021,50 @@ function renderMiniCalendario(fechaRef, items, navAction){
   </div>`;
 }
 
+function renderNuevaTareaSociosWrap(){
+  const disponibles = state.socios.filter(s=>s.activo && !nuevaTareaSocios.includes(s.id));
+  return `
+    <div class="role-options" style="margin-bottom:8px;">
+      ${nuevaTareaSocios.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="socios" value="${sid}"><button type="button" data-action="quitar-socio-nueva-tarea" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('')}
+    </div>
+    ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
+      <div><select id="nueva-tarea-socio-select">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-nueva-tarea">+</button></div>
+    </div>` : ''}
+  `;
+}
+
 function renderEncargados(){
   const tareas = state.tareas_tickets || [];
   const activas = tareas.filter(t=>t.estado!=='hecho');
   const historial = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
-  const sinFecha = activas.filter(t=>!t.fecha && t.turno);
-  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+(t.responsable_id?': '+socioNombre(t.responsable_id):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}${t.turno?' - '+t.turno:''}\n${t.responsable_id?'Responsable: '+socioNombre(t.responsable_id):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
+  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+((t.socios_ids&&t.socios_ids.length)?': '+t.socios_ids.map(socioNombre).join(', '):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}\n${(t.socios_ids&&t.socios_ids.length)?'Quien la hace: '+t.socios_ids.map(socioNombre).join(', '):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
   return `
   <div class="card">
     <h2><span class="pin"></span>Nueva tarea</h2>
     <form data-form="add-tarea-ticket">
       <div class="form-row">
         <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required placeholder="Ej: Compras, Limpieza..."></div>
-        <div><label class="f">Responsable</label><select name="responsable_id"><option value="">(sin asignar)</option>${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}" ${s.id===state.current_user?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
-      </div>
-      <div class="form-row">
         <div><label class="f">Fecha (opcional)</label><input type="date" name="fecha"></div>
-        <div><label class="f">Turno (opcional)</label><input type="text" name="turno" placeholder="Ej: Manana, tarde, noche..."></div>
         <div><label class="f">Rotacion</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}">${r||'Ninguna'}</option>`).join('')}</select></div>
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
+      <div style="margin-bottom:12px;">
+        <label class="f">Quien la hace</label>
+        <div id="nueva-tarea-socios-wrap">${renderNuevaTareaSociosWrap()}</div>
+      </div>
       <datalist id="tareas-tipos-list">${state.tareas_fijas.map(t=>`<option value="${escapeHtml(t)}">`).join('')}</datalist>
       <button class="btn" type="submit">Crear tarea</button>
     </form>
+    <p class="readonly-note" style="margin-top:8px;">Cualquier socio puede crear tareas, asignarlas a quien quiera y editarlas o borrarlas despues.</p>
   </div>
   <div class="card">
-    <h2><span class="pin"></span>Tareas activas</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Tareas activas</span>
+      ${activas.length ? `<button class="btn ghost small" data-action="export-tareas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+    </h2>
     ${activas.length===0 ? '<p class="empty">No hay tareas activas.</p>' : activas.map(t=>renderTicketRow(t)).join('')}
   </div>
-  ${sinFecha.length ? `<div class="card">
-    <h2><span class="pin"></span>Tareas por turno (sin fecha fija)</h2>
-    ${sinFecha.map(t=>renderTicketRow(t)).join('')}
-  </div>` : ''}
   <div class="card">
     <h2><span class="pin"></span>Calendario de tareas</h2>
     ${renderMiniCalendario(tareasCalFecha, calItems, 'tareas-mes')}
@@ -2043,19 +2077,48 @@ function renderEncargados(){
 }
 
 function renderTicketRow(t){
-  const puedeEditar = t.responsable_id===state.current_user || t.creado_por===state.current_user || can('manage_tasks');
   const estadoLabel = ESTADO_LABELS[t.estado]||t.estado;
   const estadoClass = ESTADO_CLASS[t.estado]||'';
-  return `<div class="list-item">
-    <div>
-      <div style="font-weight:600;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotacion: ${escapeHtml(t.rotacion)}</span>`:''}</div>
-      <div class="meta">${t.responsable_id?escapeHtml(socioNombre(t.responsable_id)):'Sin asignar'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.turno?' - '+escapeHtml(t.turno):''}${t.completado_en?' - completada el '+fmtDate(t.completado_en.slice(0,10)):''}</div>
-      ${t.notas?`<div class="meta" style="margin-top:2px;">${escapeHtml(t.notas)}</div>`:''}
+  const asignados = t.socios_ids||[];
+  const disponibles = state.socios.filter(s=>s.activo && !asignados.includes(s.id));
+  const yoAsignado = asignados.includes(state.current_user);
+  if(editandoTareaId===t.id){
+    return `<form data-form="edit-tarea-ticket" data-id="${t.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required value="${escapeHtml(t.tipo)}"></div>
+        <div><label class="f">Fecha (opcional)</label><input type="date" name="fecha" value="${t.fecha||''}"></div>
+        <div><label class="f">Rotacion</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}" ${t.rotacion===r?'selected':''}>${r||'Ninguna'}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(t.notas||'')}" placeholder="opcional"></div></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-tarea">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item" style="display:block;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotacion: ${escapeHtml(t.rotacion)}</span>`:''}</div>
+        <div class="meta">${t.fecha?fmtDate(t.fecha):''}${t.completado_en?' - completada el '+fmtDate(t.completado_en.slice(0,10)):''}</div>
+        ${t.notas?`<div class="meta" style="margin-top:2px; overflow-wrap:anywhere;">${escapeHtml(t.notas)}</div>`:''}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        ${!yoAsignado ? `<button class="btn ghost small" data-action="asignarme-ticket" data-id="${t.id}">+ Apuntarme</button>` : ''}
+        <button class="btn ghost small" data-action="ciclar-estado-ticket" data-id="${t.id}" data-estado="${t.estado}">Cambiar estado</button>
+        <button class="btn ghost small" data-action="editar-tarea" data-id="${t.id}">Editar</button>
+        <button class="btn danger small" data-action="delete-tarea-ticket" data-id="${t.id}">Borrar</button>
+      </div>
     </div>
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      ${!t.responsable_id ? `<button class="btn ghost small" data-action="asignarme-ticket" data-id="${t.id}">+ Asignarme</button>` : ''}
-      ${puedeEditar ? `<button class="btn ghost small" data-action="ciclar-estado-ticket" data-id="${t.id}" data-estado="${t.estado}">Cambiar estado</button>` : ''}
-      ${puedeEditar ? `<button class="btn danger small" data-action="delete-tarea-ticket" data-id="${t.id}">Borrar</button>` : ''}
+    <div style="margin-top:8px;">
+      <label class="f">Quien la hace</label>
+      <div class="role-options" style="margin-bottom:6px;">
+        ${asignados.length ? asignados.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<button type="button" data-action="quitar-socio-tarea" data-id="${t.id}" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin asignar</span>'}
+      </div>
+      ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
+        <div><select data-nuevo-socio-tarea="${t.id}">${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+        <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-tarea" data-id="${t.id}">+ Anadir</button></div>
+      </div>` : ''}
     </div>
   </div>`;
 }
@@ -2274,8 +2337,30 @@ document.addEventListener('click', async (e)=>{
     else if(action==='reservas-mes'){ reservasCalFecha.setMonth(reservasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
     else if(action==='reuniones-mes'){ reunionesCalFecha.setMonth(reunionesCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
     else if(action==='asignarme-ticket'){
-      await apiPost(`/api/tareas-tickets/${btn.dataset.id}`, {responsable_id: state.current_user});
+      await apiPost(`/api/tareas-tickets/${btn.dataset.id}/socios/toggle`, {socio_id: state.current_user});
       await loadState(); render();
+    }
+    else if(action==='anadir-socio-tarea'){
+      const select = document.querySelector(`select[data-nuevo-socio-tarea="${btn.dataset.id}"]`);
+      if(!select || !select.value) return;
+      await apiPost(`/api/tareas-tickets/${btn.dataset.id}/socios/toggle`, {socio_id: select.value});
+      await loadState(); render();
+    }
+    else if(action==='quitar-socio-tarea'){
+      await apiPost(`/api/tareas-tickets/${btn.dataset.id}/socios/toggle`, {socio_id: btn.dataset.socio});
+      await loadState(); render();
+    }
+    else if(action==='anadir-socio-nueva-tarea'){
+      const select = document.getElementById('nueva-tarea-socio-select');
+      if(!select || !select.value) return;
+      if(!nuevaTareaSocios.includes(select.value)) nuevaTareaSocios.push(select.value);
+      const wrap = document.getElementById('nueva-tarea-socios-wrap');
+      if(wrap) wrap.innerHTML = renderNuevaTareaSociosWrap();
+    }
+    else if(action==='quitar-socio-nueva-tarea'){
+      nuevaTareaSocios = nuevaTareaSocios.filter(id=>id!==btn.dataset.socio);
+      const wrap = document.getElementById('nueva-tarea-socios-wrap');
+      if(wrap) wrap.innerHTML = renderNuevaTareaSociosWrap();
     }
     else if(action==='ciclar-estado-ticket'){
       const siguiente = ESTADO_CICLO[btn.dataset.estado] || 'pendiente';
@@ -2284,13 +2369,46 @@ document.addEventListener('click', async (e)=>{
       if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotacion, se ha creado la siguiente automaticamente.'); }
     }
     else if(action==='delete-tarea-ticket'){
-      if(confirm('Borrar esta tarea?')){ await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('Borrar esta tarea?')){
+        editandoTareaId = null;
+        await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render();
+      }
+    }
+    else if(action==='editar-tarea'){
+      editandoTareaId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-tarea'){
+      editandoTareaId = null;
+      render();
+    }
+    else if(action==='export-tareas-whatsapp'){
+      const tareas = (state.tareas_tickets||[]).filter(t=>t.estado!=='hecho');
+      const porEstado = {pendiente:[], en_curso:[]};
+      tareas.forEach(t=>{ (porEstado[t.estado]||(porEstado[t.estado]=[])).push(t); });
+      const linea = t=>`- ${t.tipo}${(t.socios_ids&&t.socios_ids.length)?' (' + t.socios_ids.map(socioNombre).join(', ') + ')':' (sin asignar)'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.notas?' - '+t.notas:''}`;
+      let texto = `*Tareas de la pena* - ${fmtDate(todayISO())}\n`;
+      if(porEstado.pendiente && porEstado.pendiente.length){ texto += `\n*Pendientes:*\n${porEstado.pendiente.map(linea).join('\n')}\n`; }
+      if(porEstado.en_curso && porEstado.en_curso.length){ texto += `\n*En curso:*\n${porEstado.en_curso.map(linea).join('\n')}\n`; }
+      if(tareas.length===0){ texto += '\nNo hay tareas activas.'; }
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
     }
     else if(action==='delete-reunion'){
       if(confirm('Borrar esta reunion?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-inventario'){
-      if(confirm('Borrar este material?')){ await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('Borrar este material?')){
+        editandoInventarioId = null;
+        await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render();
+      }
+    }
+    else if(action==='editar-inventario'){
+      editandoInventarioId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-inventario'){
+      editandoInventarioId = null;
+      render();
     }
     else if(action==='delete-lista-compra'){
       if(confirm('Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
@@ -2616,6 +2734,10 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
     else if(type==='add-inventario'){ await apiPost('/api/inventario', data); }
+    else if(type==='edit-inventario'){
+      await apiPost(`/api/inventario/${form.dataset.id}`, data);
+      editandoInventarioId = null;
+    }
     else if(type==='add-movimiento'){ await apiPost('/api/movimientos', data); }
     else if(type==='add-gasto-socio'){ await apiPost('/api/gastos-socios', data); }
     else if(type==='edit-gasto-socio'){
@@ -2653,7 +2775,15 @@ document.addEventListener('submit', async (e)=>{
       const beneficiarios = new FormData(form).getAll('beneficiarios');
       await apiPost(`/api/gastos-eventos/${eid}/pagos`, {pagador_id: data.pagador_id, concepto: data.concepto, importe: data.importe, beneficiarios});
     }
-    else if(type==='add-tarea-ticket'){ await apiPost('/api/tareas-tickets', data); }
+    else if(type==='add-tarea-ticket'){
+      const socios = new FormData(form).getAll('socios');
+      await apiPost('/api/tareas-tickets', {tipo: data.tipo, fecha: data.fecha, rotacion: data.rotacion, notas: data.notas, socios});
+      nuevaTareaSocios = [];
+    }
+    else if(type==='edit-tarea-ticket'){
+      await apiPost(`/api/tareas-tickets/${form.dataset.id}`, data);
+      editandoTareaId = null;
+    }
     else if(type==='add-role'){
       const permisos = new FormData(form).getAll('permisos');
       await apiPost('/api/roles', {nombre: data.nombre, permisos});

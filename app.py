@@ -207,6 +207,12 @@ CREATE TABLE IF NOT EXISTS tareas_tickets (
     creado_por TEXT,
     creado_en TEXT
 );
+CREATE TABLE IF NOT EXISTS tareas_ticket_socios (
+    ticket_id TEXT NOT NULL,
+    socio_id TEXT NOT NULL,
+    PRIMARY KEY (ticket_id, socio_id),
+    FOREIGN KEY (ticket_id) REFERENCES tareas_tickets(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS roles (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
@@ -397,6 +403,13 @@ def init_db():
                     "VALUES (?, ?, ?, 'pendiente', NULL, '', '', '', NULL, ?)",
                     (uuid.uuid4().hex[:12], row["tarea"], row["socio_id"], datetime.now().isoformat(timespec="seconds")),
                 )
+        # Migracion unica: el responsable unico de cada ticket pasa a la tabla de socios multiples.
+        if db.execute("SELECT COUNT(*) AS n FROM tareas_ticket_socios").fetchone()["n"] == 0:
+            for row in db.execute("SELECT id, responsable_id FROM tareas_tickets WHERE responsable_id IS NOT NULL AND responsable_id != ''"):
+                db.execute(
+                    "INSERT OR IGNORE INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)",
+                    (row["id"], row["responsable_id"]),
+                )
         db.commit()
 
 
@@ -473,14 +486,19 @@ def siguiente_fecha_rotacion(fecha_iso, rotacion):
 
 def crear_siguiente_ocurrencia_tarea(db, ticket):
     nueva_fecha = siguiente_fecha_rotacion(ticket["fecha"], ticket["rotacion"])
+    nuevo_id = new_id()
+    socios = [r["socio_id"] for r in db.execute("SELECT socio_id FROM tareas_ticket_socios WHERE ticket_id = ?", (ticket["id"],))]
     db.execute(
-        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, completado_en, creado_por, creado_en) "
-        "VALUES (?,?,?,'pendiente',?,?,?,?,NULL,?,?)",
+        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, notas, rotacion, completado_en, creado_por, creado_en) "
+        "VALUES (?,?,?,'pendiente',?,?,?,NULL,?,?)",
         (
-            new_id(), ticket["tipo"], ticket["responsable_id"], nueva_fecha, ticket["turno"],
+            nuevo_id, ticket["tipo"], socios[0] if socios else None, nueva_fecha,
             ticket["notas"], ticket["rotacion"], ticket["creado_por"], now_iso(),
         ),
     )
+    if socios:
+        db.executemany("INSERT OR IGNORE INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)", [(nuevo_id, s) for s in socios])
+    return nuevo_id
 
 
 def current_socio_id():
@@ -720,6 +738,11 @@ def state():
         gastos_eventos.append(evento)
 
     tareas_tickets = [dict(r) for r in db.execute("SELECT * FROM tareas_tickets ORDER BY (fecha IS NULL), fecha, tipo")]
+    tareas_socios_de = {}
+    for r in db.execute("SELECT * FROM tareas_ticket_socios"):
+        tareas_socios_de.setdefault(r["ticket_id"], []).append(r["socio_id"])
+    for t in tareas_tickets:
+        t["socios_ids"] = tareas_socios_de.get(t["id"], [])
 
     gastos_socios = [
         dict(r) for r in db.execute(
@@ -1192,10 +1215,38 @@ def add_inventario():
     return jsonify({"ok": True, "id": iid})
 
 
+@app.route("/api/inventario/<iid>", methods=["POST"])
+def update_inventario(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM inventario WHERE id = ?", (iid,)).fetchone():
+        return err("Material no encontrado", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre es obligatorio.", 400)
+    db.execute(
+        "UPDATE inventario SET nombre = ?, categoria = ?, cantidad = ?, estado = ?, notas = ? WHERE id = ?",
+        (
+            nombre,
+            data.get("categoria", "Otros"),
+            int(data.get("cantidad") or 1),
+            data.get("estado", "Bien"),
+            (data.get("notas") or "").strip(),
+            iid,
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/inventario/<iid>", methods=["DELETE"])
 def delete_inventario(iid):
-    if not require_permission("manage_inventory"):
-        return err("No tienes permiso para gestionar inventario.")
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
     db = get_db()
     db.execute("DELETE FROM inventario WHERE id = ?", (iid,))
     db.commit()
@@ -1988,26 +2039,31 @@ def add_tarea_ticket():
     tipo = (data.get("tipo") or "").strip()
     if not tipo:
         return err("El tipo de tarea es obligatorio.", 400)
-    responsable_id = data.get("responsable_id") or None
-    if responsable_id and responsable_id != sid and not has_permission(sid, "manage_tasks"):
-        return err("Solo puedes crear tickets para ti mismo (o dejarlos sin responsable).")
+    socios_in = data.get("socios")
+    if not isinstance(socios_in, list):
+        socios_in = [data.get("responsable_id")] if data.get("responsable_id") else []
     estado = data.get("estado") or "pendiente"
     if estado not in ESTADOS_TICKET:
         estado = "pendiente"
     db = get_db()
-    if responsable_id and not db.execute("SELECT 1 FROM socios WHERE id = ?", (responsable_id,)).fetchone():
-        return err("Socio no encontrado", 404)
+    socios_validos = {r["id"] for r in db.execute("SELECT id FROM socios")}
+    socios = []
+    for s in socios_in:
+        if s and s in socios_validos and s not in socios:
+            socios.append(s)
     tid = new_id()
     db.execute(
-        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, creado_por, creado_en) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, notas, rotacion, creado_por, creado_en) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
         (
-            tid, tipo, responsable_id, estado,
-            data.get("fecha") or None, (data.get("turno") or "").strip(),
+            tid, tipo, socios[0] if socios else None, estado,
+            data.get("fecha") or None,
             (data.get("notas") or "").strip(), (data.get("rotacion") or "").strip(),
             sid, now_iso(),
         ),
     )
+    if socios:
+        db.executemany("INSERT OR IGNORE INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)", [(tid, s) for s in socios])
     db.commit()
     return jsonify({"ok": True, "id": tid})
 
@@ -2021,22 +2077,24 @@ def update_tarea_ticket(tid):
     ticket = db.execute("SELECT * FROM tareas_tickets WHERE id = ?", (tid,)).fetchone()
     if not ticket:
         return err("Ticket no encontrado", 404)
-    puede_editar = sid == ticket["responsable_id"] or sid == ticket["creado_por"] or has_permission(sid, "manage_tasks")
-    if not puede_editar:
-        return err("No tienes permiso para editar este ticket.")
 
     data = request.get_json(force=True)
     campos, valores = [], []
 
-    if "responsable_id" in data:
-        nuevo_resp = data.get("responsable_id") or None
-        asignando_a_otro = nuevo_resp and nuevo_resp != sid
-        if asignando_a_otro and not has_permission(sid, "manage_tasks"):
-            return err("Solo quien gestiona tareas puede asignar el ticket a otro socio.")
-        if nuevo_resp and not db.execute("SELECT 1 FROM socios WHERE id = ?", (nuevo_resp,)).fetchone():
-            return err("Socio no encontrado", 404)
+    if "socios" in data:
+        socios_in = data.get("socios")
+        if not isinstance(socios_in, list):
+            socios_in = []
+        socios_validos = {r["id"] for r in db.execute("SELECT id FROM socios")}
+        socios = []
+        for s in socios_in:
+            if s and s in socios_validos and s not in socios:
+                socios.append(s)
+        db.execute("DELETE FROM tareas_ticket_socios WHERE ticket_id = ?", (tid,))
+        if socios:
+            db.executemany("INSERT OR IGNORE INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)", [(tid, s) for s in socios])
         campos.append("responsable_id = ?")
-        valores.append(nuevo_resp)
+        valores.append(socios[0] if socios else None)
     nueva_tarea_generada = False
     if "estado" in data:
         estado = data.get("estado")
@@ -2088,12 +2146,35 @@ def delete_tarea_ticket(tid):
     ticket = db.execute("SELECT * FROM tareas_tickets WHERE id = ?", (tid,)).fetchone()
     if not ticket:
         return err("Ticket no encontrado", 404)
-    puede_borrar = sid == ticket["responsable_id"] or sid == ticket["creado_por"] or has_permission(sid, "manage_tasks")
-    if not puede_borrar:
-        return err("No tienes permiso para borrar este ticket.")
     db.execute("DELETE FROM tareas_tickets WHERE id = ?", (tid,))
+    db.execute("DELETE FROM tareas_ticket_socios WHERE ticket_id = ?", (tid,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.route("/api/tareas-tickets/<tid>/socios/toggle", methods=["POST"])
+def toggle_socio_tarea(tid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM tareas_tickets WHERE id = ?", (tid,)).fetchone():
+        return err("Ticket no encontrado", 404)
+    data = request.get_json(force=True)
+    target = data.get("socio_id")
+    if not target or not db.execute("SELECT 1 FROM socios WHERE id = ?", (target,)).fetchone():
+        return err("Socio no encontrado", 404)
+    ya_asignado = db.execute(
+        "SELECT 1 FROM tareas_ticket_socios WHERE ticket_id = ? AND socio_id = ?", (tid, target)
+    ).fetchone()
+    if ya_asignado:
+        db.execute("DELETE FROM tareas_ticket_socios WHERE ticket_id = ? AND socio_id = ?", (tid, target))
+    else:
+        db.execute("INSERT INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)", (tid, target))
+    restantes = [r["socio_id"] for r in db.execute("SELECT socio_id FROM tareas_ticket_socios WHERE ticket_id = ?", (tid,))]
+    db.execute("UPDATE tareas_tickets SET responsable_id = ? WHERE id = ?", (restantes[0] if restantes else None, tid))
+    db.commit()
+    return jsonify({"ok": True, "asignado": not ya_asignado})
 
 
 # -------------------------------------------------------------- exportar a Excel --
@@ -2236,12 +2317,15 @@ def _build_excel():
 
     ws8 = wb.create_sheet("Tareas")
     tareas = db.execute("SELECT * FROM tareas_tickets ORDER BY (fecha IS NULL), fecha, tipo").fetchall()
+    tareas_socios_de = {}
+    for r in db.execute("SELECT * FROM tareas_ticket_socios"):
+        tareas_socios_de.setdefault(r["ticket_id"], []).append(r["socio_id"])
     write_sheet(
         ws8,
-        ["ID", "Tipo", "Responsable ID", "Responsable", "Estado", "Fecha", "Turno", "Rotacion", "Notas", "Completado en"],
+        ["ID", "Tipo", "Socios", "Estado", "Fecha", "Rotacion", "Notas", "Completado en"],
         [[
-            t["id"], t["tipo"], t["responsable_id"] or "", nombre_de.get(t["responsable_id"], ""), t["estado"],
-            t["fecha"] or "", t["turno"] or "", t["rotacion"] or "", t["notas"] or "", t["completado_en"] or "",
+            t["id"], t["tipo"], nombres(tareas_socios_de.get(t["id"], [])), t["estado"],
+            t["fecha"] or "", t["rotacion"] or "", t["notas"] or "", t["completado_en"] or "",
         ] for t in tareas],
     )
 
@@ -2678,7 +2762,7 @@ def _import_excel(wb, sid):
     # ---- Tareas ----
     tareas_by_id = {t["id"] for t in db.execute("SELECT id FROM tareas_tickets")}
     for row in _sheet_rows(wb, "Tareas"):
-        rid, tipo, resp_id_txt, resp_txt, estado, fecha, turno, rotacion, notas, completado_en = (list(row) + [None] * 10)[:10]
+        rid, tipo, socios_txt, estado, fecha, rotacion, notas, completado_en = (list(row) + [None] * 8)[:8]
         tipo = _cell_str(tipo)
         if not tipo:
             marcar("Tareas", error="Fila sin tipo, omitida.")
@@ -2686,27 +2770,31 @@ def _import_excel(wb, sid):
         estado = _cell_str(estado).lower() or "pendiente"
         if estado not in ESTADOS_TICKET:
             estado = "pendiente"
-        responsable_id = resolver_socio(resp_id_txt, resp_txt)
+        socios = resolver_socios(socios_txt)
         rid = _cell_str(rid)
         valores = (
-            tipo, responsable_id, estado, _cell_str(fecha) or None, _cell_str(turno),
-            _cell_str(notas), _cell_str(rotacion), _cell_str(completado_en) or None,
+            tipo, socios[0] if socios else None, estado, _cell_str(fecha) or None,
+            _cell_str(rotacion), _cell_str(notas), _cell_str(completado_en) or None,
         )
         if rid in tareas_by_id:
             db.execute(
-                "UPDATE tareas_tickets SET tipo=?, responsable_id=?, estado=?, fecha=?, turno=?, notas=?, rotacion=?, completado_en=? WHERE id=?",
+                "UPDATE tareas_tickets SET tipo=?, responsable_id=?, estado=?, fecha=?, rotacion=?, notas=?, completado_en=? WHERE id=?",
                 valores + (rid,),
             )
+            target_id = rid
             marcar("Tareas", actualizado=True)
         else:
             target_id = rid or new_id()
             db.execute(
-                "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, turno, notas, rotacion, completado_en, creado_por, creado_en) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO tareas_tickets (id, tipo, responsable_id, estado, fecha, rotacion, notas, completado_en, creado_por, creado_en) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (target_id,) + valores + (sid, now_iso()),
             )
             tareas_by_id.add(target_id)
             marcar("Tareas", creado=True)
+        db.execute("DELETE FROM tareas_ticket_socios WHERE ticket_id = ?", (target_id,))
+        if socios:
+            db.executemany("INSERT OR IGNORE INTO tareas_ticket_socios (ticket_id, socio_id) VALUES (?, ?)", [(target_id, s) for s in socios])
 
     # ---- Tricount-Pagos ----
     pagos_by_id = {p["id"] for p in db.execute("SELECT id FROM gastos_evento_pagos")}
