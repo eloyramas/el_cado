@@ -1917,7 +1917,7 @@ function renderGastoSocioItem(g){
       </div>
     </form>`;
   }
-  return `<div class="list-item">
+  return `<div class="list-item gasto-socio-item">
     <div>
       <div style="font-weight:600;">${escapeHtml(g.concepto)} <span class="tag">${esIngreso?'Ingreso':'Gasto'}</span> ${g.abonado?`<span class="tag ok">${estadoLabel}</span>`:'<span class="tag warn">Pendiente</span>'}</div>
       <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
