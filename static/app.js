@@ -1923,15 +1923,17 @@ function renderGastoSocioItem(g){
       <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
       ${g.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/${g.id}.${g.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${g.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
     </div>
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${esIngreso?'var(--sage)':'var(--rust)'};">${esIngreso?'+':'-'} ${money(g.importe)}</span>
-      ${can('manage_finances') ? `<button class="btn ghost small" data-action="toggle-abonado-gasto-socio" data-id="${g.id}">${g.abonado?'Marcar pendiente':'Marcar como pagado'}</button>` : ''}
-      ${puedeModificar ? `<span class="ticket-upload-wrap">
-        ${g.ticket ? `<button type="button" class="ticket-remove-x" data-action="delete-ticket-gasto-socio" data-id="${g.id}" title="Quitar ticket o factura">&times;</button>` : ''}
-        <label class="btn ghost small" style="cursor:pointer;">${g.ticket?'Cambiar ticket o factura':'Subir ticket o factura'}<input type="file" accept="image/png,image/jpeg,application/pdf" data-autoupload-ticket="${g.id}" style="display:none;"></label>
-      </span>` : ''}
-      ${puedeModificar ? `<button class="btn ghost small" data-action="editar-gasto-socio" data-id="${g.id}">Editar</button>` : ''}
-      ${puedeModificar ? `<button class="btn danger small" data-action="delete-gasto-socio" data-id="${g.id}">Borrar</button>` : ''}
+    <div class="gasto-socio-right">
+      <span class="gasto-socio-importe" style="color:${esIngreso?'var(--sage)':'var(--rust)'};">${esIngreso?'+':'-'} ${money(g.importe)}</span>
+      <div class="gasto-socio-actions">
+        ${can('manage_finances') ? `<button class="btn ghost small" data-action="toggle-abonado-gasto-socio" data-id="${g.id}">${g.abonado?'Marcar pendiente':'Marcar como pagado'}</button>` : ''}
+        ${puedeModificar ? `<span class="ticket-upload-wrap">
+          ${g.ticket ? `<button type="button" class="ticket-remove-x" data-action="delete-ticket-gasto-socio" data-id="${g.id}" title="Quitar ticket o factura">&times;</button>` : ''}
+          <label class="btn ghost small" style="cursor:pointer;">${g.ticket?'Cambiar ticket o factura':'Subir ticket o factura'}<input type="file" accept="image/png,image/jpeg,application/pdf" data-autoupload-ticket="${g.id}" style="display:none;"></label>
+        </span>` : ''}
+        ${puedeModificar ? `<button class="btn ghost small" data-action="editar-gasto-socio" data-id="${g.id}">Editar</button>` : ''}
+        ${puedeModificar ? `<button class="btn danger small" data-action="delete-gasto-socio" data-id="${g.id}">Borrar</button>` : ''}
+      </div>
     </div>
   </div>`;
 }
