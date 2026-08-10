@@ -4,7 +4,6 @@
    en tiempo real (se refresca solo cada 8s). */
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const CAT_MOV = ['Alquiler','Luz','Agua','Gas','Mantenimiento','Otros'];
 const CAT_INV = ['Cocina','Mobiliario','Electronica','Otros'];
 const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
 const DIA_LIMITE_CUOTA = 5; // a partir de que dia del mes se avisa de cuota pendiente
@@ -30,7 +29,7 @@ const FAQ_ENTRIES = [
   {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
     respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lapiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
   {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
-    respuesta:'Cualquier socio puede consultar los precios en Bebidas > Consumo del dia a dia, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos o registrar consumos es cosa del administrador o el tesorero.'},
+    respuesta:'Cualquier socio puede consultar los precios en la pestana Bebidas, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos, registrar consumo de otro socio o de un invitado, y gestionar el resto de consumos es cosa del administrador o el tesorero; cualquier socio puede registrar su propio consumo.'},
   {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
     respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tu como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tu o el administrador/tesorero podeis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavia esta pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automaticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habias subido, se copia tambien alli) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahi, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en anos posteriores; no depende ya de la solicitud original.'},
   {id:'duplicados', pregunta:'Que pasa si registro un gasto que ya estaba apuntado?', palabras:['duplicado','duplicar','repetido','repetir','ya existe','aviso'],
@@ -38,7 +37,7 @@ const FAQ_ENTRIES = [
   {id:'excel', pregunta:'Como exporto o importo datos con Excel?', palabras:['excel','exportar','importar','descargar','subir','xlsx','cuentas'],
     respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario, Bebidas y Caja > Movimientos. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.\n\nEl boton "Importar Excel" (al lado del de exportar) lo puede usar cualquier socio, no hace falta ser administrador. Al subir un archivo, la app aplica cada hoja segun los permisos que ya tengas en esa parte de la app: si por ejemplo no gestionas cuotas ni finanzas, esas hojas del Excel se ignoran (se avisa en el resumen que aparece despues de importar cuantas filas se han omitido y por que), pero si puedes editar tareas, inventario, reservas o Tricount (que estan abiertos a todos), esas filas si se aplican. Asi cualquiera puede reutilizar el importador para corregir o cargar datos en lo que ya tiene permiso de tocar, sin arriesgarse a tocar roles, socios o finanzas sin querer.'},
   {id:'whatsapp', pregunta:'Como envio informacion al grupo de WhatsApp?', palabras:['whatsapp','enviar','compartir','grupo','mensaje'],
-    respuesta:'Veras un boton "Enviar por WhatsApp" en casi todas las pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Tricount (uno por cada evento, con los saldos y quien paga a quien), Bebidas (tanto en "Consumo del dia a dia", con la deuda pendiente, como en "Fiestas / eventos", con el gasto por fiesta), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial.'},
+    respuesta:'Veras un boton "Enviar por WhatsApp" en casi todas las pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Tricount (uno por cada evento, con los saldos y quien paga a quien), Bebidas (con la deuda pendiente), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial.'},
   {id:'roles', pregunta:'Que son los roles y quien los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
     respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignarselos a los socios, desde la pestana Roles.'},
   {id:'avisos', pregunta:'Que es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
@@ -198,7 +197,9 @@ function stopLoginDrag(){
 
 let state = null;
 let activeTab = 'resumen';
-let bebidasSubtab = 'consumo';
+let consumosFiltroAnio = 'todos';
+let consumosFiltroMes = 'todos';
+let consumosFiltroDia = 'todos';
 let cuotasYear = new Date().getFullYear();
 let cuotasMesMovil = new Date().getMonth()+1;
 let resumenGraficoYear = new Date().getFullYear();
@@ -217,6 +218,15 @@ let viendoSocioId = null; // si esta a un id distinto del propio, "Mi perfil" mu
 let adjuntoAbierto = null; // {url, tipo} del ticket/factura abierto en el visor interno
 let ticketVersion = Date.now();
 let loaded = false;
+let chatMensajes = []; // mensajes cargados en memoria, mas recientes al final
+let chatLastId = 0; // mayor id ya recibido del servidor
+let chatPollTimer = null;
+let chatAbierto = false;
+let chatArchivoSeleccionado = null; // File pendiente de adjuntar al proximo mensaje
+let emojiPickerAbierto = false;
+let editandoMensajeId = null; // id del mensaje propio que se esta editando ahora mismo
+const EMOJIS_CHAT = ['😀','😂','😅','😉','😊','😍','😘','😜','🤔','😎','😴','😭','😡','🥳','🤢','😱',
+  '👍','👎','🙏','👏','💪','🤝','❤️','🔥','🎉','🍺','🍻','🍕','☕','⚽','🎲','🃏','☀️','🌧️','⏰','📅','✅','❌','⚠️'];
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
 let loginSearchQuery = ''; // texto escrito en "Escribe tu nombre" de la pantalla de login
 let loginDragInitialized = false;
@@ -249,6 +259,7 @@ async function api(path, opts){
 }
 const apiGet = (p)=>api(p);
 const apiPost = (p,body)=>api(p,{method:'POST', body:JSON.stringify(body||{})});
+const apiPatch = (p,body)=>api(p,{method:'PATCH', body:JSON.stringify(body||{})});
 const apiDelete = (p)=>api(p,{method:'DELETE'});
 
 async function loadState(){
@@ -309,6 +320,14 @@ function initials(name){
   return (name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
 }
 const PENCIL_ICON_PATH = '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>';
+const PAPERCLIP_ICON_PATH = '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>';
+const SMILE_ICON_PATH = '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>';
+function toolIcon(pathD){
+  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${pathD}</svg>`;
+}
+function miniIcon(pathD){
+  return `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${pathD}</svg>`;
+}
 function avatarHtml(socio, size, mode){
   size = size || 'sm';
   const inner = `<div class="avatar avatar-${size}" data-avatar-for="${socio.id}">
@@ -508,6 +527,17 @@ async function uploadTicketMovimiento(movId, file){
   }
   ticketVersion = Date.now();
 }
+async function uploadChatArchivo(mid, file){
+  const fd = new FormData();
+  fd.append('archivo', file);
+  const res = await fetch(`/api/chat/${mid}/archivo`, {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el archivo adjunto.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  return res.json();
+}
 function escapeHtml(str){
   return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -530,6 +560,131 @@ function timeAgoEs(iso){
   return `hace ${days} dias`;
 }
 
+/* ============ CHAT DE SOCIOS (polling simple) ============ */
+const CHAT_POLL_MS = 12000;
+function chatStorageKey(){ return 'chatLeido_' + (state && state.current_user); }
+function chatLastReadId(){
+  if(!state || !state.current_user) return 0;
+  return Number(localStorage.getItem(chatStorageKey())||0);
+}
+function chatMarkRead(id){
+  if(!state || !state.current_user) return;
+  localStorage.setItem(chatStorageKey(), String(id));
+}
+function chatUnreadCount(){
+  if(!state || !state.current_user) return 0;
+  const leido = chatLastReadId();
+  return chatMensajes.filter(m=>m.id>leido && m.socio_id!==state.current_user).length;
+}
+function fmtHoraCorta(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('es-ES',{hour:'2-digit', minute:'2-digit'});
+}
+const CHAT_NAME_COLORS = ['#7fa88c','#6b8fb0','#c98bd9','#d9a544','#5fbcd3','#e08a8a','#9ac47a','#b09ce0','#4fb894','#d98ab0'];
+function chatNombreColor(socioId){
+  let hash = 0;
+  const s = String(socioId||'');
+  for(let i=0;i<s.length;i++){ hash = (hash*31 + s.charCodeAt(i)) >>> 0; }
+  return CHAT_NAME_COLORS[hash % CHAT_NAME_COLORS.length];
+}
+async function loadChatInicial(){
+  try{
+    const r = await apiGet('/api/chat');
+    chatMensajes = r.mensajes || [];
+    chatLastId = chatMensajes.reduce((max,m)=>Math.max(max,m.id), 0);
+  }catch(e){ console.error('No se pudo cargar el chat', e); }
+}
+function appendChatMensajesDom(nuevos){
+  const wrap = document.getElementById('chat-messages');
+  if(!wrap) return;
+  const vacio = wrap.querySelector('.empty');
+  if(vacio) vacio.remove();
+  const cercaDelFinal = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 80;
+  nuevos.forEach(m=>{ wrap.insertAdjacentHTML('beforeend', renderChatMsg(m)); });
+  if(cercaDelFinal) wrap.scrollTop = wrap.scrollHeight;
+}
+function rerenderChatMsg(id){
+  const m = chatMensajes.find(x=>String(x.id)===String(id));
+  const el = document.querySelector(`.chat-msg[data-id="${id}"]`);
+  if(m && el) el.outerHTML = renderChatMsg(m);
+}
+function updateChatBadge(){
+  const n = chatUnreadCount();
+  const badge = document.getElementById('chat-badge');
+  if(badge){
+    badge.textContent = n>9 ? '9+' : String(n);
+    badge.style.display = n>0 ? '' : 'none';
+  }
+}
+function chatIrAlFinalYMarcar(){
+  chatMarkRead(chatLastId);
+  updateChatBadge();
+  requestAnimationFrame(()=>{
+    const wrap = document.getElementById('chat-messages');
+    if(wrap) wrap.scrollTop = wrap.scrollHeight;
+  });
+}
+function initChatToastContainer(){
+  if(document.getElementById('chat-toast-container')) return;
+  const cont = document.createElement('div');
+  cont.id = 'chat-toast-container';
+  cont.className = 'chat-toast-container';
+  document.body.appendChild(cont);
+}
+function showChatToast(mensaje){
+  const cont = document.getElementById('chat-toast-container');
+  if(!cont) return;
+  const toast = document.createElement('div');
+  toast.className = 'chat-toast';
+  toast.innerHTML = `<b>${escapeHtml(mensaje.socio_nombre||'Alguien')}</b><span>${escapeHtml((mensaje.texto||'').slice(0,140))}</span>`;
+  toast.addEventListener('click', ()=>{
+    chatAbierto = true;
+    alertasAbiertas = false;
+    render();
+    chatIrAlFinalYMarcar();
+  });
+  cont.appendChild(toast);
+  requestAnimationFrame(()=>toast.classList.add('visible'));
+  setTimeout(()=>{
+    toast.classList.remove('visible');
+    setTimeout(()=>toast.remove(), 300);
+  }, 6000);
+}
+async function pollChat(){
+  if(document.hidden || !state || !state.current_user) return;
+  try{
+    const r = await apiGet(`/api/chat?since=${chatLastId}`);
+    const nuevos = r.mensajes || [];
+    if(nuevos.length===0) return;
+    chatMensajes = chatMensajes.concat(nuevos).slice(-200);
+    chatLastId = nuevos.reduce((max,m)=>Math.max(max,m.id), chatLastId);
+    if(chatAbierto){
+      appendChatMensajesDom(nuevos);
+      chatMarkRead(chatLastId);
+      updateChatBadge();
+    } else {
+      const deOtros = nuevos.filter(m=>m.socio_id!==state.current_user);
+      if(deOtros.length===1) showChatToast(deOtros[0]);
+      else if(deOtros.length>1) showChatToast({socio_nombre:'Chat de socios', texto:`${deOtros.length} mensajes nuevos`});
+      updateChatBadge();
+    }
+  }catch(e){ console.error('No se pudo actualizar el chat', e); }
+}
+function startChatPolling(){
+  if(chatPollTimer) return;
+  chatPollTimer = setInterval(pollChat, CHAT_POLL_MS);
+}
+function stopChatPolling(){
+  if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+async function chatOnLogin(){
+  if(chatMensajes.length===0) await loadChatInicial();
+  updateChatBadge();
+  startChatPolling();
+}
+
 /* ============ RENDER ROOT ============ */
 function render(){
   updateBackgroundVisibility();
@@ -547,7 +702,7 @@ function render(){
   }
   const me = state.socios.find(s=>s.id===state.current_user);
   if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me) + renderAyuda(); scrollHelpTranscript(); return; }
-  app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel() + renderAdjuntoViewer();
+  app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel() + renderChatPanel() + renderAdjuntoViewer();
   scrollHelpTranscript();
 }
 function renderAdjuntoViewer(){
@@ -728,6 +883,7 @@ function renderApp(){
         </div>` : ''}
         
         <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">cerrar sesion</button>
+          ${chatIconBtn()}
           <button type="button" class="bell-btn" data-action="toggle-alertas" title="Avisos">
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BELL_ICON_PATH}</svg>
             ${alertas.length ? `<span class="bell-badge">${alertas.length}</span>` : ''}
@@ -774,6 +930,14 @@ function tabIcon(name){
 }
 function tabBtn(id,label,icon){
   return `<button class="tab-btn ${activeTab===id?'active':''}" data-action="switch-tab" data-tab="${id}">${tabIcon(icon)}<span class="tab-label">${label}</span></button>`;
+}
+const CHAT_ICON_PATH = '<path d="M4 5h16v11.5H9.5L5 20.5V16.5H4z"/><path d="M8 9.2h8"/><path d="M8 12.4h5"/>';
+function chatIconBtn(){
+  const n = chatUnreadCount();
+  return `<button type="button" class="bell-btn" data-action="toggle-chat" title="Chat de socios">
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CHAT_ICON_PATH}</svg>
+    <span class="bell-badge" id="chat-badge" style="${n>0?'':'display:none;'}">${n>9?'9+':n}</span>
+  </button>`;
 }
 function renderTab(){
   switch(activeTab){
@@ -866,24 +1030,66 @@ function renderRoleRow(role, labels){
 }
 /* ============ calculos ============ */
 function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
-function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios').reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
+function misBebidasPendientesPorMes(){
+  const grupos = {};
+  misBebidasPendientes().forEach(c=>{
+    const key = (c.fecha||'').slice(0,7);
+    (grupos[key] = grupos[key] || []).push(c);
+  });
+  return Object.keys(grupos).sort((a,b)=>b.localeCompare(a)).map(mes=>({
+    mes,
+    items: grupos[mes].sort((a,b)=>b.fecha.localeCompare(a.fecha)),
+    total: grupos[mes].reduce((a,c)=>a+Number(c.importe||0), 0),
+  }));
+}
+function bebidasPendientesPorSocio(){
+  const pendientes = {};
+  state.bebidas_consumos.forEach(c=>{
+    if(!c.pagado && c.socio_id){
+      pendientes[c.socio_id] = (pendientes[c.socio_id]||0) + Number(c.importe||0);
+    }
+  });
+  return Object.keys(pendientes)
+    .sort((a,b)=>pendientes[b]-pendientes[a])
+    .map(socio_id=>({socio_id, nombre: socioNombre(socio_id), total: pendientes[socio_id]}));
+}
+function aniosConsumos(){
+  const anios = new Set(state.bebidas_consumos.map(c=>c.fecha ? c.fecha.slice(0,4) : null).filter(Boolean));
+  return [...anios].sort((a,b)=>b.localeCompare(a));
+}
+function consumosFiltrados(consumos){
+  return consumos.filter(c=>{
+    if(!c.fecha) return false;
+    const [y,m,d] = c.fecha.split('-');
+    if(consumosFiltroAnio!=='todos' && y!==consumosFiltroAnio) return false;
+    if(consumosFiltroMes!=='todos' && Number(m)!==Number(consumosFiltroMes)) return false;
+    if(consumosFiltroDia!=='todos' && Number(d)!==Number(consumosFiltroDia)) return false;
+    return true;
+  });
+}
 function actualizarTotalConsumo(form){
   const el = form.querySelector('#consumo-total');
   if(!el) return;
   const bebidaId = form.querySelector('[name=bebida_id]').value;
   const cantidad = Number(form.querySelector('[name=cantidad]').value) || 0;
-  const esSocio = form.querySelector('[name=consumidorTipo]').value === 'socio';
+  const consumidorTipo = form.querySelector('[name=consumidorTipo]');
+  const esSocio = consumidorTipo ? consumidorTipo.value === 'socio' : true;
   const precio = state.bebidas_precios.find(p=>p.id===bebidaId);
   const unit = precio ? Number(esSocio ? precio.precio_socio : precio.precio_no_socio) : 0;
-  el.textContent = `Total a pagar: ${money(unit * cantidad)}`;
+  el.textContent = `Total: ${money(unit * cantidad)}`;
 }
 function totalFiestasGasto(){ return state.fiestas_gastos.reduce((a,f)=>a+Number(f.importe||0),0); }
-function totalIngresosSociosVerificados(){ return (state.gastos_socios||[]).filter(g=>g.tipo==='ingreso' && g.abonado).reduce((a,g)=>a+Number(g.importe||0),0); }
-function totalGastosSociosVerificados(){ return (state.gastos_socios||[]).filter(g=>g.tipo!=='ingreso' && g.abonado).reduce((a,g)=>a+Number(g.importe||0),0); }
+// Al verificar un gasto/ingreso de socio, el backend lo convierte en un movimiento
+// permanente con categoria "Socios" y borra la solicitud provisional: por eso estos
+// totales se calculan a partir de movimientos, no de gastos_socios (que solo guarda
+// las solicitudes todavia pendientes de verificar).
+function totalIngresosSociosVerificados(){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosSociosVerificados(){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
 function gastosSociosPendientes(){ return (state.gastos_socios||[]).filter(g=>!g.abonado); }
 function saldoTotal(){
   const ingresos = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
@@ -926,6 +1132,12 @@ function construirAlertas(){
   if(misPendientes.length){
     const total = misPendientes.reduce((a,c)=>a+Number(c.importe||0),0);
     alertas.push({tipo:'warn', texto:`Tienes ${money(total)} pendientes de pagar en bebidas (pestana Bebidas).`, tab:'bebidas'});
+  }
+
+  if(can('manage_bebidas')){
+    bebidasPendientesPorSocio().forEach(p=>{
+      alertas.push({tipo:'warn', texto:`${p.nombre} tiene ${money(p.total)} pendientes de bebidas.`, tab:'bebidas'});
+    });
   }
 
   const recientes = [];
@@ -1132,14 +1344,14 @@ function renderResumen(){
         </span>
       </h2>
       <div class="menu-row"><span class="label">Cuotas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
-      <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
       <div class="menu-row"><span class="label">Bebidas</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
-      <div class="menu-row"><span class="label">Ingresos de socios (verificados)</span><span class="dots"></span><span class="value sage">${money(totalIngresosSociosVerificados())}</span></div>
-      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov())}</span></div>
+      <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
+      <div class="menu-row"><span class="label">Ingresos de socios</span><span class="dots"></span><span class="value sage">${money(totalIngresosSociosVerificados())}</span></div>
+      <div class="menu-row"><span class="label">Gastos de socios</span><span class="dots"></span><span class="value rust">- ${money(totalGastosSociosVerificados())}</span></div>
       <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto())}</span></div>
-      <div class="menu-row"><span class="label">Gastos de socios (verificados)</span><span class="dots"></span><span class="value rust">- ${money(totalGastosSociosVerificados())}</span></div>
-      <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo neto</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
-      ${pendientesSocios.length ? `<p class="readonly-note" style="margin-top:10px;">${pendientesSocios.length} gasto(s)/ingreso(s) de socios (${money(pendientesSociosTotal)}) pendientes de verificar por el tesorero o el administrador en "Gastos e ingresos". No suman al saldo hasta que se verifiquen.</p>` : ''}
+      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov())}</span></div>
+      <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo total</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
+      ${pendientesSocios.length ? `<p class="readonly-note" style="margin-top:10px; cursor:pointer;" data-action="switch-tab" data-tab="caja" title="Ir a Gastos e ingresos">${pendientesSocios.length} gasto(s)/ingreso(s) de socios (${money(pendientesSociosTotal)}) pendientes de verificar por el tesorero o el administrador en "Gastos e ingresos". No suman al saldo hasta que se verifiquen.</p>` : ''}
     </div>
     <div class="card">
       <h2><span class="pin"></span>Proxima reunion</h2>
@@ -1291,9 +1503,9 @@ function renderReservas(){
     <form data-form="add-reserva">
       <div class="form-row">
 
-        <div style="flex:0 0 160px;"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+        <div class="field-fecha"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
 
-        <div style="flex:2; min-width:180px;"><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleanos, comida familiar..."></div>
+        <div class="field-ancho"><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleanos, comida familiar..."></div>
       </div>
       <div class="form-row">
         
@@ -1348,9 +1560,9 @@ function renderReuniones(){
     <form data-form="add-reunion">
       <div class="form-row">
 
-        <div style="flex:0 0 160px;"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
+        <div class="field-fecha"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
 
-        <div style="flex:2; min-width:180px;"><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
+        <div class="field-ancho"><label class="f">Tema</label><input type="text" name="evento" required placeholder="Ej: Reparto de gastos verano"></div>
       </div>
       <div class="form-row">
 
@@ -1726,17 +1938,19 @@ function renderGastoSocioItem(g){
 function renderMovimientoItem(m){
   const admin = can('manage_finances');
   if(admin && editandoMovimientoId===m.id){
+    const categoriasMov = state.categorias_movimiento || [];
     return `<form data-form="edit-movimiento" data-id="${m.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto" ${m.tipo!=='ingreso'?'selected':''}>Gasto</option><option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option></select></div>
-        <div><label class="f">Categoria</label><select name="categoria">${CAT_MOV.map(c=>`<option ${m.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label class="f">Categoria</label><select name="categoria">${categoriasMov.map(c=>`<option ${m.categoria===c.nombre?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('')}</select></div>
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${m.fecha}" required></div>
       </div>
       <div class="form-row">
         <div><label class="f">Socio</label><select name="socio_id">
           <option value="">(sin socio)</option>
           ${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}" ${m.socio_id===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
-        </select></div>
+        </select>
+        <input type="text" name="no_socio_nombre" placeholder="Nombre (opcional, si no es socio)" value="${escapeHtml(m.no_socio_nombre||'')}" style="margin-top:6px; ${m.socio_id?'display:none;':''}"></div>
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required value="${escapeHtml(m.concepto)}"></div>
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" required value="${m.importe}"></div>
       </div>
@@ -1752,7 +1966,7 @@ function renderMovimientoItem(m){
       <div class="meta">
         <span class="tag">${m.categoria}</span>
         ${fmtDate(m.fecha)}
-        ${m.socio_id ? `<span class="tag ok">Socio: ${escapeHtml(socioNombre(m.socio_id))}</span>` : ''}
+        ${m.socio_id ? `<span class="tag ok">Socio: ${escapeHtml(socioNombre(m.socio_id))}</span>` : (m.no_socio_nombre ? `<span class="tag">No socio: ${escapeHtml(m.no_socio_nombre)}</span>` : '')}
       </div>
       ${m.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/mov-${m.id}.${m.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${m.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
     </div>
@@ -1771,6 +1985,7 @@ function renderCaja(){
   const admin = can('manage_finances');
   const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const gastosSocios = [...(state.gastos_socios||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const categoriasMov = state.categorias_movimiento || [];
   return `
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -1795,25 +2010,33 @@ function renderCaja(){
     <h2><span class="pin"></span>Registrar movimiento</h2>
     <form data-form="add-movimiento">
       <div class="form-row">
-        
+
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
-        
-        <div><label class="f">Categoria</label><select name="categoria">${CAT_MOV.map(c=>`<option>${c}</option>`).join('')}</select></div>
-        
+
+        <div><label class="f">Categoria</label>
+          <div style="display:flex; gap:6px;">
+            <select name="categoria" style="flex:1;">${categoriasMov.map(c=>`<option>${escapeHtml(c.nombre)}</option>`).join('')}</select>
+            <button type="button" class="btn ghost small" data-action="add-categoria-mov-inline" title="Anadir categoria nueva">+</button>
+            <button type="button" class="btn ghost small" data-action="delete-categoria-mov-inline" title="Quitar la categoria seleccionada">&minus;</button>
+          </div>
+        </div>
+
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row">
-        
+
         <div><label class="f">Socio</label><select name="socio_id">
-        
+
           <option value="">(sin socio)</option>
-        
+
           ${state.socios.filter(s=>s.activo).map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}
-        
-        </select></div>
-        
+
+        </select>
+        <input type="text" name="no_socio_nombre" placeholder="Nombre (opcional, si no es socio)" style="margin-top:6px;">
+        </div>
+
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Factura de la luz - julio"></div>
-        
+
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" required></div>
       </div>
       <button class="btn" type="submit">Guardar movimiento</button>
@@ -1843,17 +2066,13 @@ function renderCaja(){
 /* ============ BEBIDAS ============ */
 function renderBebidas(){
   return `
-  <div class="subtabs" style="justify-content:space-between; flex-wrap:wrap;">
-    <div style="display:flex; gap:6px;">
-      <button class="subtab-btn ${bebidasSubtab==='consumo'?'active':''}" data-action="bebidas-subtab" data-sub="consumo">Consumo del dia a dia</button>
-      <button class="subtab-btn ${bebidasSubtab==='fiestas'?'active':''}" data-action="bebidas-subtab" data-sub="fiestas">Fiestas / eventos</button>
-    </div>
+  <div class="subtabs" style="justify-content:flex-end; flex-wrap:wrap;">
     <span style="display:flex; gap:8px; flex-wrap:wrap;">
       ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
       <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
     </span>
   </div>
-  ${bebidasSubtab==='consumo' ? renderBebidasConsumo() : renderBebidasFiestas()}
+  ${renderBebidasConsumo()}
   `;
 }
 
@@ -1862,13 +2081,15 @@ function renderBebidasConsumo(){
   const precios = state.bebidas_precios;
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const misPendientes = misBebidasPendientes();
+  const misPendientesPorMes = misBebidasPendientesPorMes();
+  const anios = aniosConsumos();
+  const diasDelMes = Array.from({length:31}, (_,i)=>i+1);
+  const sinFiltro = consumosFiltroAnio==='todos' && consumosFiltroMes==='todos' && consumosFiltroDia==='todos';
+  const consumosFiltradosList = consumosFiltrados(consumos);
+  const consumosMostrados = sinFiltro ? consumosFiltradosList.slice(0,40) : consumosFiltradosList;
+  const totalPagadoFiltrado = consumosFiltradosList.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0);
+  const totalPendienteFiltrado = consumosFiltradosList.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0);
   return `
-  ${misPendientes.length ? `
-  <div class="card">
-    <h2><span class="pin"></span>Mi deuda de bebidas pendiente</h2>
-    ${misPendientes.map(c=>`<div class="menu-row"><span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}<small>${c.cantidad} x - ${fmtDate(c.fecha)}</small></span><span class="dots"></span><span class="value rust">${money(c.importe)}</span></div>`).join('')}
-    <div class="menu-row" style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px;"><span class="label"><strong>Total pendiente</strong></span><span class="dots"></span><span class="value rust"><strong>${money(misPendientes.reduce((a,c)=>a+Number(c.importe||0),0))}</strong></span></div>
-  </div>` : ''}
   ${puedeGestionarBebidas ? `
   <div class="card">
     <h2><span class="pin"></span>Precios</h2>
@@ -1905,12 +2126,13 @@ function renderBebidasConsumo(){
         <span class="dots"></span>
         <span class="value">socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</span>
       </div>`).join('') : '<p class="empty">Todavia no hay precios cargados.</p>'}
-    <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes anaden precios y registran los consumos.</p>
+    <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes anaden precios nuevos.</p>
   </div>`}
   <div class="card">
-    <h2><span class="pin"></span>Registrar consumo</h2>
+    <h2><span class="pin"></span>${puedeGestionarBebidas ? 'Registrar consumo' : 'Registrar mi consumo'}</h2>
     ${precios.length===0 ? '<p class="empty">Primero anade precios de bebidas arriba.</p>' : `
     <form data-form="add-consumo">
+      ${puedeGestionarBebidas ? `
       <div class="form-row">
 
         <div><label class="f">Quien consume</label>
@@ -1932,25 +2154,50 @@ function renderBebidasConsumo(){
           <input type="text" name="nombre_invitado" placeholder="Nombre del invitado" style="display:none; margin-top:6px;">
 
         </div>
-      </div>
+      </div>` : ''}
       <div class="form-row">
 
         <div><label class="f">Bebida</label><select name="bebida_id">${precios.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
 
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
-      <div id="consumo-total" class="meta" style="margin:2px 0 12px; font-weight:600; font-size:0.95rem; color:var(--amber);">Total a pagar: ${money(precios.length ? Number(precios[0].precio_socio) : 0)}</div>
-      <label class="role-option" style="margin-bottom:10px;"><input type="checkbox" name="pagado" checked> Pagado en el momento (si no, queda pendiente en la deuda del socio)</label>
-      <button class="btn" type="submit">Registrar consumo</button>
+      <div id="consumo-total" class="meta" style="margin:2px 0 6px; font-weight:600; font-size:0.95rem; color:var(--amber);">Total: ${money(precios.length ? Number(precios[0].precio_socio) : 0)}</div>
+      <p class="readonly-note" style="margin:0 0 10px;">Se suma a ${puedeGestionarBebidas ? 'la deuda del socio' : 'tu deuda'}: todo el consumo se paga por transferencia junto con la cuota, del 1 al 5 de cada mes.</p>
+      <button class="btn" type="submit">${puedeGestionarBebidas ? 'Registrar consumo' : 'Registrar mi consumo'}</button>
     </form>
     `}
   </div>
+  ${misPendientes.length ? `
+  <div class="card">
+    <h2><span class="pin"></span>Mi deuda de bebidas pendiente</h2>
+    <p class="readonly-note" style="margin:0 0 10px;">Se paga por transferencia junto con la cuota, del 1 al 5 de cada mes.</p>
+    ${misPendientesPorMes.map(g=>`
+      <div class="menu-row" style="margin-top:10px;"><span class="label"><strong>${labelMes(g.mes)}</strong></span><span class="dots"></span><span class="value rust"><strong>${money(g.total)}</strong></span></div>
+      ${g.items.map(c=>`<div class="menu-row" style="padding-left:12px; align-items:center;"><span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}<small>${c.cantidad} x - ${fmtDate(c.fecha)}</small></span><span class="dots"></span><span class="value rust">${money(c.importe)}</span><button class="btn ghost small" data-action="toggle-consumo-pagado" data-id="${c.id}">Marcar pagado</button></div>`).join('')}
+    `).join('')}
+    <div class="menu-row" style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px;"><span class="label"><strong>Total pendiente</strong></span><span class="dots"></span><span class="value rust"><strong>${money(misPendientes.reduce((a,c)=>a+Number(c.importe||0),0))}</strong></span></div>
+  </div>` : ''}
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalBebidasIngreso())} - pendiente: ${money(totalBebidasPendiente())}</span></span>
+      <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalPagadoFiltrado)} - pendiente: ${money(totalPendienteFiltrado)}</span></span>
       <button class="btn ghost small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
     </h2>
-    ${consumos.length===0 ? '<p class="empty">Sin consumos todavia.</p>' : consumos.slice(0,40).map(c=>{
+    <div class="consumos-filtro">
+      <select id="consumos-filtro-anio">
+        <option value="todos" ${consumosFiltroAnio==='todos'?'selected':''}>Todos los anos</option>
+        ${anios.map(a=>`<option value="${a}" ${consumosFiltroAnio===a?'selected':''}>${a}</option>`).join('')}
+      </select>
+      <select id="consumos-filtro-mes">
+        <option value="todos" ${consumosFiltroMes==='todos'?'selected':''}>Todos los meses</option>
+        ${MESES.map((m,i)=>`<option value="${i+1}" ${Number(consumosFiltroMes)===i+1?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <select id="consumos-filtro-dia">
+        <option value="todos" ${consumosFiltroDia==='todos'?'selected':''}>Todos los dias</option>
+        ${diasDelMes.map(d=>`<option value="${d}" ${Number(consumosFiltroDia)===d?'selected':''}>${d}</option>`).join('')}
+      </select>
+      ${!sinFiltro ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-consumos">Quitar filtro</button>` : ''}
+    </div>
+    ${consumosMostrados.length===0 ? `<p class="empty">${sinFiltro ? 'Sin consumos todavia.' : 'Sin consumos en ese periodo.'}</p>` : consumosMostrados.map(c=>{
       const nombreBebida = c.bebida_nombre || '-';
       return `<div class="list-item">
 
@@ -1973,55 +2220,6 @@ function renderBebidasConsumo(){
         </div>
       </div>`;
     }).join('')}
-  </div>`;
-}
-
-function renderBebidasFiestas(){
-  const gastos = [...state.fiestas_gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  return `
-  <div class="card">
-    <h2><span class="pin"></span>Gasto en bebida para una fiesta</h2>
-    <form data-form="add-fiesta-gasto">
-      <div class="form-row">
-
-        <div><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Fiestas del pueblo, San Juan..."></div>
-
-        <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
-      </div>
-      <div class="form-row">
-
-        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Barril de cerveza 30L, agua, refrescos..."></div>
-
-        <div><label class="f">Importe (EUR)</label><input type="number" step="0.01" min="0" name="importe" required></div>
-      </div>
-      <button class="btn" type="submit">Anadir gasto</button>
-    </form>
-  </div>
-  <div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Gastos de fiestas <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- total: ${money(totalFiestasGasto())}</span></span>
-      <button class="btn ghost small" data-action="export-fiestas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
-    </h2>
-    ${gastos.length===0 ? '<p class="empty">Sin gastos de fiestas todavia.</p>' : gastos.map(g=>`
-      <div class="list-item">
-
-        <div>
-
-          <div style="font-weight:600;">${escapeHtml(g.concepto)}</div>
-
-          <div class="meta"><span class="tag">${escapeHtml(g.evento)}</span> ${fmtDate(g.fecha)}</div>
-
-        </div>
-
-        <div style="display:flex; align-items:center; gap:10px;">
-
-          <span style="font-family:'JetBrains Mono',monospace; color:var(--rust); font-weight:600;">- ${money(g.importe)}</span>
-
-          <button class="btn danger small" data-action="delete-fiesta-gasto" data-id="${g.id}">Borrar</button>
-
-        </div>
-      </div>
-    `).join('')}
   </div>`;
 }
 
@@ -2272,6 +2470,69 @@ function renderPerfilSocio(sid){
   `;
 }
 
+/* ============ CHAT ============ */
+function renderChatPanel(){
+  if(!chatAbierto) return '';
+  return `<div class="bell-backdrop" data-action="cerrar-chat"></div>
+  <div class="chat-dropdown">
+    <div class="chat-dropdown-header">
+      <b>Chat de socios</b>
+      <button class="help-close" data-action="cerrar-chat" title="Cerrar">&times;</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      ${chatMensajes.length===0 ? '<p class="empty">Todavia no hay mensajes. Escribe el primero!</p>' : chatMensajes.map(renderChatMsg).join('')}
+    </div>
+    <div class="chat-compose-wrap">
+      ${emojiPickerAbierto ? renderEmojiPicker() : ''}
+      <form id="chat-compose-form" data-form="send-chat" class="chat-compose">
+        ${chatArchivoSeleccionado ? `<div class="chat-attach-preview">
+          <span class="chat-attach-name">📎 ${escapeHtml(chatArchivoSeleccionado.name)}</span>
+          <button type="button" class="chat-attach-remove" data-action="quitar-adjunto-chat" title="Quitar adjunto">&times;</button>
+        </div>` : ''}
+        <textarea id="chat-input" name="texto" placeholder="Escribe un mensaje..." rows="1" maxlength="2000"></textarea>
+        <div class="chat-compose-row">
+          <button type="button" class="chat-tool-btn" data-action="toggle-emoji-picker" title="Emoticonos">${toolIcon(SMILE_ICON_PATH)}</button>
+          <button type="button" class="chat-tool-btn" data-action="chat-attach-click" title="Adjuntar archivo">${toolIcon(PAPERCLIP_ICON_PATH)}</button>
+          <span class="chat-compose-spacer"></span>
+          <button type="submit" class="btn">Enviar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <input type="file" id="chat-file-input" accept="image/*,.pdf" style="display:none;">`;
+}
+function renderEmojiPicker(){
+  return `<div class="emoji-picker-backdrop" data-action="cerrar-emoji"></div>
+  <div class="emoji-picker">
+    ${EMOJIS_CHAT.map(em=>`<button type="button" class="emoji-btn" data-action="insertar-emoji" data-emoji="${em}">${em}</button>`).join('')}
+  </div>`;
+}
+function renderChatMsg(m){
+  const mine = state && m.socio_id===state.current_user;
+  const url = m.archivo ? `/static/chat/${m.id}.${m.archivo_ext||'jpg'}?v=${ticketVersion}` : null;
+  const adjunto = !m.archivo ? '' : (m.archivo_ext==='pdf'
+    ? `<button type="button" class="link-btn chat-attach-link" data-action="ver-adjunto" data-url="${url}" data-tipo="pdf">📄 Ver PDF adjunto</button>`
+    : `<button type="button" class="chat-msg-img-btn" data-action="ver-adjunto" data-url="${url}" data-tipo="jpg"><img src="${url}" class="chat-msg-img" alt="Adjunto"></button>`);
+  const editando = mine && String(editandoMensajeId)===String(m.id);
+  const cuerpo = editando
+    ? `<form data-form="edit-chat-msg" data-id="${m.id}" class="chat-edit-form">
+        <textarea name="texto" class="chat-edit-textarea" maxlength="2000">${escapeHtml(m.texto)}</textarea>
+        <div class="chat-edit-actions">
+          <button type="button" class="btn ghost small" data-action="cancelar-editar-chat">Cancelar</button>
+          <button type="submit" class="btn small">Guardar</button>
+        </div>
+      </form>`
+    : (m.texto ? `<div class="chat-msg-text">${linkify(m.texto)}</div>` : '');
+  return `<div class="chat-msg ${mine?'mine':'theirs'}" data-id="${m.id}">
+    ${!mine ? `<div class="chat-msg-autor" style="color:${chatNombreColor(m.socio_id)};">${escapeHtml(m.socio_nombre||'-')}</div>` : ''}
+    <div class="chat-msg-bubble">
+      ${adjunto}
+      ${cuerpo}
+      ${editando ? '' : `<div class="chat-msg-meta">${fmtHoraCorta(m.creado_en)}${m.editado?' <span class="chat-msg-edited">(editado)</span>':''}${mine?` <button type="button" class="chat-msg-edit" data-action="editar-chat-msg" data-id="${m.id}" title="Editar mensaje">${miniIcon(PENCIL_ICON_PATH)}</button> <button type="button" class="chat-msg-del" data-action="delete-chat-msg" data-id="${m.id}" title="Borrar mensaje">&times;</button>`:''}</div>`}
+    </div>
+  </div>`;
+}
+
 /* ============ EVENTOS: clicks ============ */
 document.addEventListener('click', async (e)=>{
   const btn = e.target.closest('[data-action]');
@@ -2288,7 +2549,7 @@ document.addEventListener('click', async (e)=>{
       pendingLoginId = null;
       render();
     }
-    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; loginSearchQuery = ''; alertasAbiertas = false; viendoSocioId = null; await loadState(); render(); }
+    else if(action==='logout'){ await apiPost('/api/logout'); pendingLoginId = null; loginSearchQuery = ''; alertasAbiertas = false; viendoSocioId = null; stopChatPolling(); await loadState(); render(); }
     else if(action==='ver-socio'){ viendoSocioId = btn.dataset.id; activeTab = 'perfil'; render(); }
     else if(action==='volver-mi-perfil'){ viendoSocioId = null; render(); }
     else if(action==='edit-club-name'){
@@ -2318,12 +2579,64 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='switch-tab'){ activeTab = btn.dataset.tab; viendoSocioId = null; render(); }
-    else if(action==='bebidas-subtab'){ bebidasSubtab = btn.dataset.sub; render(); }
+    else if(action==='toggle-chat'){
+      chatAbierto = !chatAbierto;
+      if(chatAbierto) alertasAbiertas = false;
+      render();
+      if(chatAbierto){
+        if(chatMensajes.length===0){ await loadChatInicial(); render(); }
+        chatIrAlFinalYMarcar();
+      }
+    }
+    else if(action==='cerrar-chat'){ chatAbierto = false; emojiPickerAbierto = false; render(); }
+    else if(action==='delete-chat-msg'){
+      if(!confirm('Borrar este mensaje?')) return;
+      await apiDelete(`/api/chat/${btn.dataset.id}`);
+      chatMensajes = chatMensajes.filter(m=>String(m.id)!==String(btn.dataset.id));
+      const el = document.querySelector(`.chat-msg[data-id="${btn.dataset.id}"]`);
+      if(el) el.remove();
+    }
+    else if(action==='editar-chat-msg'){
+      editandoMensajeId = btn.dataset.id;
+      rerenderChatMsg(btn.dataset.id);
+      const ta = document.querySelector(`.chat-msg[data-id="${btn.dataset.id}"] .chat-edit-textarea`);
+      if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    else if(action==='cancelar-editar-chat'){
+      const id = editandoMensajeId;
+      editandoMensajeId = null;
+      if(id) rerenderChatMsg(id);
+    }
+    else if(action==='toggle-emoji-picker'){ emojiPickerAbierto = !emojiPickerAbierto; render(); }
+    else if(action==='cerrar-emoji'){ emojiPickerAbierto = false; render(); }
+    else if(action==='insertar-emoji'){
+      const ta = document.getElementById('chat-input');
+      const emoji = btn.dataset.emoji;
+      if(ta){
+        const start = ta.selectionStart ?? ta.value.length;
+        const end = ta.selectionEnd ?? ta.value.length;
+        ta.value = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+        const pos = start + emoji.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      }
+    }
+    else if(action==='chat-attach-click'){
+      const input = document.getElementById('chat-file-input');
+      if(input) input.click();
+    }
+    else if(action==='quitar-adjunto-chat'){
+      chatArchivoSeleccionado = null;
+      const input = document.getElementById('chat-file-input');
+      if(input) input.value = '';
+      render();
+    }
+    else if(action==='limpiar-filtro-consumos'){ consumosFiltroAnio='todos'; consumosFiltroMes='todos'; consumosFiltroDia='todos'; render(); }
     else if(action==='cuota-year'){ cuotasYear += Number(btn.dataset.dir); render(); }
     else if(action==='resumen-grafico-year'){ resumenGraficoYear += Number(btn.dataset.dir); render(); }
     else if(action==='export-log-eventos'){ exportarLogEventos(); }
     else if(action==='toggle-ayuda'){ ayudaAbierta = !ayudaAbierta; render(); }
-    else if(action==='toggle-alertas'){ alertasAbiertas = !alertasAbiertas; render(); }
+    else if(action==='toggle-alertas'){ alertasAbiertas = !alertasAbiertas; if(alertasAbiertas) chatAbierto = false; render(); }
     else if(action==='cerrar-alertas'){ alertasAbiertas = false; render(); }
     else if(action==='ir-a-alerta'){ activeTab = btn.dataset.tab; alertasAbiertas = false; viendoSocioId = null; render(); }
     else if(action==='ver-adjunto'){ adjuntoAbierto = {url: btn.dataset.url, tipo: btn.dataset.tipo}; render(); }
@@ -2478,19 +2791,6 @@ document.addEventListener('click', async (e)=>{
       }
       enviarWhatsapp(texto);
     }
-    else if(action==='export-fiestas-whatsapp'){
-      const gastos = [...(state.fiestas_gastos||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-      const porEvento = {};
-      gastos.forEach(g=>{ porEvento[g.evento] = (porEvento[g.evento]||0) + Number(g.importe||0); });
-      let texto = `*Gastos de bebida en fiestas* - ${fmtDate(todayISO())}\n\n`;
-      if(gastos.length){
-        texto += Object.keys(porEvento).map(ev=>`- ${ev}: ${money(porEvento[ev])}`).join('\n');
-        texto += `\n\n*Total: ${money(totalFiestasGasto())}*`;
-      } else {
-        texto += 'Todavia no hay gastos de fiestas registrados.';
-      }
-      enviarWhatsapp(texto);
-    }
     else if(action==='export-gastos-socios-whatsapp'){
       const pendientes = gastosSociosPendientes();
       let texto = `*Gastos e ingresos de socios* - ${fmtDate(todayISO())}\n\n`;
@@ -2506,7 +2806,7 @@ document.addEventListener('click', async (e)=>{
       const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
       const filtrados = cajaMesFiltro==='todos' ? ordenados : ordenados.filter(m=>m.fecha && m.fecha.slice(0,7)===cajaMesFiltro);
       let texto = `*Movimientos${cajaMesFiltro==='todos'?'':' - '+labelMes(cajaMesFiltro)}* - ${fmtDate(todayISO())}\n\n`;
-      texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}${money(m.importe)} - ${m.concepto} (${m.categoria})${m.socio_id?' - '+socioNombre(m.socio_id):''} - ${fmtDate(m.fecha)}`).join('\n') : 'Sin movimientos.';
+      texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}${money(m.importe)} - ${m.concepto} (${m.categoria})${m.socio_id?' - '+socioNombre(m.socio_id):(m.no_socio_nombre?' - '+m.no_socio_nombre:'')} - ${fmtDate(m.fecha)}`).join('\n') : 'Sin movimientos.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-cuentas-whatsapp'){
@@ -2514,14 +2814,59 @@ document.addEventListener('click', async (e)=>{
       const gastosTotales = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
       const saldo = ingresosTotales - gastosTotales;
       let texto = `*Cuentas de la pena* - ${fmtDate(todayISO())}\n\n`;
-      texto += `Cuotas: ${money(totalIngresosCuotas())}\n`;
-      texto += `Otros ingresos: ${money(totalIngresosMov())}\n`;
-      texto += `Bebidas: ${money(totalBebidasIngreso())}\n`;
-      texto += `Ingresos de socios (verificados): ${money(totalIngresosSociosVerificados())}\n`;
-      texto += `Gastos generales: -${money(totalGastosMov())}\n`;
-      texto += `Gastos de fiestas: -${money(totalFiestasGasto())}\n`;
-      texto += `Gastos de socios (verificados): -${money(totalGastosSociosVerificados())}\n\n`;
-      texto += `*Saldo neto: ${saldo<0?'-':'+'}${money(Math.abs(saldo))}*`;
+
+      const cuotasPagadas = state.cuotas.filter(c=>c.pagado)
+        .sort((a,b)=> (b.year-a.year) || (b.month-a.month) || socioNombre(a.socio_id).localeCompare(socioNombre(b.socio_id)));
+      texto += `*Cuotas* (${money(totalIngresosCuotas())})\n`;
+      texto += cuotasPagadas.length
+        ? cuotasPagadas.map(c=>`- ${socioNombre(c.socio_id)} - ${MESES[c.month-1]} ${c.year}: ${money(c.importe)}`).join('\n')
+        : 'Sin cuotas pagadas.';
+      texto += '\n\n';
+
+      const bebidasPagadas = [...state.bebidas_consumos].filter(c=>c.pagado).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      texto += `*Bebidas* (${money(totalBebidasIngreso())})\n`;
+      texto += bebidasPagadas.length
+        ? bebidasPagadas.map(c=>`- ${c.consumidor} - ${c.cantidad} x ${c.bebida_nombre||'bebida'} - ${fmtDate(c.fecha)}: ${money(c.importe)}`).join('\n')
+        : 'Sin consumos pagados.';
+      texto += '\n\n';
+
+      const movsOrdenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const otrosIngresos = movsOrdenados.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios');
+      texto += `*Otros ingresos* (${money(totalIngresosMov())})\n`;
+      texto += otrosIngresos.length
+        ? otrosIngresos.map(m=>`- ${fmtDate(m.fecha)} - ${m.concepto} (${m.categoria}): ${money(m.importe)}`).join('\n')
+        : 'Sin otros ingresos.';
+      texto += '\n\n';
+
+      const ingresosSocios = movsOrdenados.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso');
+      texto += `*Ingresos de socios* (${money(totalIngresosSociosVerificados())})\n`;
+      texto += ingresosSocios.length
+        ? ingresosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - ${fmtDate(m.fecha)}: ${money(m.importe)}`).join('\n')
+        : 'Sin ingresos de socios verificados.';
+      texto += '\n\n';
+
+      const gastosSocios = movsOrdenados.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso');
+      texto += `*Gastos de socios* (-${money(totalGastosSociosVerificados())})\n`;
+      texto += gastosSocios.length
+        ? gastosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - ${fmtDate(m.fecha)}: -${money(m.importe)}`).join('\n')
+        : 'Sin gastos de socios verificados.';
+      texto += '\n\n';
+
+      const fiestasGastos = [...state.fiestas_gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      texto += `*Gastos de fiestas* (-${money(totalFiestasGasto())})\n`;
+      texto += fiestasGastos.length
+        ? fiestasGastos.map(f=>`- ${f.evento} - ${f.concepto} - ${fmtDate(f.fecha)}: -${money(f.importe)}`).join('\n')
+        : 'Sin gastos de fiestas.';
+      texto += '\n\n';
+
+      const gastosGenerales = movsOrdenados.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios');
+      texto += `*Gastos generales* (-${money(totalGastosMov())})\n`;
+      texto += gastosGenerales.length
+        ? gastosGenerales.map(m=>`- ${fmtDate(m.fecha)} - ${m.concepto} (${m.categoria}): -${money(m.importe)}`).join('\n')
+        : 'Sin gastos generales.';
+      texto += '\n\n';
+
+      texto += `*Saldo total: ${saldo<0?'-':'+'}${money(Math.abs(saldo))}*`;
       const pendientes = gastosSociosPendientes();
       if(pendientes.length){
         texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavia al saldo.`;
@@ -2626,15 +2971,36 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-bebida-precio'){
       if(confirm('Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='add-categoria-mov-inline'){
+      const nombre = prompt('Nueva categoria:');
+      if(!nombre || !nombre.trim()) return;
+      try{
+        await apiPost('/api/categorias-movimiento', {nombre: nombre.trim()});
+      }catch(err){ alert(err.message || 'No se pudo anadir la categoria.'); return; }
+      await loadState();
+      render();
+      const sel = document.querySelector('form[data-form="add-movimiento"] [name=categoria]');
+      if(sel) sel.value = nombre.trim();
+    }
+    else if(action==='delete-categoria-mov-inline'){
+      const form = btn.closest('form');
+      const sel = form ? form.querySelector('[name=categoria]') : null;
+      if(!sel || !sel.value) return;
+      const categoria = (state.categorias_movimiento||[]).find(c=>c.nombre===sel.value);
+      if(!categoria) return;
+      if(!confirm(`Borrar la categoria "${sel.value}"?`)) return;
+      try{
+        await apiDelete(`/api/categorias-movimiento/${categoria.id}`);
+      }catch(err){ alert(err.message || 'No se pudo borrar la categoria.'); return; }
+      await loadState();
+      render();
+    }
     else if(action==='delete-consumo'){
       if(confirm('Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='toggle-consumo-pagado'){
       await apiPost(`/api/bebidas/consumos/${btn.dataset.id}/pagado`);
       await loadState(); render();
-    }
-    else if(action==='delete-fiesta-gasto'){
-      if(confirm('Borrar este gasto?')){ await apiDelete(`/api/fiestas/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-reserva'){
       if(confirm('Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
@@ -2770,6 +3136,17 @@ document.addEventListener('input', (e)=>{
 });
 
 document.addEventListener('change', async (e)=>{
+  if(e.target.id==='chat-file-input'){
+    const file = e.target.files[0];
+    if(file){
+      chatArchivoSeleccionado = file;
+      emojiPickerAbierto = false;
+      render();
+      const ta = document.getElementById('chat-input');
+      if(ta) ta.focus();
+    }
+    return;
+  }
   if(e.target.id==='cuota-mes-movil'){
     cuotasMesMovil = Number(e.target.value);
     render();
@@ -2783,6 +3160,14 @@ document.addEventListener('change', async (e)=>{
   if(e.target.id==='caja-mes-filtro'){
     cajaMesFiltro = e.target.value;
     render();
+    return;
+  }
+  if(e.target.id==='consumos-filtro-anio'){ consumosFiltroAnio = e.target.value; render(); return; }
+  if(e.target.id==='consumos-filtro-mes'){ consumosFiltroMes = e.target.value; render(); return; }
+  if(e.target.id==='consumos-filtro-dia'){ consumosFiltroDia = e.target.value; render(); return; }
+  if(e.target.name==='socio_id' && e.target.form && (e.target.form.dataset.form==='add-movimiento' || e.target.form.dataset.form==='edit-movimiento')){
+    const noSocioInput = e.target.form.querySelector('[name=no_socio_nombre]');
+    if(noSocioInput) noSocioInput.style.display = e.target.value ? 'none' : '';
     return;
   }
   if(e.target.name==='consumidorTipo'){
@@ -2874,6 +3259,7 @@ document.addEventListener('submit', async (e)=>{
       saveFavoriteUser(pendingLoginId);
       pendingLoginId = null;
       await loadState(); activeTab='resumen'; render();
+      await chatOnLogin();
       return;
     }
     else if(type==='force-pin'){
@@ -2881,6 +3267,51 @@ document.addEventListener('submit', async (e)=>{
       if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 digitos.'); return; }
       await apiPost('/api/perfil/pin', {pin: data.pin});
       await loadState(); activeTab='resumen'; render();
+      await chatOnLogin();
+      return;
+    }
+    else if(type==='send-chat'){
+      const texto = (data.texto||'').trim();
+      const archivo = chatArchivoSeleccionado;
+      if(!texto && !archivo) return;
+      let msg;
+      try{
+        msg = await apiPost('/api/chat', {texto, con_archivo: !!archivo});
+      }catch(err){ alert(err.message || 'No se pudo enviar el mensaje.'); return; }
+      if(archivo){
+        try{
+          const r = await uploadChatArchivo(msg.id, archivo);
+          msg.archivo = 1;
+          msg.archivo_ext = r.ext;
+        }catch(err){ alert(err.message || 'No se pudo subir el archivo adjunto.'); }
+      }
+      chatMensajes.push(msg);
+      chatLastId = Math.max(chatLastId, msg.id);
+      chatArchivoSeleccionado = null;
+      emojiPickerAbierto = false;
+      const fileInput = document.getElementById('chat-file-input');
+      if(fileInput) fileInput.value = '';
+      const preview = document.querySelector('.chat-attach-preview');
+      if(preview) preview.remove();
+      const picker = document.querySelector('.emoji-picker');
+      if(picker) picker.remove();
+      const pickerBackdrop = document.querySelector('.emoji-picker-backdrop');
+      if(pickerBackdrop) pickerBackdrop.remove();
+      form.reset();
+      appendChatMensajesDom([msg]);
+      chatIrAlFinalYMarcar();
+      return;
+    }
+    else if(type==='edit-chat-msg'){
+      const id = form.dataset.id;
+      const texto = (data.texto||'').trim();
+      try{
+        const updated = await apiPatch(`/api/chat/${id}`, {texto});
+        const idx = chatMensajes.findIndex(m=>String(m.id)===String(id));
+        if(idx>-1) chatMensajes[idx] = updated;
+      }catch(err){ alert(err.message || 'No se pudo editar el mensaje.'); return; }
+      editandoMensajeId = null;
+      rerenderChatMsg(id);
       return;
     }
     else if(type==='add-socio'){
@@ -2924,11 +3355,9 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='add-bebida-precio'){ await apiPost('/api/bebidas/precios', data); }
     else if(type==='add-consumo'){
-      data.es_socio = data.consumidorTipo==='socio';
-      data.pagado = form.querySelector('[name=pagado]').checked;
+      data.es_socio = data.consumidorTipo ? data.consumidorTipo==='socio' : true;
       await apiPost('/api/bebidas/consumos', data);
     }
-    else if(type==='add-fiesta-gasto'){ await apiPost('/api/fiestas', data); }
     else if(type==='add-reserva'){ await apiPost('/api/reservas', data); }
     else if(type==='add-lista-compra'){ await apiPost('/api/listas-compra', data); }
     else if(type==='add-item-compra'){
@@ -2974,7 +3403,16 @@ document.addEventListener('submit', async (e)=>{
 
     await loadState();
     render();
+    if(state && state.current_user) chatOnLogin();
   }catch(err){ alert(err.message || 'Ha ocurrido un error'); }
+});
+
+document.addEventListener('keydown', (e)=>{
+  if(e.target && e.target.id==='chat-input' && e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    const form = document.getElementById('chat-compose-form');
+    if(form) form.requestSubmit();
+  }
 });
 
 /* ============ actualizacion en segundo plano (casi tiempo real) ============ */
@@ -3068,12 +3506,25 @@ function initPullToRefresh(){
 /* ============ INIT ============ */
 (async function init(){
   render();
+  initChatToastContainer();
   await loadBackgroundImages();
   initBackgroundSlideshow();
   initScrollTopButton();
   initPullToRefresh();
   await loadState();
   render();
+  if(state && state.current_user){
+    await loadChatInicial();
+    updateChatBadge();
+    const n = chatUnreadCount();
+    if(n===1){
+      const ultimoDeOtro = [...chatMensajes].reverse().find(m=>m.socio_id!==state.current_user);
+      if(ultimoDeOtro) showChatToast(ultimoDeOtro);
+    } else if(n>1){
+      showChatToast({socio_nombre:'Chat de socios', texto:`${n} mensajes nuevos`});
+    }
+    startChatPolling();
+  }
 })();
 
 document.addEventListener('click', async (e)=>{

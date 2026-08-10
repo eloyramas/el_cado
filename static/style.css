@@ -49,25 +49,6 @@ body.bg-hidden .bg-overlay{
 }
 button{font-family:inherit; cursor:pointer;}
 input,select,textarea{font-family:inherit; font-size:0.95rem;}
-
-@media(max-width:720px){
-  .container{padding:0 10px 60px;}
-  .masthead{padding:20px 12px 16px;}
-  .masthead h1{font-size:2rem;}
-  .masthead .logo-row{gap:10px;}
-  .header-panel{margin:10px 0 14px; border-radius:14px;}
-  .card{padding:14px; margin-bottom:14px;}
-  .card h2{font-size:1.4rem;}
-  .form-row{gap:8px;}
-  .form-row > *{min-width:100%;}
-  .user-bar{flex-wrap:wrap; justify-content:center;}
-  /* evita que iOS haga zoom automatico al enfocar un campo */
-  input[type=text],input[type=number],input[type=date],input[type=tel],
-  input[type=password],input[type=time],select,textarea{font-size:16px;}
-  .btn.small{padding:8px 12px; font-size:0.8rem;}
-  .cuota-cell{width:32px; height:32px;}
-}
-input,select,textarea{font-family:inherit; font-size:0.95rem;}
 .container{max-width:900px; margin:0 auto; padding:0 16px 80px;}
 
 .header-panel{
@@ -191,12 +172,12 @@ input,select,textarea{font-family:inherit; font-size:0.95rem;}
 .stat{
   background:var(--bg-panel-2); border-radius:10px; padding:16px; text-align:center;
 }
-.stat .n{font-family:'JetBrains Mono',monospace; font-size:1.7rem; font-weight:600; color:var(--amber);}
+.stat .n{font-family:'JetBrains Mono',monospace; font-size:1.7rem; font-weight:600; color:var(--amber); white-space:nowrap;}
 .stat.rust .n{color:var(--rust);}
 .stat.sage .n{color:var(--sage);}
 .stat .l{font-size:0.76rem; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;}
 .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;}
-@media(max-width:600px){.stat-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.stat-grid{grid-template-columns:1fr 1fr;} .stat{padding:12px 8px;} .stat .n{font-size:1.3rem;}}
 
 /* graficas de ingresos/gastos */
 .chart-legend{display:flex; gap:16px; margin-bottom:8px; font-size:0.8rem; color:var(--chalk-dim);}
@@ -224,9 +205,11 @@ input,select,textarea{font-family:inherit; font-size:0.95rem;}
 /* forms */
 .form-row{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;}
 .form-row > *{flex:1; min-width:120px;}
+.field-fecha{flex:0 0 160px; min-width:0;}
+.field-ancho{flex:2; min-width:180px;}
 label.f{display:block; font-size:0.74rem; color:var(--chalk-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.4px;}
 input[type=text],input[type=number],input[type=date],input[type=tel],select,textarea{
-  width:100%; background:var(--bg-deep); border:1px solid var(--line); color:var(--chalk);
+  width:100%; min-width:0; max-width:100%; background:var(--bg-deep); border:1px solid var(--line); color:var(--chalk);
   border-radius:6px; padding:9px 10px; outline:none;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--amber-dim);}
@@ -243,6 +226,9 @@ textarea{resize:vertical; min-height:60px;}
 .btn.danger:hover{background:rgba(193,85,58,0.12);}
 
 /* lists */
+.consumos-filtro{display:flex; flex-wrap:wrap; gap:8px; padding:0 0 10px;}
+.consumos-filtro select{width:auto; flex:1 1 100px; min-width:90px;}
+.consumos-filtro .btn{flex:none;}
 .list-item{
   display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:10px;
   padding:10px 0; border-bottom:1px solid var(--line); max-width:100%;
@@ -539,6 +525,109 @@ body.no-scroll{overflow:hidden;}
 .cuota-cell[disabled]{opacity:0.45; cursor:default;}
 .cuota-cell.mine{border-color:var(--amber-dim);}
 
+/* ---------- chat de socios (panel desplegable junto a la campana) ---------- */
+.chat-dropdown{
+  position:fixed; top:76px; right:20px; width:380px; max-width:92vw; max-height:76vh;
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+  padding:14px; box-shadow:0 16px 48px rgba(0,0,0,0.4); z-index:30;
+  display:flex; flex-direction:column;
+}
+.chat-dropdown-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex:none;}
+@media(max-width:600px){
+  .chat-dropdown{
+    top:auto; bottom:0; left:10px; right:10px; width:auto; max-width:none;
+    border-radius:14px 14px 0 0; max-height:82vh;
+  }
+}
+.chat-messages{
+  flex:1; min-height:160px; display:flex; flex-direction:column; gap:10px;
+  overflow-y:auto; padding:6px 4px; margin-bottom:12px;
+  background:var(--bg-panel-2); border:1px solid var(--line); border-radius:10px;
+}
+.chat-msg{display:flex; flex-direction:column; max-width:82%; padding:0 8px;}
+.chat-msg.mine{align-self:flex-end; align-items:flex-end;}
+.chat-msg.theirs{align-self:flex-start; align-items:flex-start;}
+.chat-msg-autor{font-size:0.74rem; font-weight:700; margin:4px 2px 2px;}
+.chat-msg-bubble{
+  background:var(--bg-raised); border:1px solid var(--line); border-radius:14px;
+  padding:8px 12px; font-size:0.9rem;
+}
+.chat-msg.mine .chat-msg-bubble{background:var(--amber-dim); border-color:var(--amber-dim); color:#fff;}
+.chat-msg-text{white-space:pre-wrap; overflow-wrap:anywhere;}
+.chat-msg-meta{
+  display:flex; align-items:center; justify-content:flex-end; gap:4px;
+  font-size:0.66rem; color:var(--chalk-dim); opacity:0.8; margin-top:3px;
+}
+.chat-msg.mine .chat-msg-meta{color:rgba(255,255,255,0.85); opacity:1;}
+.chat-msg-del{
+  background:none; border:none; color:inherit; font-size:0.95rem; line-height:1;
+  padding:2px 3px; margin:-2px -3px -2px 0; cursor:pointer; opacity:0.85;
+}
+.chat-msg-del:hover{color:var(--rust); opacity:1;}
+.chat-msg-edit{
+  background:none; border:none; color:inherit; line-height:1;
+  padding:2px 3px; cursor:pointer; opacity:0.85; display:inline-flex; align-items:center;
+}
+.chat-msg-edit:hover{color:var(--amber); opacity:1;}
+.chat-msg.mine .chat-msg-edit:hover{color:#fff; opacity:1;}
+.chat-msg-edited{font-style:italic;}
+.chat-edit-form{width:220px; max-width:60vw;}
+.chat-edit-textarea{
+  width:100%; box-sizing:border-box; min-height:60px; max-height:160px; resize:vertical;
+  font-size:0.9rem; font-family:inherit;
+}
+.chat-edit-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px;}
+.chat-msg-img-btn{background:none; border:none; padding:0; cursor:pointer; display:block; margin-bottom:6px;}
+.chat-msg-img{max-width:100%; max-height:220px; border-radius:10px; display:block;}
+.chat-attach-link{color:var(--amber); font-size:0.85rem; margin-bottom:6px; display:inline-block;}
+.chat-compose-wrap{position:relative; flex:none;}
+.chat-compose{display:flex; flex-direction:column; gap:8px; flex:none;}
+.chat-compose textarea{width:100%; box-sizing:border-box; min-height:42px; max-height:120px; resize:none;}
+.chat-compose-row{display:flex; gap:8px; align-items:center;}
+.chat-compose-spacer{flex:1;}
+.chat-compose .btn{flex:none;}
+.chat-tool-btn{
+  flex:none; background:none; border:1px solid var(--line); border-radius:10px;
+  width:34px; height:34px; cursor:pointer; color:var(--chalk);
+  display:flex; align-items:center; justify-content:center;
+}
+.chat-tool-btn:hover{background:var(--bg-raised);}
+.chat-attach-preview{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px;
+  padding:6px 10px; font-size:0.82rem;
+}
+.chat-attach-name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.chat-attach-remove{
+  background:none; border:none; color:var(--chalk-dim); font-size:1rem; line-height:1; padding:0; cursor:pointer; flex:none;
+}
+.chat-attach-remove:hover{color:var(--rust);}
+.emoji-picker-backdrop{position:fixed; inset:0; z-index:31;}
+.emoji-picker{
+  position:absolute; bottom:100%; left:0; right:0; margin-bottom:8px; z-index:32;
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 12px 32px rgba(0,0,0,0.4); padding:8px;
+  display:grid; grid-template-columns:repeat(8, 1fr); gap:2px; max-height:180px; overflow-y:auto;
+}
+.emoji-btn{
+  background:none; border:none; font-size:1.3rem; line-height:1; padding:6px 0; cursor:pointer; border-radius:6px;
+}
+.emoji-btn:hover{background:var(--bg-raised);}
+
+.chat-toast-container{
+  position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:95;
+  display:flex; flex-direction:column; gap:8px; width:min(360px, 92vw); pointer-events:none;
+}
+.chat-toast{
+  pointer-events:auto; cursor:pointer; background:var(--bg-panel); border:1px solid var(--amber-dim);
+  border-radius:12px; padding:10px 14px; box-shadow:0 14px 34px rgba(0,0,0,0.4);
+  display:flex; flex-direction:column; gap:2px;
+  opacity:0; transform:translateY(-14px); transition:opacity 0.25s ease, transform 0.25s ease;
+}
+.chat-toast.visible{opacity:1; transform:translateY(0);}
+.chat-toast b{color:var(--amber); font-size:0.84rem;}
+.chat-toast span{color:var(--chalk); font-size:0.82rem; overflow-wrap:anywhere;}
+
 /* calendario de tareas */
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
 .cal-weekday{font-size:0.68rem; color:var(--chalk-dim); text-align:center; padding:4px 0; text-transform:uppercase; letter-spacing:0.3px;}
@@ -674,7 +763,7 @@ body.no-scroll{overflow:hidden;}
 .socio-row-avatar{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
 
 @media(max-width:380px){
-  .stat .n{font-size:1.4rem;}
+  .stat .n{font-size:1.1rem;}
   .menu-row{flex-wrap:wrap;}
   .menu-row .dots{display:none;}
   .menu-row .value{margin-left:auto;}
@@ -695,3 +784,23 @@ body.no-scroll{overflow:hidden;}
 .permisos-dropdown summary::before{content:'\25B8 '; color:var(--amber);}
 .permisos-dropdown[open] summary::before{content:'\25BE '; color:var(--amber);}
 .permisos-dropdown .role-options{padding:0 12px 12px;}
+
+/* ---------- ajustes moviles (van al final a proposito: si no, reglas base
+   mas abajo en el archivo con la misma especificidad las pisarian) ---------- */
+@media(max-width:720px){
+  .container{padding:0 10px 60px;}
+  .masthead{padding:20px 12px 16px;}
+  .masthead h1{font-size:2rem;}
+  .masthead .logo-row{gap:10px;}
+  .header-panel{margin:10px 0 14px; border-radius:14px;}
+  .card{padding:14px; margin-bottom:14px;}
+  .card h2{font-size:1.4rem;}
+  .form-row{gap:8px;}
+  .form-row > *{min-width:0; width:100%; flex-basis:100%;}
+  .user-bar{flex-wrap:wrap; justify-content:center;}
+  /* evita que iOS haga zoom automatico al enfocar un campo */
+  input[type=text],input[type=number],input[type=date],input[type=tel],
+  input[type=password],input[type=time],select,textarea{font-size:16px;}
+  .btn.small{padding:8px 12px; font-size:0.8rem;}
+  .cuota-cell{width:32px; height:32px;}
+}

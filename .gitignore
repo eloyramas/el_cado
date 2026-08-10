@@ -12,3 +12,4 @@ server.log
 *.xlsx
 static/avatars/*.jpg
 !static/avatars/.gitkeep
+static/chat/

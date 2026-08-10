@@ -52,6 +52,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "pena.db")))
 AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
 TICKETS_DIR = os.path.abspath(os.environ.get("TICKETS_DIR", os.path.join(BASE_DIR, "static", "tickets")))
+CHAT_DIR = os.path.abspath(os.environ.get("CHAT_DIR", os.path.join(BASE_DIR, "static", "chat")))
 
 app = Flask(__name__)
 # En produccion, define la variable de entorno SECRET_KEY con un valor propio.
@@ -151,8 +152,13 @@ CREATE TABLE IF NOT EXISTS movimientos (
     importe REAL NOT NULL,
     fecha TEXT NOT NULL,
     socio_id TEXT,
+    no_socio_nombre TEXT DEFAULT '',
     ticket INTEGER NOT NULL DEFAULT 0,
     ticket_ext TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS categorias_movimiento (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS bebidas_precios (
     id TEXT PRIMARY KEY,
@@ -282,6 +288,16 @@ CREATE TABLE IF NOT EXISTS lista_compra_items (
     creado_en TEXT,
     FOREIGN KEY (lista_id) REFERENCES listas_compra(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS chat_mensajes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    socio_id TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    creado_en TEXT NOT NULL,
+    archivo INTEGER NOT NULL DEFAULT 0,
+    archivo_ext TEXT DEFAULT '',
+    editado INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE CASCADE
+);
 """
 
 
@@ -356,6 +372,28 @@ def init_db():
             db.execute("ALTER TABLE movimientos ADD COLUMN gasto_socio_id TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE chat_mensajes ADD COLUMN archivo INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE chat_mensajes ADD COLUMN archivo_ext TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE chat_mensajes ADD COLUMN editado INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE movimientos ADD COLUMN no_socio_nombre TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        if db.execute("SELECT COUNT(*) AS n FROM categorias_movimiento").fetchone()["n"] == 0:
+            for nombre in ("Alquiler", "Luz", "Agua", "Gas", "Mantenimiento", "Otros"):
+                db.execute(
+                    "INSERT OR IGNORE INTO categorias_movimiento (id, nombre) VALUES (?, ?)",
+                    (new_id(), nombre),
+                )
         # Migracion: actualizar tabla reuniones si existe con estructura antigua
         try:
             cur = db.execute("PRAGMA table_info(reuniones)")
@@ -676,6 +714,8 @@ def state():
     else:
         cuotas = []
 
+    categorias_movimiento = [dict(r) for r in db.execute("SELECT * FROM categorias_movimiento ORDER BY nombre")]
+
     reuniones = []
     for r in db.execute("SELECT * FROM reuniones ORDER BY fecha DESC"):
         asistentes = [
@@ -768,6 +808,7 @@ def state():
             "reuniones": reuniones,
             "inventario": inventario,
             "movimientos": movimientos,
+            "categorias_movimiento": categorias_movimiento,
             "bebidas_precios": bebidas_precios,
             "bebidas_consumos": bebidas_consumos,
             "fiestas_gastos": fiestas_gastos,
@@ -1258,6 +1299,36 @@ def delete_inventario(iid):
     return jsonify({"ok": True})
 
 
+# -------------------------------------------------------------- categorias de movimientos --
+@app.route("/api/categorias-movimiento", methods=["POST"])
+def add_categoria_movimiento():
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden gestionar las categorias.")
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre de la categoria es obligatorio.", 400)
+    db = get_db()
+    if db.execute("SELECT 1 FROM categorias_movimiento WHERE nombre = ?", (nombre,)).fetchone():
+        return err("Ya existe una categoria con ese nombre.", 400)
+    cid = new_id()
+    db.execute("INSERT INTO categorias_movimiento (id, nombre) VALUES (?, ?)", (cid, nombre))
+    db.commit()
+    return jsonify({"ok": True, "id": cid})
+
+
+@app.route("/api/categorias-movimiento/<cid>", methods=["DELETE"])
+def delete_categoria_movimiento(cid):
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden gestionar las categorias.")
+    db = get_db()
+    if db.execute("SELECT COUNT(*) AS n FROM categorias_movimiento").fetchone()["n"] <= 1:
+        return err("Tiene que quedar al menos una categoria.", 400)
+    db.execute("DELETE FROM categorias_movimiento WHERE id = ?", (cid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
 # -------------------------------------------------------------- movimientos (solo admin) --
 @app.route("/api/movimientos", methods=["POST"])
 def add_movimiento():
@@ -1269,9 +1340,10 @@ def add_movimiento():
     if socio_id:
         if not db.execute("SELECT 1 FROM socios WHERE id = ?", (socio_id,)).fetchone():
             return err("Socio no encontrado", 404)
+    no_socio_nombre = "" if socio_id else (data.get("no_socio_nombre") or "").strip()[:120]
     mid = new_id()
     db.execute(
-        "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha, socio_id) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha, socio_id, no_socio_nombre) VALUES (?,?,?,?,?,?,?,?)",
         (
             mid,
             data.get("tipo", "gasto"),
@@ -1280,6 +1352,7 @@ def add_movimiento():
             float(data.get("importe") or 0),
             data.get("fecha"),
             socio_id,
+            no_socio_nombre,
         ),
     )
     db.commit()
@@ -1298,8 +1371,9 @@ def update_movimiento(mid):
     if socio_id:
         if not db.execute("SELECT 1 FROM socios WHERE id = ?", (socio_id,)).fetchone():
             return err("Socio no encontrado", 404)
+    no_socio_nombre = "" if socio_id else (data.get("no_socio_nombre") or "").strip()[:120]
     db.execute(
-        "UPDATE movimientos SET tipo=?, categoria=?, concepto=?, importe=?, fecha=?, socio_id=? WHERE id=?",
+        "UPDATE movimientos SET tipo=?, categoria=?, concepto=?, importe=?, fecha=?, socio_id=?, no_socio_nombre=? WHERE id=?",
         (
             data.get("tipo", "gasto"),
             data.get("categoria", "Otros"),
@@ -1307,6 +1381,7 @@ def update_movimiento(mid):
             float(data.get("importe") or 0),
             data.get("fecha"),
             socio_id,
+            no_socio_nombre,
             mid,
         ),
     )
@@ -1402,7 +1477,8 @@ def delete_bebida_precio(bid):
 # -------------------------------------------------------------- bebidas: consumos --
 @app.route("/api/bebidas/consumos", methods=["POST"])
 def add_consumo():
-    if not require_login():
+    sid = require_login()
+    if not sid:
         return err("No has iniciado sesion.", 401)
     data = request.get_json(force=True)
     db = get_db()
@@ -1410,18 +1486,25 @@ def add_consumo():
     if not bebida:
         return err("Bebida no encontrada", 404)
 
-    es_socio = bool(data.get("es_socio"))
+    puede_gestionar = has_permission(sid, "manage_bebidas")
+    # Un socio sin el permiso de gestionar bebidas solo puede anotar su propio
+    # consumo: no puede elegir a otro socio ni anadir invitados.
+    es_socio = bool(data.get("es_socio")) if puede_gestionar else True
     cantidad = int(data.get("cantidad") or 1)
     socio_id = None
     if es_socio:
-        socio_id = data.get("socio_id") or None
+        socio_id = (data.get("socio_id") or None) if puede_gestionar else sid
         consumidor_row = db.execute("SELECT nombre FROM socios WHERE id = ?", (socio_id,)).fetchone()
-        consumidor = consumidor_row["nombre"] if consumidor_row else "Socio"
+        if not consumidor_row:
+            return err("Socio no encontrado", 404)
+        consumidor = consumidor_row["nombre"]
         precio_unit = bebida["precio_socio"]
     else:
         consumidor = (data.get("nombre_invitado") or "Invitado").strip()
         precio_unit = bebida["precio_no_socio"]
-    pagado = 1 if data.get("pagado", True) else 0
+    # Todo el consumo se acumula como deuda y se liquida por transferencia
+    # junto con la cuota (del 1 al 5 de cada mes): nunca se marca pagado al registrarlo.
+    pagado = 0
 
     cid = new_id()
     db.execute(
@@ -1444,12 +1527,17 @@ def delete_consumo(cid):
 
 @app.route("/api/bebidas/consumos/<cid>/pagado", methods=["POST"])
 def toggle_consumo_pagado(cid):
-    if not require_permission("manage_bebidas"):
-        return err("No tienes permiso para gestionar bebidas.")
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
     db = get_db()
-    row = db.execute("SELECT pagado FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
+    row = db.execute("SELECT pagado, socio_id FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
     if not row:
         return err("Consumo no encontrado", 404)
+    # El propio socio puede marcar como pagado su consumo (una vez hecha la
+    # transferencia); el tesorero o el administrador pueden marcar cualquiera.
+    if row["socio_id"] != sid and not has_permission(sid, "manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
     nuevo = 0 if row["pagado"] else 1
     db.execute("UPDATE bebidas_consumos SET pagado = ? WHERE id = ?", (nuevo, cid))
     db.commit()
@@ -2235,6 +2323,127 @@ def toggle_socio_tarea(tid):
     return jsonify({"ok": True, "asignado": not ya_asignado})
 
 
+# -------------------------------------------------------------- chat de socios --
+CHAT_SELECT = (
+    "SELECT cm.*, s.nombre AS socio_nombre FROM chat_mensajes cm "
+    "LEFT JOIN socios s ON s.id = cm.socio_id "
+)
+
+
+@app.route("/api/chat")
+def chat_mensajes():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    since = request.args.get("since")
+    if since:
+        try:
+            since_id = int(since)
+        except (TypeError, ValueError):
+            since_id = 0
+        rows = db.execute(
+            CHAT_SELECT + "WHERE cm.id > ? ORDER BY cm.id ASC LIMIT 200", (since_id,)
+        ).fetchall()
+    else:
+        rows = list(reversed(db.execute(CHAT_SELECT + "ORDER BY cm.id DESC LIMIT 100").fetchall()))
+    return jsonify({"mensajes": [dict(r) for r in rows]})
+
+
+@app.route("/api/chat", methods=["POST"])
+def add_chat_mensaje():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    texto = (data.get("texto") or "").strip()
+    # Se permite un mensaje sin texto solo si el cliente va a adjuntar un
+    # archivo justo despues (ver /api/chat/<id>/archivo).
+    if not texto and not data.get("con_archivo"):
+        return err("El mensaje esta vacio.", 400)
+    texto = texto[:2000]
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO chat_mensajes (socio_id, texto, creado_en) VALUES (?, ?, ?)",
+        (sid, texto, now_iso()),
+    )
+    db.commit()
+    row = db.execute(CHAT_SELECT + "WHERE cm.id = ?", (cur.lastrowid,)).fetchone()
+    return jsonify(dict(row))
+
+
+@app.route("/api/chat/<int:mid>", methods=["PATCH"])
+def edit_chat_mensaje(mid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT socio_id, archivo FROM chat_mensajes WHERE id = ?", (mid,)).fetchone()
+    if not row:
+        return err("Mensaje no encontrado", 404)
+    if row["socio_id"] != sid:
+        return err("No puedes editar este mensaje.")
+    data = request.get_json(force=True)
+    texto = (data.get("texto") or "").strip()
+    if not texto and not row["archivo"]:
+        return err("El mensaje esta vacio.", 400)
+    texto = texto[:2000]
+    db.execute("UPDATE chat_mensajes SET texto = ?, editado = 1 WHERE id = ?", (texto, mid))
+    db.commit()
+    row = db.execute(CHAT_SELECT + "WHERE cm.id = ?", (mid,)).fetchone()
+    return jsonify(dict(row))
+
+
+def _borrar_archivo_chat(mid, ext):
+    if not ext:
+        return
+    ruta = os.path.join(CHAT_DIR, f"{mid}.{ext}")
+    try:
+        if os.path.exists(ruta):
+            os.remove(ruta)
+    except OSError:
+        pass
+
+
+@app.route("/api/chat/<int:mid>/archivo", methods=["POST"])
+def upload_chat_archivo(mid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT socio_id, archivo_ext FROM chat_mensajes WHERE id = ?", (mid,)).fetchone()
+    if not row:
+        return err("Mensaje no encontrado", 404)
+    if row["socio_id"] != sid:
+        return err("No puedes adjuntar un archivo a este mensaje.")
+    if "archivo" not in request.files or request.files["archivo"].filename == "":
+        return err("No se ha recibido ningun archivo.", 400)
+    _borrar_archivo_chat(mid, row["archivo_ext"])
+    ext, error = _guardar_ticket_o_factura(request.files["archivo"], CHAT_DIR, str(mid))
+    if error:
+        return error
+    db.execute("UPDATE chat_mensajes SET archivo = 1, archivo_ext = ? WHERE id = ?", (ext, mid))
+    db.commit()
+    return jsonify({"ok": True, "ext": ext})
+
+
+@app.route("/api/chat/<int:mid>", methods=["DELETE"])
+def delete_chat_mensaje(mid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT socio_id, archivo_ext FROM chat_mensajes WHERE id = ?", (mid,)).fetchone()
+    if not row:
+        return err("Mensaje no encontrado", 404)
+    if row["socio_id"] != sid and not is_admin_user(sid):
+        return err("No puedes borrar este mensaje.")
+    db.execute("DELETE FROM chat_mensajes WHERE id = ?", (mid,))
+    db.commit()
+    _borrar_archivo_chat(mid, row["archivo_ext"])
+    return jsonify({"ok": True})
+
+
 # -------------------------------------------------------------- exportar a Excel --
 @app.route("/api/export.xlsx")
 def export_excel():
@@ -2303,8 +2512,19 @@ def _build_excel():
     movs = db.execute("SELECT * FROM movimientos ORDER BY fecha").fetchall()
     write_sheet(
         ws1,
-        ["ID", "Fecha", "Tipo", "Categoria", "Socio ID", "Socio", "Concepto", "Importe (EUR)"],
-        [[m["id"], m["fecha"], m["tipo"], m["categoria"], m["socio_id"] or "", nombre_de.get(m["socio_id"], ""), m["concepto"], m["importe"]] for m in movs],
+        ["ID", "Fecha", "Tipo", "Categoria", "Socio ID", "Socio", "No socio (nombre)", "Concepto", "Importe (EUR)"],
+        [[
+            m["id"], m["fecha"], m["tipo"], m["categoria"], m["socio_id"] or "", nombre_de.get(m["socio_id"], ""),
+            m["no_socio_nombre"] or "", m["concepto"], m["importe"],
+        ] for m in movs],
+    )
+
+    ws1b = wb.create_sheet("Categorias-Movimiento")
+    categorias = db.execute("SELECT * FROM categorias_movimiento ORDER BY nombre").fetchall()
+    write_sheet(
+        ws1b,
+        ["ID", "Nombre"],
+        [[c["id"], c["nombre"]] for c in categorias],
     )
 
     ws2 = wb.create_sheet("Cuotas")
@@ -2443,7 +2663,7 @@ def _build_excel():
     for categoria, importe in sorted(gastos_por_categoria.items()):
         filas.append((f"  - {categoria}", -importe))
     filas.append(("Gastos de fiestas", -gastos_fiestas))
-    filas.append(("SALDO TOTAL (solo lo cobrado)", saldo))
+    filas.append(("SALDO TOTAL", saldo))
     for concepto, importe in filas:
         ws5.append([concepto, importe])
     ws5.column_dimensions["A"].width = 32
@@ -2713,24 +2933,55 @@ def _import_excel(wb, sid):
     else:
         hoja_sin_permiso("Cuotas", "gestionar cuotas")
 
+    # ---- Categorias-Movimiento ----
+    if puede("manage_finances"):
+        cats_by_id = {c["id"] for c in db.execute("SELECT id FROM categorias_movimiento")}
+        cats_by_nombre = {c["nombre"]: c["id"] for c in db.execute("SELECT id, nombre FROM categorias_movimiento")}
+        for row in _sheet_rows(wb, "Categorias-Movimiento"):
+            rid, nombre = (list(row) + [None] * 2)[:2]
+            rid = _cell_str(rid)
+            nombre = _cell_str(nombre)
+            if not nombre:
+                continue
+            if rid in cats_by_id:
+                db.execute("UPDATE categorias_movimiento SET nombre=? WHERE id=?", (nombre, rid))
+                marcar("Categorias-Movimiento", actualizado=True)
+            elif nombre not in cats_by_nombre:
+                target_id = rid or new_id()
+                db.execute("INSERT INTO categorias_movimiento (id, nombre) VALUES (?,?)", (target_id, nombre))
+                cats_by_id.add(target_id)
+                cats_by_nombre[nombre] = target_id
+                marcar("Categorias-Movimiento", creado=True)
+
     # ---- Movimientos ----
     if puede("manage_finances"):
         movs_by_id = {m["id"] for m in db.execute("SELECT id FROM movimientos")}
+        # Los ficheros exportados antes de anadir "No socio (nombre)" tienen una
+        # columna menos: se detecta por la cabecera para no desalinear las filas.
+        formato_con_no_socio = True
+        if "Movimientos" in wb.sheetnames:
+            cabecera = [c.value for c in next(wb["Movimientos"].iter_rows(min_row=1, max_row=1))]
+            formato_con_no_socio = "No socio (nombre)" in cabecera
         for row in _sheet_rows(wb, "Movimientos"):
-            rid, fecha, tipo, categoria, socio_id_txt, socio_txt, concepto, importe = (list(row) + [None] * 8)[:8]
+            if formato_con_no_socio:
+                rid, fecha, tipo, categoria, socio_id_txt, socio_txt, no_socio_nombre, concepto, importe = (list(row) + [None] * 9)[:9]
+            else:
+                rid, fecha, tipo, categoria, socio_id_txt, socio_txt, concepto, importe = (list(row) + [None] * 8)[:8]
+                no_socio_nombre = None
             rid = _cell_str(rid)
             socio_id = resolver_socio(socio_id_txt, socio_txt)
+            no_socio_val = "" if socio_id else (_cell_str(no_socio_nombre) or "")
             valores = (
                 _cell_str(fecha) or date.today().isoformat(), _cell_str(tipo) or "gasto", _cell_str(categoria) or "Otros",
-                _cell_str(concepto), _cell_float(importe), socio_id,
+                _cell_str(concepto), _cell_float(importe), socio_id, no_socio_val,
             )
             if rid in movs_by_id:
-                db.execute("UPDATE movimientos SET fecha=?, tipo=?, categoria=?, concepto=?, importe=?, socio_id=? WHERE id=?", valores + (rid,))
+                db.execute("UPDATE movimientos SET fecha=?, tipo=?, categoria=?, concepto=?, importe=?, socio_id=?, no_socio_nombre=? WHERE id=?", valores + (rid,))
                 marcar("Movimientos", actualizado=True)
             else:
                 target_id = rid or new_id()
-                db.execute("INSERT INTO movimientos (id, fecha, tipo, categoria, concepto, importe, socio_id) VALUES (?,?,?,?,?,?,?)",
-                           (target_id, valores[0], valores[1], valores[2], valores[3], valores[4], valores[5]))
+                db.execute("INSERT INTO movimientos (id, fecha, tipo, categoria, concepto, importe, socio_id, no_socio_nombre) VALUES (?,?,?,?,?,?,?,?)",
+                           (target_id,) + valores)
                 movs_by_id.add(target_id)
                 marcar("Movimientos", creado=True)
     else:
