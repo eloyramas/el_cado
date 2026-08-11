@@ -87,7 +87,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     nombre TEXT NOT NULL,
-    cuota_mensual REAL NOT NULL
+    cuota_mensual REAL NOT NULL,
+    numero_cuenta TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS socios (
     id TEXT PRIMARY KEY,
@@ -288,6 +289,23 @@ CREATE TABLE IF NOT EXISTS lista_compra_items (
     creado_en TEXT,
     FOREIGN KEY (lista_id) REFERENCES listas_compra(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS listas_pago (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    creado_por TEXT,
+    creado_en TEXT
+);
+CREATE TABLE IF NOT EXISTS lista_pago_items (
+    id TEXT PRIMARY KEY,
+    lista_id TEXT NOT NULL,
+    socio_id TEXT,
+    nombre TEXT NOT NULL,
+    importe REAL NOT NULL DEFAULT 0,
+    pagado INTEGER NOT NULL DEFAULT 0,
+    pagado_en TEXT,
+    creado_en TEXT,
+    FOREIGN KEY (lista_id) REFERENCES listas_pago(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS chat_mensajes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     socio_id TEXT NOT NULL,
@@ -386,6 +404,10 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE movimientos ADD COLUMN no_socio_nombre TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE config ADD COLUMN numero_cuenta TEXT DEFAULT ''")
         except sqlite3.OperationalError:
             pass
         if db.execute("SELECT COUNT(*) AS n FROM categorias_movimiento").fetchone()["n"] == 0:
@@ -755,6 +777,19 @@ def state():
         ]
         listas_compra.append(lista)
 
+    listas_pago = []
+    for r in db.execute("SELECT * FROM listas_pago ORDER BY creado_en DESC"):
+        lista = dict(r)
+        lista["items"] = [
+            dict(i) for i in db.execute(
+                "SELECT lp.*, s.nombre AS socio_nombre FROM lista_pago_items lp "
+                "LEFT JOIN socios s ON s.id = lp.socio_id "
+                "WHERE lp.lista_id = ? ORDER BY lp.pagado, lp.nombre",
+                (lista["id"],),
+            )
+        ]
+        listas_pago.append(lista)
+
     gastos_eventos = []
     for r in db.execute("SELECT * FROM gastos_eventos ORDER BY fecha DESC"):
         evento = dict(r)
@@ -814,6 +849,7 @@ def state():
             "fiestas_gastos": fiestas_gastos,
             "reservas": reservas,
             "listas_compra": listas_compra,
+            "listas_pago": listas_pago,
             "gastos_eventos": gastos_eventos,
             "gastos_socios": gastos_socios,
             "tareas_tickets": tareas_tickets,
@@ -837,8 +873,8 @@ def update_config():
     except (TypeError, ValueError):
         cuota = 45
     db.execute(
-        "UPDATE config SET nombre = ?, cuota_mensual = ? WHERE id = 1",
-        ((data.get("nombre") or "El Cado").strip(), cuota),
+        "UPDATE config SET nombre = ?, cuota_mensual = ?, numero_cuenta = ? WHERE id = 1",
+        ((data.get("nombre") or "El Cado").strip(), cuota, (data.get("numero_cuenta") or "").strip()),
     )
     db.commit()
     return jsonify({"ok": True})
@@ -1387,6 +1423,36 @@ def update_movimiento(mid):
     )
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.route("/api/movimientos/<mid>/no-pagado", methods=["POST"])
+def marcar_movimiento_no_pagado(mid):
+    if not require_permission("manage_finances"):
+        return err("Solo el administrador o el tesorero pueden modificar gastos o ingresos.")
+    db = get_db()
+    mov = db.execute("SELECT * FROM movimientos WHERE id = ?", (mid,)).fetchone()
+    if not mov:
+        return err("Movimiento no encontrado", 404)
+    if not mov["socio_id"]:
+        return err("Este movimiento no tiene un socio asociado.", 400)
+    gid = new_id()
+    db.execute(
+        "INSERT INTO gastos_socios (id, socio_id, tipo, concepto, importe, fecha, ticket, ticket_ext, abonado, creado_en) "
+        "VALUES (?,?,?,?,?,?,?,?,0,?)",
+        (gid, mov["socio_id"], mov["tipo"], mov["concepto"], mov["importe"], mov["fecha"], mov["ticket"], mov["ticket_ext"], now_iso()),
+    )
+    if mov["ticket"]:
+        _copiar_ticket(f"mov-{mid}", gid, mov["ticket_ext"])
+        for ext in ("jpg", "pdf"):
+            ticket_path = os.path.join(TICKETS_DIR, f"mov-{mid}.{ext}")
+            try:
+                if os.path.exists(ticket_path):
+                    os.remove(ticket_path)
+            except OSError:
+                pass
+    db.execute("DELETE FROM movimientos WHERE id = ?", (mid,))
+    db.commit()
+    return jsonify({"ok": True, "id": gid})
 
 
 @app.route("/api/movimientos/<mid>", methods=["DELETE"])
@@ -2175,6 +2241,167 @@ def delete_item_compra(iid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/listas-compra/<lid>", methods=["POST"])
+def rename_lista_compra(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_compra WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre de la lista es obligatorio.", 400)
+    db.execute("UPDATE listas_compra SET nombre = ? WHERE id = ?", (nombre, lid))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- listas de pago (derramas) --
+@app.route("/api/listas-pago", methods=["POST"])
+def add_lista_pago():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El asunto de la lista es obligatorio.", 400)
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    db = get_db()
+    lid = new_id()
+    ahora = now_iso()
+    db.execute(
+        "INSERT INTO listas_pago (id, nombre, creado_por, creado_en) VALUES (?,?,?,?)",
+        (lid, nombre, sid, ahora),
+    )
+    socios = db.execute("SELECT id, nombre FROM socios WHERE activo = 1 ORDER BY nombre").fetchall()
+    db.executemany(
+        "INSERT INTO lista_pago_items (id, lista_id, socio_id, nombre, importe, pagado, creado_en) "
+        "VALUES (?,?,?,?,?,0,?)",
+        [(new_id(), lid, s["id"], s["nombre"], importe, ahora) for s in socios],
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": lid})
+
+
+@app.route("/api/listas-pago/<lid>", methods=["POST"])
+def rename_lista_pago(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_pago WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El asunto de la lista es obligatorio.", 400)
+    db.execute("UPDATE listas_pago SET nombre = ? WHERE id = ?", (nombre, lid))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/listas-pago/<lid>", methods=["DELETE"])
+def delete_lista_pago(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_pago WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    db.execute("DELETE FROM lista_pago_items WHERE lista_id = ?", (lid,))
+    db.execute("DELETE FROM listas_pago WHERE id = ?", (lid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/listas-pago/<lid>/items", methods=["POST"])
+def add_item_pago(lid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM listas_pago WHERE id = ?", (lid,)).fetchone():
+        return err("Lista no encontrada", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre es obligatorio.", 400)
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    socio_id = (data.get("socio_id") or "").strip() or None
+    if socio_id and not db.execute("SELECT 1 FROM socios WHERE id = ?", (socio_id,)).fetchone():
+        socio_id = None
+    iid = new_id()
+    db.execute(
+        "INSERT INTO lista_pago_items (id, lista_id, socio_id, nombre, importe, pagado, creado_en) "
+        "VALUES (?,?,?,?,?,0,?)",
+        (iid, lid, socio_id, nombre, importe, now_iso()),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": iid})
+
+
+@app.route("/api/listas-pago/items/<iid>", methods=["POST"])
+def update_item_pago(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    if not db.execute("SELECT 1 FROM lista_pago_items WHERE id = ?", (iid,)).fetchone():
+        return err("Fila no encontrada", 404)
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre es obligatorio.", 400)
+    try:
+        importe = float(data.get("importe") or 0)
+    except (TypeError, ValueError):
+        importe = 0
+    db.execute(
+        "UPDATE lista_pago_items SET nombre = ?, importe = ? WHERE id = ?",
+        (nombre, importe, iid),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/listas-pago/items/<iid>/toggle", methods=["POST"])
+def toggle_item_pago(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    row = db.execute("SELECT pagado FROM lista_pago_items WHERE id = ?", (iid,)).fetchone()
+    if not row:
+        return err("Fila no encontrada", 404)
+    nuevo = 0 if row["pagado"] else 1
+    db.execute(
+        "UPDATE lista_pago_items SET pagado = ?, pagado_en = ? WHERE id = ?",
+        (nuevo, now_iso() if nuevo else None, iid),
+    )
+    db.commit()
+    return jsonify({"ok": True, "pagado": bool(nuevo)})
+
+
+@app.route("/api/listas-pago/items/<iid>", methods=["DELETE"])
+def delete_item_pago(iid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesion.", 401)
+    db = get_db()
+    db.execute("DELETE FROM lista_pago_items WHERE id = ?", (iid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
 # -------------------------------------------------------------- tareas: tickets --
 @app.route("/api/tareas-tickets", methods=["POST"])
 def add_tarea_ticket():
@@ -2457,14 +2684,26 @@ def export_excel():
             500,
         )
 
+    desde = (request.args.get("desde") or "").strip() or None
+    hasta = (request.args.get("hasta") or "").strip() or None
     try:
-        return _build_excel()
+        return _build_excel(desde, hasta)
     except Exception as e:
         app.logger.exception("Error generando el Excel")
         return err(f"No se pudo generar el Excel: {e}", 500)
 
 
-def _build_excel():
+def _en_rango(fecha, desde, hasta):
+    if not fecha:
+        return False
+    if desde and fecha < desde:
+        return False
+    if hasta and fecha > hasta:
+        return False
+    return True
+
+
+def _build_excel(desde=None, hasta=None):
     db = get_db()
     wb = openpyxl.Workbook()
     header_fill = PatternFill(start_color="21332B", end_color="21332B", fill_type="solid")
@@ -2509,13 +2748,14 @@ def _build_excel():
     )
 
     ws1 = wb.create_sheet("Movimientos")
-    movs = db.execute("SELECT * FROM movimientos ORDER BY fecha").fetchall()
+    movs_todos = db.execute("SELECT * FROM movimientos ORDER BY fecha").fetchall()
+    movs = [m for m in movs_todos if _en_rango(m["fecha"], desde, hasta)] if (desde or hasta) else movs_todos
     write_sheet(
         ws1,
-        ["ID", "Fecha", "Tipo", "Categoria", "Socio ID", "Socio", "No socio (nombre)", "Concepto", "Importe (EUR)"],
+        ["ID", "Fecha", "Tipo", "Socio ID", "Socio", "No socio (nombre)", "Concepto", "Importe (EUR)"],
         [[
-            m["id"], m["fecha"], m["tipo"], m["categoria"], m["socio_id"] or "", nombre_de.get(m["socio_id"], ""),
-            m["no_socio_nombre"] or "", m["concepto"], m["importe"],
+            m["id"], m["fecha"], m["tipo"], m["socio_id"] or "", nombre_de.get(m["socio_id"], ""),
+            m["no_socio_nombre"] or "", f"{m['categoria']} - {m['concepto']}", m["importe"],
         ] for m in movs],
     )
 
@@ -2528,7 +2768,13 @@ def _build_excel():
     )
 
     ws2 = wb.create_sheet("Cuotas")
-    cuotas = db.execute("SELECT * FROM cuotas ORDER BY year, month").fetchall()
+    cuotas_todas = db.execute("SELECT * FROM cuotas ORDER BY year, month").fetchall()
+    if desde or hasta:
+        desde_mes = desde[:7] if desde else None
+        hasta_mes = hasta[:7] if hasta else None
+        cuotas = [c for c in cuotas_todas if _en_rango(f"{c['year']:04d}-{c['month']:02d}", desde_mes, hasta_mes)]
+    else:
+        cuotas = cuotas_todas
     write_sheet(
         ws2,
         ["ID", "Socio ID", "Socio", "Ano", "Mes", "Importe (EUR)", "Pagado", "Fecha de pago"],
@@ -2545,7 +2791,8 @@ def _build_excel():
     )
 
     ws3 = wb.create_sheet("Bebidas-Consumos")
-    consumos = db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha").fetchall()
+    consumos_todos = db.execute("SELECT * FROM bebidas_consumos ORDER BY fecha").fetchall()
+    consumos = [c for c in consumos_todos if _en_rango(c["fecha"], desde, hasta)] if (desde or hasta) else consumos_todos
     write_sheet(
         ws3,
         ["ID", "Fecha", "Bebida ID", "Bebida", "Socio ID", "Consumidor", "Es socio", "Cantidad", "Importe (EUR)", "Pagado"],
@@ -2556,7 +2803,8 @@ def _build_excel():
     )
 
     ws4 = wb.create_sheet("Gastos-Fiestas")
-    fiestas = db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha").fetchall()
+    fiestas_todas = db.execute("SELECT * FROM fiestas_gastos ORDER BY fecha").fetchall()
+    fiestas = [f for f in fiestas_todas if _en_rango(f["fecha"], desde, hasta)] if (desde or hasta) else fiestas_todas
     write_sheet(
         ws4,
         ["ID", "Fecha", "Evento", "Concepto", "Importe (EUR)"],

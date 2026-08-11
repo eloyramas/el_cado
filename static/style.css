@@ -224,6 +224,15 @@ textarea{resize:vertical; min-height:60px;}
 .btn.small{padding:5px 10px; font-size:0.78rem;}
 .btn.danger{background:transparent; color:var(--rust); border:1px solid rgba(193,85,58,0.4);}
 .btn.danger:hover{background:rgba(193,85,58,0.12);}
+.btn.accent{background:var(--sky); color:#152836; border:1px solid var(--sky);}
+.btn.accent:hover{background:#82a5c2;}
+
+.subtab-btn{
+  background:transparent; border:1px solid var(--line); color:var(--chalk-dim);
+  padding:8px 14px; border-radius:10px; font-weight:600; font-size:0.82rem; cursor:pointer;
+}
+.subtab-btn:hover:not(.active){color:var(--chalk); border-color:var(--amber-dim);}
+.subtab-btn.active{color:#20160a; background:var(--amber); border-color:var(--amber);}
 
 /* lists */
 .consumos-filtro{display:flex; flex-wrap:wrap; gap:8px; padding:0 0 10px;}

@@ -44,8 +44,8 @@ const FAQ_ENTRIES = [
     respuesta:'La campanita de la cabecera avisa de cuotas pendientes, bebidas por pagar y actividad reciente (reservas y reuniones). El numero indica cuantos avisos hay ahora mismo; desde ahi tambien puedes exportarlos como un log de texto. Para cerrar el desplegable, pulsa la campanita otra vez o toca en cualquier otro sitio de la pantalla.'},
   {id:'baja', pregunta:'Que pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
     respuesta:'Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia a reuniones, etc): simplemente deja de aparecer en el buscador de la pantalla de inicio y se marca como "de baja" en la lista de socios.'},
-  {id:'lista-compra', pregunta:'Como funciona la Lista de la compra?', palabras:['compra','lista','listas','producto','productos','supermercado'],
-    respuesta:'En la pestana Lista compra cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad. Todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado (queda tachado y se mueve al desplegable "Comprados"). Los cambios de cualquier socio se ven en el resto de moviles en unos segundos, sin tener que avisaros por otro lado. Cada lista tiene ademas su propio boton "Enviar por WhatsApp" con lo que queda pendiente de comprar.'},
+  {id:'lista-compra', pregunta:'Como funciona la pestana Listas?', palabras:['compra','lista','listas','producto','productos','supermercado','pago','derrama','pagos'],
+    respuesta:'La pestana Listas tiene dos apartados. En "Lista de la compra" cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad; todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado. En "Listas de pago" se usan para derramas o pagos extra: al crear la lista se genera una fila para cada socio activo con el importe indicado, aparece el numero de cuenta en la cabecera, y cada uno marca su fila como pagada cuando hace el ingreso. En ambos apartados se puede cambiar el titulo de la lista despues de creada con "Editar titulo", y cada lista tiene su propio boton "Enviar por WhatsApp".'},
   {id:'inventario', pregunta:'Quien puede anadir o editar el material del inventario?', palabras:['inventario','material','estado','revision','comprar'],
     respuesta:'Todos los socios ven el inventario. Anadir material nuevo es cosa de quien tiene el permiso de gestionar inventario, pero una vez que un material ya esta creado, cualquier socio puede editarlo (nombre, categoria, cantidad, estado o notas) y tambien borrarlo, por ejemplo para actualizar su estado a "Necesita revision" o "Hay que comprar". Hay un boton para enviar por WhatsApp solo lo que esta pendiente de revisar o comprar, sin tener que mandar el inventario entero.'},
 ];
@@ -197,20 +197,22 @@ function stopLoginDrag(){
 
 let state = null;
 let activeTab = 'resumen';
-let consumosFiltroAnio = 'todos';
-let consumosFiltroMes = 'todos';
-let consumosFiltroDia = 'todos';
+let listasSubTab = 'compra';
+let consumosPeriodo = {tipo:'todos', valor:''};
 let cuotasYear = new Date().getFullYear();
 let cuotasMesMovil = new Date().getMonth()+1;
 let resumenGraficoYear = new Date().getFullYear();
-let resumenStatMes = todayISO().slice(0,7);
-let cajaMesFiltro = todayISO().slice(0,7);
+let resumenPeriodo = {tipo:'mes', valor: todayISO().slice(0,7)};
+let cajaPeriodo = {tipo:'mes', valor: todayISO().slice(0,7)};
+let cuentasPeriodo = {tipo:'todos', valor:''};
+let editandoNombreListaId = null;
 let reservasCalFecha = new Date();
 let reunionesCalFecha = new Date();
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let editandoMovimientoId = null;
 let editandoItemCompraId = null;
+let editandoItemPagoId = null;
 let editandoTareaId = null;
 let editandoInventarioId = null;
 let nuevaTareaSocios = [];
@@ -290,6 +292,81 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' EUR'; }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function enviarWhatsapp(texto){ window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); }
+/* ---------- filtros de periodo (mes / semana / dia) ---------- */
+function isoWeekKey(fechaISO){
+  if(!fechaISO) return '';
+  const d = new Date(fechaISO+'T00:00:00');
+  d.setDate(d.getDate() + 4 - (d.getDay()||7));
+  const inicioAnio = new Date(d.getFullYear(),0,1);
+  const semana = Math.ceil((((d - inicioAnio) / 86400000) + 1)/7);
+  return `${d.getFullYear()}-W${String(semana).padStart(2,'0')}`;
+}
+function dentroDePeriodo(fechaISO, periodo){
+  if(!periodo || periodo.tipo==='todos' || !periodo.valor) return true;
+  if(!fechaISO) return false;
+  if(periodo.tipo==='anio') return fechaISO.slice(0,4)===periodo.valor;
+  if(periodo.tipo==='mes') return fechaISO.slice(0,7)===periodo.valor;
+  if(periodo.tipo==='semana') return isoWeekKey(fechaISO)===periodo.valor;
+  if(periodo.tipo==='dia') return fechaISO===periodo.valor;
+  return true;
+}
+function labelPeriodo(periodo){
+  if(!periodo || periodo.tipo==='todos' || !periodo.valor) return '';
+  if(periodo.tipo==='anio') return periodo.valor;
+  if(periodo.tipo==='mes') return labelMes(periodo.valor);
+  if(periodo.tipo==='semana'){ const [y,w] = periodo.valor.split('-W'); return `semana ${w} de ${y}`; }
+  if(periodo.tipo==='dia') return fmtDate(periodo.valor);
+  return '';
+}
+function rangoPeriodo(periodo){
+  if(!periodo || periodo.tipo==='todos' || !periodo.valor) return {desde:null, hasta:null};
+  if(periodo.tipo==='dia') return {desde:periodo.valor, hasta:periodo.valor};
+  const fmt = dt=>`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if(periodo.tipo==='anio'){
+    return {desde:`${periodo.valor}-01-01`, hasta:`${periodo.valor}-12-31`};
+  }
+  if(periodo.tipo==='mes'){
+    const [y,m] = periodo.valor.split('-').map(Number);
+    const ultimoDia = new Date(y, m, 0).getDate();
+    return {desde:`${periodo.valor}-01`, hasta:`${periodo.valor}-${String(ultimoDia).padStart(2,'0')}`};
+  }
+  if(periodo.tipo==='semana'){
+    const [yStr, wStr] = periodo.valor.split('-W');
+    const y = Number(yStr), w = Number(wStr);
+    const simple = new Date(y,0,1+(w-1)*7);
+    const dow = simple.getDay() || 7;
+    const monday = new Date(simple);
+    monday.setDate(simple.getDate() - dow + 1);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate()+6);
+    return {desde:fmt(monday), hasta:fmt(sunday)};
+  }
+  return {desde:null, hasta:null};
+}
+function renderSelectorPeriodo(idPrefix, periodo, mesesOpciones){
+  const tipo = periodo.tipo || 'todos';
+  const anios = [...new Set(mesesOpciones.map(k=>k.slice(0,4)))].sort((a,b)=>b.localeCompare(a));
+  return `<span class="periodo-selector">
+    <select id="${idPrefix}-tipo" data-periodo-prefix="${idPrefix}">
+      <option value="todos" ${tipo==='todos'?'selected':''}>Todos</option>
+      <option value="anio" ${tipo==='anio'?'selected':''}>Por ano</option>
+      <option value="mes" ${tipo==='mes'?'selected':''}>Por mes</option>
+      <option value="semana" ${tipo==='semana'?'selected':''}>Por semana</option>
+      <option value="dia" ${tipo==='dia'?'selected':''}>Por dia</option>
+    </select>
+    ${tipo==='anio' ? `<select id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}">${anios.map(a=>`<option value="${a}" ${periodo.valor===a?'selected':''}>${a}</option>`).join('')}</select>` : ''}
+    ${tipo==='mes' ? `<select id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}">${mesesOpciones.map(k=>`<option value="${k}" ${periodo.valor===k?'selected':''}>${labelMes(k)}</option>`).join('')}</select>` : ''}
+    ${tipo==='semana' ? `<input type="week" id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}" value="${periodo.valor||''}">` : ''}
+    ${tipo==='dia' ? `<input type="date" id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}" value="${periodo.valor||''}">` : ''}
+  </span>`;
+}
+function valorPorDefectoPeriodo(tipo){
+  if(tipo==='anio') return String(new Date().getFullYear());
+  if(tipo==='mes') return todayISO().slice(0,7);
+  if(tipo==='semana') return isoWeekKey(todayISO());
+  if(tipo==='dia') return todayISO();
+  return '';
+}
 function encontrarPosibleDuplicado(concepto, fecha, excluirId){
   const norm = s=>(s||'').trim().toLowerCase();
   const c = norm(concepto);
@@ -857,7 +934,7 @@ function renderAlertasPanel(){
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <b>Avisos</b>
       <div style="display:flex; gap:8px; align-items:center;">
-        <button class="btn ghost small" data-action="export-log-eventos">Exportar log</button>
+        <button class="btn accent small" data-action="export-log-eventos">Exportar log</button>
         <button class="help-close" data-action="cerrar-alertas" title="Cerrar">&times;</button>
       </div>
     </div>
@@ -880,6 +957,8 @@ function renderApp(){
 
           <button class="edit-name-btn" data-action="edit-cuota">cambiar cuota</button>
 
+          <button class="edit-name-btn" data-action="edit-cuenta">numero de cuenta</button>
+
         </div>` : ''}
         
         <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">cerrar sesion</button>
@@ -897,7 +976,7 @@ function renderApp(){
         ${tabBtn('reservas','Reservas','calendar-check')}
         ${tabBtn('reuniones','Reuniones','calendar')}
         ${tabBtn('inventario','Inventario','box')}
-        ${tabBtn('compra','Lista compra','cart')}
+        ${tabBtn('compra','Listas','cart')}
         ${tabBtn('caja','Gastos e ingresos','wallet')}
         ${tabBtn('bebidas','Bebidas','cup')}
         ${tabBtn('encargados','Tareas','check')}
@@ -948,7 +1027,7 @@ function renderTab(){
     case 'reuniones': return renderReuniones();
     case 'reparto': return renderReparto();
     case 'inventario': return renderInventario();
-    case 'compra': return renderListaCompra();
+    case 'compra': return renderListasTab();
     case 'caja': return renderCaja();
     case 'bebidas': return renderBebidas();
     case 'encargados': return renderEncargados();
@@ -1029,10 +1108,10 @@ function renderRoleRow(role, labels){
   </div>`;
 }
 /* ============ calculos ============ */
-function totalIngresosCuotas(){ return state.cuotas.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
-function totalIngresosMov(){ return state.movimientos.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalGastosMov(){ return state.movimientos.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalBebidasIngreso(){ return state.bebidas_consumos.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
+function totalIngresosCuotas(periodo){ return state.cuotas.filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo)).reduce((a,c)=>a+Number(c.importe||0),0); }
+function totalIngresosMov(periodo){ return state.movimientos.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosMov(periodo){ return state.movimientos.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalBebidasIngreso(periodo){ return state.bebidas_consumos.filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo)).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalBebidasPendiente(){ return state.bebidas_consumos.filter(c=>!c.pagado).reduce((a,c)=>a+Number(c.importe||0),0); }
 function misBebidasPendientes(){ return state.bebidas_consumos.filter(c=>c.socio_id===state.current_user && !c.pagado); }
 function misBebidasPendientesPorMes(){
@@ -1058,19 +1137,8 @@ function bebidasPendientesPorSocio(){
     .sort((a,b)=>pendientes[b]-pendientes[a])
     .map(socio_id=>({socio_id, nombre: socioNombre(socio_id), total: pendientes[socio_id]}));
 }
-function aniosConsumos(){
-  const anios = new Set(state.bebidas_consumos.map(c=>c.fecha ? c.fecha.slice(0,4) : null).filter(Boolean));
-  return [...anios].sort((a,b)=>b.localeCompare(a));
-}
 function consumosFiltrados(consumos){
-  return consumos.filter(c=>{
-    if(!c.fecha) return false;
-    const [y,m,d] = c.fecha.split('-');
-    if(consumosFiltroAnio!=='todos' && y!==consumosFiltroAnio) return false;
-    if(consumosFiltroMes!=='todos' && Number(m)!==Number(consumosFiltroMes)) return false;
-    if(consumosFiltroDia!=='todos' && Number(d)!==Number(consumosFiltroDia)) return false;
-    return true;
-  });
+  return consumos.filter(c=>dentroDePeriodo(c.fecha, consumosPeriodo));
 }
 function actualizarTotalConsumo(form){
   const el = form.querySelector('#consumo-total');
@@ -1083,13 +1151,13 @@ function actualizarTotalConsumo(form){
   const unit = precio ? Number(esSocio ? precio.precio_socio : precio.precio_no_socio) : 0;
   el.textContent = `Total: ${money(unit * cantidad)}`;
 }
-function totalFiestasGasto(){ return state.fiestas_gastos.reduce((a,f)=>a+Number(f.importe||0),0); }
+function totalFiestasGasto(periodo){ return state.fiestas_gastos.filter(f=>dentroDePeriodo(f.fecha, periodo)).reduce((a,f)=>a+Number(f.importe||0),0); }
 // Al verificar un gasto/ingreso de socio, el backend lo convierte en un movimiento
 // permanente con categoria "Socios" y borra la solicitud provisional: por eso estos
 // totales se calculan a partir de movimientos, no de gastos_socios (que solo guarda
 // las solicitudes todavia pendientes de verificar).
-function totalIngresosSociosVerificados(){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
-function totalGastosSociosVerificados(){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso').reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalIngresosSociosVerificados(periodo){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
+function totalGastosSociosVerificados(periodo){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
 function gastosSociosPendientes(){ return (state.gastos_socios||[]).filter(g=>!g.abonado); }
 function saldoTotal(){
   const ingresos = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
@@ -1174,6 +1242,20 @@ function exportarLogEventos(){
   URL.revokeObjectURL(url);
 }
 
+function totalesPorPeriodo(periodo){
+  let ingresos = 0, gastos = 0;
+  function add(fecha, campo, importe){
+    if(!dentroDePeriodo(fecha, periodo)) return;
+    if(campo==='ingresos') ingresos += Number(importe||0); else gastos += Number(importe||0);
+  }
+  state.cuotas.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
+  state.movimientos.forEach(m=>add(m.fecha, m.tipo==='ingreso' ? 'ingresos' : 'gastos', m.importe));
+  state.bebidas_consumos.forEach(c=>{ if(c.pagado) add(c.fecha, 'ingresos', c.importe); });
+  state.fiestas_gastos.forEach(f=>add(f.fecha, 'gastos', f.importe));
+  (state.gastos_socios||[]).forEach(g=>{ if(g.abonado) add(g.fecha, g.tipo==='ingreso' ? 'ingresos' : 'gastos', g.importe); });
+  return {ingresos, gastos};
+}
+
 /* ============ GRAFICAS: evolucion de ingresos y gastos ============ */
 function movimientosPorMes(){
   const map = {}; // 'YYYY-MM' -> {ingresos, gastos}
@@ -1232,11 +1314,6 @@ function totalesPorAnio(year){
   Object.keys(map).forEach(k=>{ if(Number(k.slice(0,4))===year){ ingresos += map[k].ingresos; gastos += map[k].gastos; } });
   return {ingresos, gastos};
 }
-function totalesPorMes(year, month){
-  const map = movimientosPorMes();
-  const key = `${year}-${String(month).padStart(2,'0')}`;
-  return map[key] || {ingresos:0, gastos:0};
-}
 function mesesDisponibles(claves){
   const set = new Set(claves.filter(Boolean));
   set.add(todayISO().slice(0,7));
@@ -1288,22 +1365,20 @@ function renderResumen(){
   const anios = aniosConDatos();
   const totalesAnio = totalesPorAnio(resumenGraficoYear);
   const mesesResumen = mesesDisponibles(Object.keys(movimientosPorMes()));
-  if(!mesesResumen.includes(resumenStatMes)) resumenStatMes = mesesResumen[0];
-  const [rsYear, rsMonth] = resumenStatMes.split('-').map(Number);
-  const totalesMesActual = totalesPorMes(rsYear, rsMonth);
+  if(resumenPeriodo.tipo==='mes' && !mesesResumen.includes(resumenPeriodo.valor)) resumenPeriodo.valor = mesesResumen[0];
+  const totalesPeriodoResumen = totalesPorPeriodo(resumenPeriodo);
+  const etiquetaPeriodoResumen = labelPeriodo(resumenPeriodo) || 'de todo el historial';
 
   return `
   <div class="stat-grid">
     <div class="stat"><div class="n">${saldo<0?'- ':''}${money(Math.abs(saldo))}</div><div class="l">SALDO TOTAL</div></div>
-    <div class="stat sage"><div class="n">${money(totalesMesActual.ingresos)}</div><div class="l">Ingresos ${labelMes(resumenStatMes)}</div></div>
-    <div class="stat rust"><div class="n">- ${money(totalesMesActual.gastos)}</div><div class="l">Gastos ${labelMes(resumenStatMes)}</div></div>
+    <div class="stat sage"><div class="n">${money(totalesPeriodoResumen.ingresos)}</div><div class="l">Ingresos ${etiquetaPeriodoResumen}</div></div>
+    <div class="stat rust"><div class="n">- ${money(totalesPeriodoResumen.gastos)}</div><div class="l">Gastos ${etiquetaPeriodoResumen}</div></div>
   </div>
-  <div class="menu-row" style="margin:-4px 0 14px;">
+  <div class="menu-row" style="margin:-4px 0 14px; flex-wrap:wrap;">
     <span class="label">Ver Ingresos/Gastos</span>
     <span class="dots"></span>
-    <select id="resumen-stat-mes">
-      ${mesesResumen.map(k=>`<option value="${k}" ${resumenStatMes===k?'selected':''}>${labelMes(k)}</option>`).join('')}
-    </select>
+    ${renderSelectorPeriodo('resumen', resumenPeriodo, mesesResumen)}
   </div>
   <div class="year-nav">
     <button data-action="resumen-grafico-year" data-dir="-1">&laquo; ${resumenGraficoYear-1}</button>
@@ -1334,23 +1409,29 @@ function renderResumen(){
   <div class="card-grid">
     <div class="card">
       <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        
+
         <span><span class="pin"></span>Cuentas</span>
 
         <span style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn ghost small" data-action="export-cuentas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
-          ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-          <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
+          <button class="btn accent small" data-action="export-cuentas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+          ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" data-desde="${rangoPeriodo(cuentasPeriodo).desde||''}" data-hasta="${rangoPeriodo(cuentasPeriodo).hasta||''}" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+          <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
         </span>
       </h2>
-      <div class="menu-row"><span class="label">Cuotas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas())}</span></div>
-      <div class="menu-row"><span class="label">Bebidas</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso())}</span></div>
-      <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov())}</span></div>
-      <div class="menu-row"><span class="label">Ingresos de socios</span><span class="dots"></span><span class="value sage">${money(totalIngresosSociosVerificados())}</span></div>
-      <div class="menu-row"><span class="label">Gastos de socios</span><span class="dots"></span><span class="value rust">- ${money(totalGastosSociosVerificados())}</span></div>
-      <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto())}</span></div>
-      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov())}</span></div>
+      <div class="menu-row" style="margin-bottom:10px; flex-wrap:wrap;">
+        <span class="label">Periodo</span>
+        <span class="dots"></span>
+        ${renderSelectorPeriodo('cuentas', cuentasPeriodo, mesesDisponibles(Object.keys(movimientosPorMes())))}
+      </div>
+      <div class="menu-row"><span class="label">Cuotas</span><span class="dots"></span><span class="value sage">${money(totalIngresosCuotas(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Bebidas</span><span class="dots"></span><span class="value sage">${money(totalBebidasIngreso(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Otros ingresos</span><span class="dots"></span><span class="value sage">${money(totalIngresosMov(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Ingresos de socios</span><span class="dots"></span><span class="value sage">${money(totalIngresosSociosVerificados(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Gastos de socios</span><span class="dots"></span><span class="value rust">- ${money(totalGastosSociosVerificados(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto(cuentasPeriodo))}</span></div>
+      <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov(cuentasPeriodo))}</span></div>
       <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo total</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
+      ${cuentasPeriodo.tipo!=='todos' ? '<p class="meta" style="margin-top:6px;">El saldo total es siempre de todo el historial; las demas cifras de arriba son solo del periodo elegido.</p>' : ''}
       ${pendientesSocios.length ? `<p class="readonly-note" style="margin-top:10px; cursor:pointer;" data-action="switch-tab" data-tab="caja" title="Ir a Gastos e ingresos">${pendientesSocios.length} gasto(s)/ingreso(s) de socios (${money(pendientesSociosTotal)}) pendientes de verificar por el tesorero o el administrador en "Gastos e ingresos". No suman al saldo hasta que se verifiquen.</p>` : ''}
     </div>
     <div class="card">
@@ -1521,7 +1602,7 @@ function renderReservas(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Proximas reservas</span>
-      ${proximas.length ? `<button class="btn ghost small" data-action="export-reservas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+      ${proximas.length ? `<button class="btn accent small" data-action="export-reservas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
     ${proximas.length===0 ? '<p class="empty">La pena esta libre por ahora.</p>' : proximas.map(r=>`
       <div class="list-item">
@@ -1581,7 +1662,7 @@ function renderReuniones(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Historial</span>
-      ${ordenadas.length ? `<button class="btn ghost small" data-action="export-reuniones-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+      ${ordenadas.length ? `<button class="btn accent small" data-action="export-reuniones-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
     ${ordenadas.length===0 ? '<p class="empty">Aun no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
@@ -1676,7 +1757,7 @@ function renderGastoEvento(ev){
       <span><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
       <span style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--amber);">${money(ev.total)}</span>
-        <button class="btn ghost small" data-action="export-evento-whatsapp" data-id="${ev.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+        <button class="btn accent small" data-action="export-evento-whatsapp" data-id="${ev.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         ${puedeGestionarEvento ? `<button class="btn ghost small" data-action="toggle-ocultar-evento" data-id="${ev.id}">Ocultar</button>` : ''}
         ${puedeGestionarEvento ? `<button class="btn danger small" data-action="delete-gasto-evento" data-id="${ev.id}">Borrar evento</button>` : ''}
       </span>
@@ -1757,9 +1838,9 @@ function renderInventario(){
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Anadir material</span>
       <span style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
-        ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-        <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
+        <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+        ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+        <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
     <form data-form="add-inventario">
@@ -1779,7 +1860,7 @@ function renderInventario(){
       </div>
       <button class="btn" type="submit">Anadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn ghost small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -1823,18 +1904,39 @@ function renderInventarioItem(i){
 }
 
 /* ============ LISTA DE LA COMPRA ============ */
+function renderListasTab(){
+  return `
+  <div class="subtabs" style="margin-bottom:14px;">
+    <button type="button" class="subtab-btn ${listasSubTab==='compra'?'active':''}" data-action="listas-subtab" data-sub="compra">Lista de la compra</button>
+    <button type="button" class="subtab-btn ${listasSubTab==='pago'?'active':''}" data-action="listas-subtab" data-sub="pago">Listas de pago</button>
+  </div>
+  ${listasSubTab==='pago' ? renderListasPago() : renderListaCompra()}
+  `;
+}
+
+function renderNombreLista(lista, tipo){
+  if(editandoNombreListaId === lista.id){
+    return `<form data-form="edit-nombre-lista-${tipo}" data-id="${lista.id}" style="display:flex; gap:6px; align-items:center; flex:1; min-width:200px;">
+      <input type="text" name="nombre" required value="${escapeHtml(lista.nombre)}" style="flex:1;">
+      <button class="btn small" type="submit">Guardar</button>
+      <button class="btn ghost small" type="button" data-action="cancelar-editar-nombre-lista">Cancelar</button>
+    </form>`;
+  }
+  return `<span><span class="pin"></span>${escapeHtml(lista.nombre)} <button type="button" class="link-btn meta" data-action="editar-nombre-lista" data-id="${lista.id}" title="Cambiar el titulo de la lista">Editar titulo</button></span>`;
+}
+
 function renderListaCompra(){
   const listas = state.listas_compra || [];
   return `
   <div class="card">
-    <h2><span class="pin"></span>Nueva lista</h2>
+    <h2><span class="pin"></span>Nueva lista de compra</h2>
     <form data-form="add-lista-compra">
       <div class="form-row">
         <div><label class="f">Nombre de la lista</label><input type="text" name="nombre" required placeholder="Ej: Supermercado, Fiesta mayor..."></div>
       </div>
       <button class="btn" type="submit">Crear lista</button>
     </form>
-    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas y anadir o quitar productos. Se actualiza para todos automaticamente.</p>
+    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas, cambiar el titulo y anadir o quitar productos. Se actualiza para todos automaticamente.</p>
   </div>
   ${listas.length===0 ? '<div class="card"><p class="empty">Todavia no hay listas de la compra. Crea la primera arriba.</p></div>' : ''}
   ${listas.map(renderListaCompraCard).join('')}
@@ -1847,9 +1949,10 @@ function renderListaCompraCard(lista){
   const comprados = items.filter(i=>i.comprado);
   return `<div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>${escapeHtml(lista.nombre)} <span class="meta">- creada por ${escapeHtml(socioNombre(lista.creado_por))}</span></span>
-      <span style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn ghost small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+      ${renderNombreLista(lista, 'compra')}
+      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <span class="meta">creada por ${escapeHtml(socioNombre(lista.creado_por))}</span>
+        <button class="btn accent small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
       </span>
     </h2>
@@ -1866,6 +1969,94 @@ function renderListaCompraCard(lista){
       </div>
       <button class="btn ghost small" type="submit">Anadir producto</button>
     </form>
+  </div>`;
+}
+
+function renderListasPago(){
+  const listas = state.listas_pago || [];
+  const numeroCuenta = (state.config && state.config.numero_cuenta) || '';
+  return `
+  <div class="card">
+    <h2><span class="pin"></span>Nueva lista de pago</h2>
+    <p class="meta" style="margin:-4px 0 10px;">Para derramas o pagos extra</p>
+    ${!numeroCuenta ? `<p class="readonly-note" style="margin-bottom:10px;">No hay numero de cuenta configurado. El administrador puede anadirlo con el boton "numero de cuenta" de la cabecera, para que salga en las listas de pago.</p>` : ''}
+    <form data-form="add-lista-pago">
+      <div class="form-row">
+        <div style="flex:2;"><label class="f">Asunto</label><input type="text" name="nombre" required placeholder="Ej: Derrama piscina 2026"></div>
+        <div><label class="f">Importe por socio (EUR)</label><input type="number" name="importe" step="0.01" min="0" placeholder="opcional"></div>
+      </div>
+      <button class="btn" type="submit">Crear lista de pago</button>
+    </form>
+    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas de pago, cambiar el titulo, anadir filas y marcar o desmarcar pagos.</p>
+  </div>
+  ${listas.length===0 ? '<div class="card"><p class="empty">Todavia no hay listas de pago. Crea la primera arriba.</p></div>' : ''}
+  ${listas.map(l=>renderListaPagoCard(l, numeroCuenta)).join('')}
+  `;
+}
+
+function renderListaPagoCard(lista, numeroCuenta){
+  const items = lista.items || [];
+  const pendientes = items.filter(i=>!i.pagado);
+  const pagados = items.filter(i=>i.pagado);
+  const sociosEnLista = new Set(items.map(i=>i.socio_id).filter(Boolean));
+  const disponibles = state.socios.filter(s=>s.activo && !sociosEnLista.has(s.id));
+  return `<div class="card">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      ${renderNombreLista(lista, 'pago')}
+      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <span class="meta">creada por ${escapeHtml(socioNombre(lista.creado_por))}</span>
+        <button class="btn accent small" data-action="export-lista-pago-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+        <button class="btn danger small" data-action="delete-lista-pago" data-id="${lista.id}">Borrar lista</button>
+      </span>
+    </h2>
+    ${numeroCuenta ? `<p class="meta" style="margin:-4px 0 10px;">Numero de cuenta: <strong>${escapeHtml(numeroCuenta)}</strong></p>` : ''}
+    <div class="menu-row" style="margin-bottom:6px;"><span class="label">Pendientes</span><span class="dots"></span><span class="value rust">${pendientes.length}</span></div>
+    ${items.length===0 ? '<p class="empty">Todavia no hay filas en esta lista.</p>' : ''}
+    ${pendientes.map(i=>renderItemPago(i)).join('')}
+    ${pagados.length ? `<details style="margin-top:8px;">
+      <summary>Ya han pagado (${pagados.length})</summary>
+      ${pagados.map(i=>renderItemPago(i)).join('')}
+    </details>` : ''}
+    <form data-form="add-item-pago" data-lista="${lista.id}" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);">
+      <p class="readonly-note" style="margin:0 0 10px;">No todos los socios tienen por que estar en esta lista: puedes anadir un socio que falte, o a alguien que no sea socio, y quitar filas con "Quitar".</p>
+      <div class="form-row">
+        <div><label class="f">Socio (opcional)</label><select name="socio_id">
+          <option value="" selected>Otra persona (no socio)</option>
+          ${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}
+        </select></div>
+        <div style="flex:2;"><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: alguien que no era socio al crear la lista"></div>
+        <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" placeholder="opcional"></div>
+      </div>
+      <button class="btn ghost small" type="submit">Anadir fila</button>
+    </form>
+  </div>`;
+}
+
+function renderItemPago(i){
+  if(editandoItemPagoId===i.id){
+    return `<form data-form="edit-item-pago" data-id="${i.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div style="flex:2;"><label class="f">Nombre</label><input type="text" name="nombre" required value="${escapeHtml(i.nombre)}"></div>
+        <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" value="${i.importe||0}"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-item-pago">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item">
+    <label style="display:flex; align-items:flex-start; gap:10px; flex:1; cursor:pointer;">
+      <input type="checkbox" data-action="toggle-item-pago" data-id="${i.id}" ${i.pagado?'checked':''} style="margin-top:4px;">
+      <span>
+        <div style="font-weight:600; ${i.pagado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.importe ? `<span class="meta">- ${money(i.importe)}</span>` : ''}</div>
+        <div class="meta">${i.pagado ? `Pagado${i.pagado_en?' el '+fmtDate(i.pagado_en.slice(0,10)):''}` : 'Pendiente de pago'}</div>
+      </span>
+    </label>
+    <div style="display:flex; gap:8px;">
+      <button class="btn ghost small" data-action="editar-item-pago" data-id="${i.id}">Editar</button>
+      <button class="btn danger small" data-action="delete-item-pago" data-id="${i.id}">Quitar</button>
+    </div>
   </div>`;
 }
 
@@ -1956,9 +2147,10 @@ function renderMovimientoItem(m){
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required value="${escapeHtml(m.concepto)}"></div>
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" required value="${m.importe}"></div>
       </div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn small" type="submit">Guardar</button>
         <button class="btn ghost small" type="button" data-action="cancelar-editar-movimiento">Cancelar</button>
+        ${m.socio_id ? `<button class="btn danger small" type="button" data-action="movimiento-no-pagado" data-id="${m.id}" title="Vuelve a la lista de gastos e ingresos de socios pendientes de verificar">Marcar como no pagado</button>` : ''}
       </div>
     </form>`;
   }
@@ -1992,7 +2184,7 @@ function renderCaja(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Gastos e ingresos de socios</span>
-      ${gastosSocios.length ? `<button class="btn ghost small" data-action="export-gastos-socios-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+      ${gastosSocios.length ? `<button class="btn accent small" data-action="export-gastos-socios-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
     <p class="meta" style="margin:-4px 0 10px;">Registra aqui un gasto que hayas pagado de tu bolsillo para la pena (para que el tesorero te lo pueda abonar) o un ingreso para que quede registrado y lo pueda comprobar el tesorero.</p>
     <form data-form="add-gasto-socio">
@@ -2048,18 +2240,15 @@ function renderCaja(){
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
       <span style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <select id="caja-mes-filtro">
-          <option value="todos" ${cajaMesFiltro==='todos'?'selected':''}>Todos los meses</option>
-          ${mesesDisponibles(state.movimientos.map(m=>m.fecha ? m.fecha.slice(0,7) : null)).map(k=>`<option value="${k}" ${cajaMesFiltro===k?'selected':''}>${labelMes(k)}</option>`).join('')}
-        </select>
-        ${ordenados.length ? `<button class="btn ghost small" data-action="export-movimientos-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
-        ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-        <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
+        ${renderSelectorPeriodo('caja', cajaPeriodo, mesesDisponibles(state.movimientos.map(m=>m.fecha ? m.fecha.slice(0,7) : null)))}
+        ${ordenados.length ? `<button class="btn accent small" data-action="export-movimientos-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+        ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+        <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
     ${(()=>{
-      const filtrados = cajaMesFiltro==='todos' ? ordenados : ordenados.filter(m=>m.fecha && m.fecha.slice(0,7)===cajaMesFiltro);
-      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaMesFiltro==='todos'?'registrados':'en ese mes'}.</p>`;
+      const filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
+      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos'?'registrados':'en ese periodo'}.</p>`;
       return filtrados.map(m=>renderMovimientoItem(m)).join('');
     })()}
   </div>`;
@@ -2070,8 +2259,8 @@ function renderBebidas(){
   return `
   <div class="subtabs" style="justify-content:flex-end; flex-wrap:wrap;">
     <span style="display:flex; gap:8px; flex-wrap:wrap;">
-      ${can('export_data') ? `<button class="btn ghost small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-      <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
+      ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+      <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
     </span>
   </div>
   ${renderBebidasConsumo()}
@@ -2084,9 +2273,8 @@ function renderBebidasConsumo(){
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const misPendientes = misBebidasPendientes();
   const misPendientesPorMes = misBebidasPendientesPorMes();
-  const anios = aniosConsumos();
-  const diasDelMes = Array.from({length:31}, (_,i)=>i+1);
-  const sinFiltro = consumosFiltroAnio==='todos' && consumosFiltroMes==='todos' && consumosFiltroDia==='todos';
+  const sinFiltro = consumosPeriodo.tipo==='todos';
+  const mesesConsumos = mesesDisponibles(state.bebidas_consumos.map(c=>c.fecha ? c.fecha.slice(0,7) : null));
   const consumosFiltradosList = consumosFiltrados(consumos);
   const consumosMostrados = sinFiltro ? consumosFiltradosList.slice(0,40) : consumosFiltradosList;
   const totalPagadoFiltrado = consumosFiltradosList.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0);
@@ -2182,21 +2370,10 @@ function renderBebidasConsumo(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalPagadoFiltrado)} - pendiente: ${money(totalPendienteFiltrado)}</span></span>
-      <button class="btn ghost small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+      <button class="btn accent small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
     </h2>
     <div class="consumos-filtro">
-      <select id="consumos-filtro-anio">
-        <option value="todos" ${consumosFiltroAnio==='todos'?'selected':''}>Todos los anos</option>
-        ${anios.map(a=>`<option value="${a}" ${consumosFiltroAnio===a?'selected':''}>${a}</option>`).join('')}
-      </select>
-      <select id="consumos-filtro-mes">
-        <option value="todos" ${consumosFiltroMes==='todos'?'selected':''}>Todos los meses</option>
-        ${MESES.map((m,i)=>`<option value="${i+1}" ${Number(consumosFiltroMes)===i+1?'selected':''}>${m}</option>`).join('')}
-      </select>
-      <select id="consumos-filtro-dia">
-        <option value="todos" ${consumosFiltroDia==='todos'?'selected':''}>Todos los dias</option>
-        ${diasDelMes.map(d=>`<option value="${d}" ${Number(consumosFiltroDia)===d?'selected':''}>${d}</option>`).join('')}
-      </select>
+      ${renderSelectorPeriodo('consumos', consumosPeriodo, mesesConsumos)}
       ${!sinFiltro ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-consumos">Quitar filtro</button>` : ''}
     </div>
     ${consumosMostrados.length===0 ? `<p class="empty">${sinFiltro ? 'Sin consumos todavia.' : 'Sin consumos en ese periodo.'}</p>` : consumosMostrados.map(c=>{
@@ -2250,9 +2427,19 @@ function renderMiniCalendario(fechaRef, items, navAction){
   for(let i=0;i<offset;i++) celdas.push('<div class="cal-day cal-day-empty"></div>');
   for(let d=1; d<=totalDias; d++){
     const dia = porDia[d]||[];
+    let ticket = '';
+    if(dia.length===1){
+      const it = dia[0];
+      ticket = `<button type="button" class="cal-ticket ${it.cls||''}" data-action="ver-evento-cal" data-detalle="${escapeHtml(it.detalle||it.label)}" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</button>`;
+    } else if(dia.length>1){
+      const clases = new Set(dia.map(it=>it.cls).filter(Boolean));
+      const cls = clases.size===1 ? [...clases][0] : '';
+      const detalle = dia.map(it=>it.detalle||it.label).join('\n\n———\n\n');
+      ticket = `<button type="button" class="cal-ticket ${cls}" data-action="ver-evento-cal" data-detalle="${escapeHtml(detalle)}" title="${dia.length} eventos este dia">${dia.length} eventos</button>`;
+    }
     celdas.push(`<div class="cal-day">
       <div class="cal-day-num">${d}</div>
-      ${dia.map(it=>`<button type="button" class="cal-ticket ${it.cls||''}" data-action="ver-evento-cal" data-detalle="${escapeHtml(it.detalle||it.label)}" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</button>`).join('')}
+      ${ticket}
     </div>`);
   }
 
@@ -2308,7 +2495,7 @@ function renderEncargados(){
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Tareas activas</span>
-      ${activas.length ? `<button class="btn ghost small" data-action="export-tareas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
+      ${activas.length ? `<button class="btn accent small" data-action="export-tareas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
     ${activas.length===0 ? '<p class="empty">No hay tareas activas.</p>' : activas.map(t=>renderTicketRow(t)).join('')}
   </div>
@@ -2557,26 +2744,39 @@ document.addEventListener('click', async (e)=>{
     else if(action==='edit-club-name'){
       const nombre = prompt('Nombre de la pena:', state.config.nombre);
       if(nombre && nombre.trim()){
-        
-        await apiPost('/api/config', {nombre: nombre.trim(), cuota_mensual: state.config.cuota_mensual ?? 45});
-        
+
+        await apiPost('/api/config', {nombre: nombre.trim(), cuota_mensual: state.config.cuota_mensual ?? 45, numero_cuenta: state.config.numero_cuenta || ''});
+
         await loadState(); render();
       }
     }
     else if(action==='edit-cuota'){
       const cuotaInput = prompt('Cuota mensual (EUR):', String(state.config.cuota_mensual ?? 45));
       if(cuotaInput !== null){
-        
+
         const cuotaValue = Number(cuotaInput);
-        
+
         await apiPost('/api/config', {
-        
+
           nombre: state.config.nombre,
-        
-          cuota_mensual: Number.isFinite(cuotaValue) ? cuotaValue : (state.config.cuota_mensual ?? 45)
-        
+
+          cuota_mensual: Number.isFinite(cuotaValue) ? cuotaValue : (state.config.cuota_mensual ?? 45),
+
+          numero_cuenta: state.config.numero_cuenta || ''
+
         });
-        
+
+        await loadState(); render();
+      }
+    }
+    else if(action==='edit-cuenta'){
+      const cuentaInput = prompt('Numero de cuenta para pagos (IBAN):', state.config.numero_cuenta || '');
+      if(cuentaInput !== null){
+        await apiPost('/api/config', {
+          nombre: state.config.nombre,
+          cuota_mensual: state.config.cuota_mensual ?? 45,
+          numero_cuenta: cuentaInput.trim(),
+        });
         await loadState(); render();
       }
     }
@@ -2633,7 +2833,7 @@ document.addEventListener('click', async (e)=>{
       if(input) input.value = '';
       render();
     }
-    else if(action==='limpiar-filtro-consumos'){ consumosFiltroAnio='todos'; consumosFiltroMes='todos'; consumosFiltroDia='todos'; render(); }
+    else if(action==='limpiar-filtro-consumos'){ consumosPeriodo = {tipo:'todos', valor:''}; render(); }
     else if(action==='cuota-year'){ cuotasYear += Number(btn.dataset.dir); render(); }
     else if(action==='resumen-grafico-year'){ resumenGraficoYear += Number(btn.dataset.dir); render(); }
     else if(action==='export-log-eventos'){ exportarLogEventos(); }
@@ -2742,7 +2942,7 @@ document.addEventListener('click', async (e)=>{
       const tareas = (state.tareas_tickets||[]).filter(t=>t.estado!=='hecho');
       const porEstado = {pendiente:[], en_curso:[]};
       tareas.forEach(t=>{ (porEstado[t.estado]||(porEstado[t.estado]=[])).push(t); });
-      const linea = t=>`- ${t.tipo}${(t.socios_ids&&t.socios_ids.length)?' (' + t.socios_ids.map(socioNombre).join(', ') + ')':' (sin asignar)'}${t.fecha?' - '+fmtDate(t.fecha):''}${t.notas?' - '+t.notas:''}`;
+      const linea = t=>`- ${t.tipo}${(t.socios_ids&&t.socios_ids.length)?' (' + t.socios_ids.map(socioNombre).join(', ') + ')':' (sin asignar)'}${t.fecha?' - *'+fmtDate(t.fecha)+'*':''}${t.notas?' - '+t.notas:''}`;
       let texto = `*Tareas de la pena* - ${fmtDate(todayISO())}\n`;
       if(porEstado.pendiente && porEstado.pendiente.length){ texto += `\n*Pendientes:*\n${porEstado.pendiente.map(linea).join('\n')}\n`; }
       if(porEstado.en_curso && porEstado.en_curso.length){ texto += `\n*En curso:*\n${porEstado.en_curso.map(linea).join('\n')}\n`; }
@@ -2752,13 +2952,13 @@ document.addEventListener('click', async (e)=>{
     else if(action==='export-reservas-whatsapp'){
       const proximas = state.reservas.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
       let texto = `*Reservas de la pena* - ${fmtDate(todayISO())}\n\n`;
-      texto += proximas.length ? proximas.map(r=>`- ${fmtDate(r.fecha)} (${fmtHoras(r)}): ${r.evento} - ${socioNombre(r.socio_id)}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reservas proximas.';
+      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento} - ${socioNombre(r.socio_id)}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reservas proximas.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-reuniones-whatsapp'){
       const proximas = state.reuniones.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
       let texto = `*Reuniones de la pena* - ${fmtDate(todayISO())}\n\n`;
-      texto += proximas.length ? proximas.map(r=>`- ${fmtDate(r.fecha)} (${fmtHoras(r)}): ${r.evento}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reuniones proximas.';
+      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reuniones proximas.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-inventario-whatsapp'){
@@ -2779,6 +2979,21 @@ document.addEventListener('click', async (e)=>{
       texto += pendientes.length ? pendientes.map(i=>`- ${i.nombre}${i.cantidad?' ('+i.cantidad+')':''}`).join('\n') : 'No queda nada pendiente por comprar.';
       enviarWhatsapp(texto);
     }
+    else if(action==='export-lista-pago-whatsapp'){
+      const lista = (state.listas_pago||[]).find(l=>l.id===btn.dataset.id);
+      if(!lista) return;
+      const items = lista.items||[];
+      const pendientes = items.filter(i=>!i.pagado);
+      const pagados = items.filter(i=>i.pagado);
+      let texto = `*Lista de pago: ${lista.nombre}* - ${fmtDate(todayISO())}\n\n`;
+      if(state.config && state.config.numero_cuenta){ texto += `Numero de cuenta: *${state.config.numero_cuenta}*\n\n`; }
+      texto += `*Pendientes de pagar:*\n`;
+      texto += pendientes.length ? pendientes.map(i=>`- ${i.nombre}${i.importe?' - *'+money(i.importe)+'*':''}`).join('\n') : 'Nadie pendiente, todos han pagado.';
+      if(pagados.length){
+        texto += `\n\n*Ya han pagado:*\n` + pagados.map(i=>`- ${i.nombre}${i.importe?' - *'+money(i.importe)+'*':''}`).join('\n');
+      }
+      enviarWhatsapp(texto);
+    }
     else if(action==='export-bebidas-whatsapp'){
       const pendientes = (state.bebidas_consumos||[]).filter(c=>!c.pagado);
       const porConsumidor = {};
@@ -2786,7 +3001,7 @@ document.addEventListener('click', async (e)=>{
       const nombres = Object.keys(porConsumidor).sort((a,b)=>porConsumidor[b]-porConsumidor[a]);
       let texto = `*Deuda de bebidas pendiente* - ${fmtDate(todayISO())}\n\n`;
       if(nombres.length){
-        texto += nombres.map(n=>`- ${n}: ${money(porConsumidor[n])}`).join('\n');
+        texto += nombres.map(n=>`- ${n}: *${money(porConsumidor[n])}*`).join('\n');
         texto += `\n\n*Total pendiente: ${money(pendientes.reduce((a,c)=>a+Number(c.importe||0),0))}*`;
       } else {
         texto += 'No hay deuda pendiente, todo esta pagado.';
@@ -2797,7 +3012,7 @@ document.addEventListener('click', async (e)=>{
       const pendientes = gastosSociosPendientes();
       let texto = `*Gastos e ingresos de socios* - ${fmtDate(todayISO())}\n\n`;
       if(pendientes.length){
-        texto += '*Pendientes de verificar:*\n' + pendientes.map(g=>`- ${g.tipo==='ingreso'?'Ingreso':'Gasto'}: ${g.concepto} - ${money(g.importe)} - ${g.socio_nombre||'-'} (${fmtDate(g.fecha)})`).join('\n');
+        texto += '*Pendientes de verificar:*\n' + pendientes.map(g=>`- ${g.tipo==='ingreso'?'Ingreso':'Gasto'}: ${g.concepto} - *${money(g.importe)}* - ${g.socio_nombre||'-'} (*${fmtDate(g.fecha)}*)`).join('\n');
         texto += `\n\n*Total pendiente: ${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}*`;
       } else {
         texto += 'No hay gastos ni ingresos de socios pendientes de verificar.';
@@ -2806,69 +3021,71 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='export-movimientos-whatsapp'){
       const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-      const filtrados = cajaMesFiltro==='todos' ? ordenados : ordenados.filter(m=>m.fecha && m.fecha.slice(0,7)===cajaMesFiltro);
-      let texto = `*Movimientos${cajaMesFiltro==='todos'?'':' - '+labelMes(cajaMesFiltro)}* - ${fmtDate(todayISO())}\n\n`;
-      texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}${money(m.importe)} - ${m.concepto} (${m.categoria})${m.socio_id?' - '+socioNombre(m.socio_id):(m.no_socio_nombre?' - '+m.no_socio_nombre:'')} - ${fmtDate(m.fecha)}`).join('\n') : 'Sin movimientos.';
+      const filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
+      let texto = `*Movimientos${cajaPeriodo.tipo==='todos'?'':' - '+labelPeriodo(cajaPeriodo)}* - ${fmtDate(todayISO())}\n\n`;
+      texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}*${money(m.importe)}* - ${m.categoria} - ${m.concepto}${m.socio_id?' - '+socioNombre(m.socio_id):(m.no_socio_nombre?' - '+m.no_socio_nombre:'')} - *${fmtDate(m.fecha)}*`).join('\n') : 'Sin movimientos.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-cuentas-whatsapp'){
+      const periodo = cuentasPeriodo;
       const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
       const gastosTotales = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
       const saldo = ingresosTotales - gastosTotales;
-      let texto = `*Cuentas de la pena* - ${fmtDate(todayISO())}\n\n`;
+      let texto = `*Cuentas de la pena${periodo.tipo==='todos'?'':' - '+labelPeriodo(periodo)}* - ${fmtDate(todayISO())}\n\n`;
 
-      const cuotasPagadas = state.cuotas.filter(c=>c.pagado)
+      const cuotasPagadas = state.cuotas.filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo))
         .sort((a,b)=> (b.year-a.year) || (b.month-a.month) || socioNombre(a.socio_id).localeCompare(socioNombre(b.socio_id)));
-      texto += `*Cuotas* (${money(totalIngresosCuotas())})\n`;
+      texto += `*Cuotas* (${money(totalIngresosCuotas(periodo))})\n`;
       texto += cuotasPagadas.length
-        ? cuotasPagadas.map(c=>`- ${socioNombre(c.socio_id)} - ${MESES[c.month-1]} ${c.year}: ${money(c.importe)}`).join('\n')
+        ? cuotasPagadas.map(c=>`- ${socioNombre(c.socio_id)} - ${MESES[c.month-1]} ${c.year}: *${money(c.importe)}*`).join('\n')
         : 'Sin cuotas pagadas.';
       texto += '\n\n';
 
-      const bebidasPagadas = [...state.bebidas_consumos].filter(c=>c.pagado).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-      texto += `*Bebidas* (${money(totalBebidasIngreso())})\n`;
+      const bebidasPagadas = [...state.bebidas_consumos].filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      texto += `*Bebidas* (${money(totalBebidasIngreso(periodo))})\n`;
       texto += bebidasPagadas.length
-        ? bebidasPagadas.map(c=>`- ${c.consumidor} - ${c.cantidad} x ${c.bebida_nombre||'bebida'} - ${fmtDate(c.fecha)}: ${money(c.importe)}`).join('\n')
+        ? bebidasPagadas.map(c=>`- ${c.consumidor} - ${c.cantidad} x ${c.bebida_nombre||'bebida'} - *${fmtDate(c.fecha)}*: *${money(c.importe)}*`).join('\n')
         : 'Sin consumos pagados.';
       texto += '\n\n';
 
-      const movsOrdenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      const movsOrdenados = [...state.movimientos].filter(m=>dentroDePeriodo(m.fecha, periodo)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
       const otrosIngresos = movsOrdenados.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios');
-      texto += `*Otros ingresos* (${money(totalIngresosMov())})\n`;
+      texto += `*Otros ingresos* (${money(totalIngresosMov(periodo))})\n`;
       texto += otrosIngresos.length
-        ? otrosIngresos.map(m=>`- ${fmtDate(m.fecha)} - ${m.concepto} (${m.categoria}): ${money(m.importe)}`).join('\n')
+        ? otrosIngresos.map(m=>`- *${fmtDate(m.fecha)}* - ${m.categoria} - ${m.concepto}: *${money(m.importe)}*`).join('\n')
         : 'Sin otros ingresos.';
       texto += '\n\n';
 
       const ingresosSocios = movsOrdenados.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso');
-      texto += `*Ingresos de socios* (${money(totalIngresosSociosVerificados())})\n`;
+      texto += `*Ingresos de socios* (${money(totalIngresosSociosVerificados(periodo))})\n`;
       texto += ingresosSocios.length
-        ? ingresosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - ${fmtDate(m.fecha)}: ${money(m.importe)}`).join('\n')
+        ? ingresosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - *${fmtDate(m.fecha)}*: *${money(m.importe)}*`).join('\n')
         : 'Sin ingresos de socios verificados.';
       texto += '\n\n';
 
       const gastosSocios = movsOrdenados.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso');
-      texto += `*Gastos de socios* (-${money(totalGastosSociosVerificados())})\n`;
+      texto += `*Gastos de socios* (-${money(totalGastosSociosVerificados(periodo))})\n`;
       texto += gastosSocios.length
-        ? gastosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - ${fmtDate(m.fecha)}: -${money(m.importe)}`).join('\n')
+        ? gastosSocios.map(m=>`- ${m.socio_nombre||'-'} - ${m.concepto} - *${fmtDate(m.fecha)}*: -*${money(m.importe)}*`).join('\n')
         : 'Sin gastos de socios verificados.';
       texto += '\n\n';
 
-      const fiestasGastos = [...state.fiestas_gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-      texto += `*Gastos de fiestas* (-${money(totalFiestasGasto())})\n`;
+      const fiestasGastos = [...state.fiestas_gastos].filter(f=>dentroDePeriodo(f.fecha, periodo)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      texto += `*Gastos de fiestas* (-${money(totalFiestasGasto(periodo))})\n`;
       texto += fiestasGastos.length
-        ? fiestasGastos.map(f=>`- ${f.evento} - ${f.concepto} - ${fmtDate(f.fecha)}: -${money(f.importe)}`).join('\n')
+        ? fiestasGastos.map(f=>`- ${f.evento} - ${f.concepto} - *${fmtDate(f.fecha)}*: -*${money(f.importe)}*`).join('\n')
         : 'Sin gastos de fiestas.';
       texto += '\n\n';
 
       const gastosGenerales = movsOrdenados.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios');
-      texto += `*Gastos generales* (-${money(totalGastosMov())})\n`;
+      texto += `*Gastos generales* (-${money(totalGastosMov(periodo))})\n`;
       texto += gastosGenerales.length
-        ? gastosGenerales.map(m=>`- ${fmtDate(m.fecha)} - ${m.concepto} (${m.categoria}): -${money(m.importe)}`).join('\n')
+        ? gastosGenerales.map(m=>`- *${fmtDate(m.fecha)}* - ${m.categoria} - ${m.concepto}: -*${money(m.importe)}*`).join('\n')
         : 'Sin gastos generales.';
       texto += '\n\n';
 
       texto += `*Saldo total: ${saldo<0?'-':'+'}${money(Math.abs(saldo))}*`;
+      if(periodo.tipo!=='todos'){ texto += ' (de todo el historial; el resto de cifras de arriba son solo del periodo elegido)'; }
       const pendientes = gastosSociosPendientes();
       if(pendientes.length){
         texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavia al saldo.`;
@@ -2881,16 +3098,16 @@ document.addEventListener('click', async (e)=>{
       const balances = ev.balances||{};
       const transferencias = ev.transferencias||[];
       let texto = `*Tricount: ${ev.nombre}* - ${fmtDate(ev.fecha)}\n\n`;
-      texto += `Total del evento: ${money(ev.total)}\n\n`;
+      texto += `Total del evento: *${money(ev.total)}*\n\n`;
       if((ev.participantes||[]).length){
         texto += '*Saldos:*\n' + ev.participantes.map(sid=>{
           const b = balances[sid]||0;
-          const texto2 = b>0.005 ? `le deben ${money(b)}` : (b<-0.005 ? `debe ${money(-b)}` : 'en paz');
+          const texto2 = b>0.005 ? `le deben *${money(b)}*` : (b<-0.005 ? `debe *${money(-b)}*` : 'en paz');
           return `- ${socioNombre(sid)}: ${texto2}`;
         }).join('\n') + '\n\n';
       }
       texto += transferencias.length
-        ? '*Quien paga a quien:*\n' + transferencias.map(t=>`- ${socioNombre(t.de)} -> ${socioNombre(t.a)}: ${money(t.importe)}`).join('\n')
+        ? '*Quien paga a quien:*\n' + transferencias.map(t=>`- ${socioNombre(t.de)} -> ${socioNombre(t.a)}: *${money(t.importe)}*`).join('\n')
         : 'No queda ningun pago pendiente entre los participantes.';
       enviarWhatsapp(texto);
     }
@@ -2930,6 +3147,38 @@ document.addEventListener('click', async (e)=>{
       editandoItemCompraId = null;
       render();
     }
+    else if(action==='listas-subtab'){
+      listasSubTab = btn.dataset.sub;
+      editandoNombreListaId = null;
+      render();
+    }
+    else if(action==='editar-nombre-lista'){
+      editandoNombreListaId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-nombre-lista'){
+      editandoNombreListaId = null;
+      render();
+    }
+    else if(action==='delete-lista-pago'){
+      if(confirm('Borrar esta lista de pago y todas sus filas?')){ await apiDelete(`/api/listas-pago/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='toggle-item-pago'){
+      await apiPost(`/api/listas-pago/items/${btn.dataset.id}/toggle`);
+      await loadState(); render();
+    }
+    else if(action==='delete-item-pago'){
+      await apiDelete(`/api/listas-pago/items/${btn.dataset.id}`);
+      await loadState(); render();
+    }
+    else if(action==='editar-item-pago'){
+      editandoItemPagoId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-item-pago'){
+      editandoItemPagoId = null;
+      render();
+    }
     else if(action==='delete-movimiento'){
       if(confirm('Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
     }
@@ -2943,6 +3192,13 @@ document.addEventListener('click', async (e)=>{
     else if(action==='cancelar-editar-movimiento'){
       editandoMovimientoId = null;
       render();
+    }
+    else if(action==='movimiento-no-pagado'){
+      if(confirm('Este movimiento volvera a "Gastos e ingresos de socios" como pendiente de verificar. Continuar?')){
+        await apiPost(`/api/movimientos/${btn.dataset.id}/no-pagado`);
+        editandoMovimientoId = null;
+        await loadState(); render();
+      }
     }
     else if(action==='toggle-abonado-gasto-socio'){
       await apiPost(`/api/gastos-socios/${btn.dataset.id}/abonado`);
@@ -3046,9 +3302,9 @@ document.addEventListener('click', async (e)=>{
       const original = btn.textContent;
       btn.textContent = 'Generando...'; btn.disabled = true;
       try{
-        
-        const res = await fetch('/api/export.xlsx');
-        
+        const qs = btn.dataset.desde ? `?desde=${btn.dataset.desde}&hasta=${btn.dataset.hasta}` : '';
+        const res = await fetch('/api/export.xlsx'+qs);
+
         if(!res.ok){
         
           let msg = 'No se pudo exportar el Excel.';
@@ -3154,22 +3410,30 @@ document.addEventListener('change', async (e)=>{
     render();
     return;
   }
-  if(e.target.id==='resumen-stat-mes'){
-    resumenStatMes = e.target.value;
-    render();
+  if(e.target.dataset && e.target.dataset.periodoPrefix){
+    const prefix = e.target.dataset.periodoPrefix;
+    const periodos = {caja:cajaPeriodo, cuentas:cuentasPeriodo, consumos:consumosPeriodo, resumen:resumenPeriodo};
+    const periodo = periodos[prefix];
+    if(periodo){
+      if(e.target.id===`${prefix}-tipo`){
+        periodo.tipo = e.target.value;
+        periodo.valor = valorPorDefectoPeriodo(periodo.tipo);
+      } else if(e.target.id===`${prefix}-valor`){
+        periodo.valor = e.target.value;
+      }
+      render();
+    }
     return;
   }
-  if(e.target.id==='caja-mes-filtro'){
-    cajaMesFiltro = e.target.value;
-    render();
-    return;
-  }
-  if(e.target.id==='consumos-filtro-anio'){ consumosFiltroAnio = e.target.value; render(); return; }
-  if(e.target.id==='consumos-filtro-mes'){ consumosFiltroMes = e.target.value; render(); return; }
-  if(e.target.id==='consumos-filtro-dia'){ consumosFiltroDia = e.target.value; render(); return; }
   if(e.target.name==='socio_id' && e.target.form && (e.target.form.dataset.form==='add-movimiento' || e.target.form.dataset.form==='edit-movimiento')){
     const noSocioInput = e.target.form.querySelector('[name=no_socio_nombre]');
     if(noSocioInput) noSocioInput.style.display = e.target.value ? 'none' : '';
+    return;
+  }
+  if(e.target.name==='socio_id' && e.target.form && e.target.form.dataset.form==='add-item-pago'){
+    const nombreInput = e.target.form.querySelector('[name=nombre]');
+    const opcionElegida = e.target.selectedOptions[0];
+    if(nombreInput && e.target.value && opcionElegida){ nombreInput.value = opcionElegida.textContent; }
     return;
   }
   if(e.target.name==='consumidorTipo'){
@@ -3369,6 +3633,23 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='edit-item-compra'){
       await apiPost(`/api/listas-compra/items/${form.dataset.id}`, data);
       editandoItemCompraId = null;
+    }
+    else if(type==='edit-nombre-lista-compra'){
+      await apiPost(`/api/listas-compra/${form.dataset.id}`, data);
+      editandoNombreListaId = null;
+    }
+    else if(type==='edit-nombre-lista-pago'){
+      await apiPost(`/api/listas-pago/${form.dataset.id}`, data);
+      editandoNombreListaId = null;
+    }
+    else if(type==='add-lista-pago'){ await apiPost('/api/listas-pago', data); }
+    else if(type==='add-item-pago'){
+      await apiPost(`/api/listas-pago/${form.dataset.lista}/items`, data);
+      form.reset();
+    }
+    else if(type==='edit-item-pago'){
+      await apiPost(`/api/listas-pago/items/${form.dataset.id}`, data);
+      editandoItemPagoId = null;
     }
     else if(type==='add-gasto-evento'){
       const participantes = new FormData(form).getAll('participantes');
