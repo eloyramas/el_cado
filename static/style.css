@@ -145,10 +145,39 @@ input,select,textarea{font-family:inherit; font-size:0.95rem;}
   overflow-wrap:break-word;
 }
 .card h2{
-  font-family:'Caveat', cursive; font-weight:700; font-size:1.7rem;
-  color:var(--chalk); margin:0 0 12px; display:flex; align-items:center; gap:8px;
+  font-family:'Caveat', cursive; font-weight:700; font-size:1.85rem;
+  color:var(--chalk); margin:0 0 14px; display:flex; align-items:center; gap:8px;
+  padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg-panel-2);
 }
-.card h2 .pin{width:8px; height:8px; border-radius:50%; background:var(--rust); display:inline-block;}
+.card h2 .pin{width:8px; height:8px; border-radius:50%; background:var(--rust); display:inline-block; flex:none;}
+/* el subrayado va SOLO en el span del titulo (nunca en h2 directamente), para que no se
+   "filtre" a los botones de accion (WhatsApp, Excel...) que viven al lado dentro del mismo h2 */
+.card h2 .h2-underline{
+  display:inline-flex; align-items:center; gap:8px;
+  text-decoration:underline; text-decoration-color:var(--rust); text-decoration-thickness:2px; text-underline-offset:5px;
+}
+/* dentro de la cabecera de una tarjeta, solo el titulo va subrayado: cualquier boton
+   tipo enlace (p.ej. "Editar titulo") que quede fuera del span del titulo, sin linea */
+.card h2 .link-btn{text-decoration:none;}
+/* titulo de las tarjetas que crean/anaden algo (h2 seguido de un formulario, con o sin un
+   parrafo suelto en medio, p.ej. "Nueva lista de pago"): resaltado extra, distinto del resto.
+   No se usa el combinador general "~" a proposito, para no confundirlo con los formularios
+   de editar que aparecen mas abajo dentro de la misma tarjeta (gastos de socio, movimientos...). */
+.card:not(.no-collapse):has(> h2:first-child + form) > h2:first-child,
+.card:not(.no-collapse):has(> h2:first-child + * + form) > h2:first-child{
+  background:rgba(232,163,61,0.14); border:1px solid var(--amber-dim); border-width:1.5px;
+  color:var(--amber);
+}
+/* las cabeceras con desplegable (recuadro amarillo) van sin subrayado, solo el recuadro */
+.card:not(.no-collapse):has(> h2:first-child + form) > h2:first-child .h2-underline,
+.card:not(.no-collapse):has(> h2:first-child + * + form) > h2:first-child .h2-underline{text-decoration:none;}
+.card:not(.no-collapse):has(> h2:first-child + form) > h2:first-child .pin,
+.card:not(.no-collapse):has(> h2:first-child + * + form) > h2:first-child .pin{background:var(--amber);}
+.card-toggle-arrow{
+  background:none; border:none; color:inherit; cursor:pointer; padding:2px 6px;
+  font-size:0.85rem; line-height:1; transition:transform 0.15s ease; flex:none;
+}
+.card-toggle-arrow.collapsed{transform:rotate(180deg);}
 .card-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
 @media(max-width:680px){.card-grid{grid-template-columns:1fr;}}
 
@@ -216,7 +245,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--amber-dim);}
 textarea{resize:vertical; min-height:60px;}
 .btn{
   background:var(--amber); color:#20160a; border:none; border-radius:7px;
-  padding:9px 16px; font-weight:700; font-size:0.88rem;
+  padding:9px 16px; font-weight:700; font-size:0.88rem; text-decoration:none !important;
 }
 .btn:hover{background:#f2b458;}
 .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--chalk); font-weight:600;}
@@ -255,6 +284,8 @@ textarea{resize:vertical; min-height:60px;}
 }
 .tag.ok{background:rgba(127,168,140,0.18); color:var(--sage);}
 .tag.warn{background:rgba(193,85,58,0.18); color:var(--rust);}
+.tag.sky{background:rgba(107,143,176,0.22); color:var(--sky);}
+.tag.big{font-size:0.86rem; padding:6px 12px; font-weight:700; margin-right:0;}
 .empty{color:var(--chalk-dim); font-size:0.86rem; font-style:italic; padding:8px 0;}
 
 @media(max-width:520px){
@@ -451,6 +482,20 @@ body.no-scroll{overflow:hidden;}
 .scroll-top-btn.visible{opacity:1; pointer-events:auto; transform:translateY(0);}
 .scroll-top-btn:hover{border-color:var(--amber-dim); color:var(--amber);}
 @media(max-width:480px){.scroll-top-btn{right:14px; bottom:14px;}}
+
+/* flechitas para mover el cursor en campos de texto largos (movil) */
+.cursor-nudge{
+  position:fixed; z-index:80; display:none; gap:6px;
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:20px;
+  padding:4px; box-shadow:0 8px 20px rgba(0,0,0,0.35);
+}
+.cursor-nudge.visible{display:flex;}
+.cursor-nudge-btn{
+  width:34px; height:34px; border-radius:50%; border:1px solid var(--line);
+  background:var(--bg-panel-2); color:var(--amber); font-size:1.1rem; line-height:1;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+}
+.cursor-nudge-btn:active{background:var(--amber); color:#20160a;}
 
 /* deslizar hacia abajo para actualizar */
 .pull-refresh-indicator{
@@ -732,6 +777,7 @@ body.no-scroll{overflow:hidden;}
 }
 
 /* asistente de ayuda flotante */
+.help-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:39;}
 .help-fab{
   position:fixed; left:20px; top:20px; z-index:40;
   width:52px; height:52px; border-radius:50%; border:none;
@@ -741,7 +787,7 @@ body.no-scroll{overflow:hidden;}
 .help-fab:hover{filter:brightness(1.08);}
 .help-panel{
   position:fixed; left:20px; top:82px; z-index:40;
-  width:340px; max-width:88vw; max-height:60vh; display:flex; flex-direction:column;
+  width:340px; max-width:88vw; max-height:82vh; display:flex; flex-direction:column;
   background:var(--bg-panel); border:1px solid var(--line); border-radius:14px;
   box-shadow:0 20px 60px rgba(0,0,0,0.45); overflow:hidden;
 }
@@ -759,7 +805,7 @@ body.no-scroll{overflow:hidden;}
   margin:0 14px; padding:9px 12px; border-radius:8px; border:1px solid var(--line);
   background:rgba(15,26,21,0.72); color:var(--chalk); flex:none;
 }
-.help-suggestions{display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px 12px; flex:none; max-height:96px; overflow-y:auto;}
+.help-suggestions{display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px 12px; flex:none; max-height:280px; overflow-y:auto;}
 .help-suggestion{
   background:var(--bg-panel-2); border:1px solid var(--line); color:var(--chalk);
   border-radius:14px; padding:6px 10px; font-size:0.76rem; text-align:left;

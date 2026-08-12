@@ -6,7 +6,7 @@
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const CAT_INV = ['Cocina','Mobiliario','Electronica','Otros'];
 const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
-const DIA_LIMITE_CUOTA = 5; // a partir de que dia del mes se avisa de cuota pendiente
+const DIA_LIMITE_CUOTA = 5; // a partir de qué día del mes se avisa de cuota pendiente
 let BG_IMAGES = [];
 const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg','/static/backgrounds/bg-6.jpg'];
 const PENA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
@@ -14,40 +14,40 @@ let avatarVersion = Date.now();
 
 /* ============ AYUDA (FAQ con guion, sin IA externa) ============ */
 const FAQ_ENTRIES = [
-  {id:'entrar', pregunta:'Como entro / inicio sesion?', palabras:['entrar','entro','sesion','login','iniciar','acceder'],
-    respuesta:'Escribe tu nombre en el buscador de la pantalla de inicio, elige tu cara entre los resultados y escribe tu PIN de 4 digitos. Si es la primera vez que entras, la app te pedira crear tu propio PIN antes de continuar.'},
-  {id:'pin-olvidado', pregunta:'Se me ha olvidado el PIN, que hago?', palabras:['olvide','olvidado','pin','recuperar','restablecer','reset'],
-    respuesta:'Pidele al administrador (o a quien gestione socios) que te restablezca el PIN desde la pestana Socios, boton "Restablecer PIN". Te dara uno temporal y tendras que cambiarlo por el tuyo la proxima vez que entres.'},
-  {id:'marcar-cuota', pregunta:'Quien puede ver y marcar las cuotas?', palabras:['cuota','cuotas','pagar','pagado','marcar','tesorero'],
-    respuesta:'Todos los socios pueden ver la pestana Cuotas (quien ha pagado y quien falta cada mes), pero solo el tesorero y el administrador pueden marcar una cuota como pagada (se marca con una cruz), previa comprobacion.'},
-  {id:'reservar', pregunta:'Como reservo la pena?', palabras:['reservar','reserva','reservas','calendario'],
-    respuesta:'Ve a la pestana Reservas, rellena la fecha y el evento (las horas son opcionales) y pulsa "Reservar a mi nombre". Puedes cancelar tu propia reserva desde la lista de proximas reservas. En los calendarios (Reservas, Reuniones, Tareas) puedes pulsar la etiqueta de un dia para ver los detalles de ese evento, muy util desde el movil.'},
-  {id:'tricount', pregunta:'Como funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
-    respuesta:'En la pestana Tricount crea un evento; para anadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automaticamente). Cada participante puede registrar los pagos que hizo y entre quien se reparten; la app calcula sola quien tiene que pagar a quien. Cada evento tiene su boton "Enviar por WhatsApp" para mandar al grupo los saldos y quien tiene que pagar a quien, sin tener que explicarlo a mano. Cuando el evento ya esta cerrado puedes ocultarlo con el boton "Ocultar".'},
-  {id:'tareas', pregunta:'Como me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket','estado','pendiente','hecha'],
-    respuesta:'En la pestana Tareas cualquier socio puede crear una tarea. En "Quien la hace" puedes anadir con el boton "+" a tantos socios como haga falta (no tiene por que ser uno solo), o dejarla sin nadie y que alguien se apunte despues con "+ Apuntarme". Una vez creada, cualquier socio puede anadir o quitar gente, editarla, cambiarle el estado o borrarla: el estado (Pendiente / En curso / Hecha) se elige directamente en un desplegable, no hace falta ir pasando por los tres en orden. La tarea nunca se borra sola al cambiar de estado: cuando la marcas como "Hecha" simplemente pasa de "Tareas activas" al "Historial de tareas completadas" mas abajo en la misma pestana, y solo desaparece de verdad si alguien pulsa "Borrar". Tambien puedes enviar el listado de tareas activas al grupo de WhatsApp con un boton.'},
-  {id:'foto', pregunta:'Como cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
-    respuesta:'Desde la pestana Socios (o Mi perfil) pulsa el boton "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lapiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviertela antes a JPG.'},
-  {id:'precios-bebidas', pregunta:'Quien puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
-    respuesta:'Cualquier socio puede consultar los precios en la pestana Bebidas, para saber cuanto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Anadir precios nuevos, registrar consumo de otro socio o de un invitado, y gestionar el resto de consumos es cosa del administrador o el tesorero; cualquier socio puede registrar su propio consumo.'},
-  {id:'gastos-socios', pregunta:'Como registro un gasto que he pagado yo para la pena?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
-    respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tu como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tu o el administrador/tesorero podeis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavia esta pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automaticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habias subido, se copia tambien alli) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahi, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en anos posteriores; no depende ya de la solicitud original.'},
-  {id:'duplicados', pregunta:'Que pasa si registro un gasto que ya estaba apuntado?', palabras:['duplicado','duplicar','repetido','repetir','ya existe','aviso'],
-    respuesta:'Al anadir o editar un movimiento (Caja > Registrar movimiento) o un gasto/ingreso de socio, la app comprueba si ya hay algo con la misma fecha y el mismo concepto (mirando tanto en Movimientos como en Gastos e ingresos de socios) y te avisa por si es un duplicado antes de guardarlo. No te lo bloquea del todo -si de verdad son dos cosas distintas el mismo dia con el mismo nombre, puedes confirmar igualmente y se guarda-, es solo un aviso para evitar que se apunte dos veces lo mismo por error.'},
-  {id:'excel', pregunta:'Como exporto o importo datos con Excel?', palabras:['excel','exportar','importar','descargar','subir','xlsx','cuentas'],
-    respuesta:'Si tienes permiso para exportar datos, veras un boton "Exportar a Excel" en Resumen, Inventario, Bebidas y Caja > Movimientos. Descarga un unico archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.\n\nEl boton "Importar Excel" (al lado del de exportar) lo puede usar cualquier socio, no hace falta ser administrador. Al subir un archivo, la app aplica cada hoja segun los permisos que ya tengas en esa parte de la app: si por ejemplo no gestionas cuotas ni finanzas, esas hojas del Excel se ignoran (se avisa en el resumen que aparece despues de importar cuantas filas se han omitido y por que), pero si puedes editar tareas, inventario, reservas o Tricount (que estan abiertos a todos), esas filas si se aplican. Asi cualquiera puede reutilizar el importador para corregir o cargar datos en lo que ya tiene permiso de tocar, sin arriesgarse a tocar roles, socios o finanzas sin querer.'},
-  {id:'whatsapp', pregunta:'Como envio informacion al grupo de WhatsApp?', palabras:['whatsapp','enviar','compartir','grupo','mensaje'],
-    respuesta:'Veras un boton "Enviar por WhatsApp" en casi todas las pestanas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Tricount (uno por cada evento, con los saldos y quien paga a quien), Bebidas (con la deuda pendiente), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", ademas de en Resumen > Cuentas. Al pulsarlo se prepara automaticamente un mensaje con la informacion mas util de esa pestana (lo pendiente, lo proximo, etc.) y se abre WhatsApp para que elijas tu mismo a que chat o grupo lo mandas. Esta disponible para todos los socios, sin necesidad de ningun permiso especial.'},
-  {id:'roles', pregunta:'Que son los roles y quien los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
-    respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignarselos a los socios, desde la pestana Roles.'},
-  {id:'avisos', pregunta:'Que es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
-    respuesta:'La campanita de la cabecera avisa de cuotas pendientes, bebidas por pagar y actividad reciente (reservas y reuniones). El numero indica cuantos avisos hay ahora mismo; desde ahi tambien puedes exportarlos como un log de texto. Para cerrar el desplegable, pulsa la campanita otra vez o toca en cualquier otro sitio de la pantalla.'},
-  {id:'baja', pregunta:'Que pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
+  {id:'entrar', pregunta:'¿Cómo entro / inicio sesión?', palabras:['entrar','entro','sesion','login','iniciar','acceder'],
+    respuesta:'Escribe tu nombre en el buscador de la pantalla de inicio, elige tu cara entre los resultados y escribe tu PIN de 4 dígitos. Si es la primera vez que entras, la app te pedirá crear tu propio PIN antes de continuar.'},
+  {id:'pin-olvidado', pregunta:'Se me ha olvidado el PIN, ¿qué hago?', palabras:['olvide','olvidado','pin','recuperar','restablecer','reset'],
+    respuesta:'Pídele al administrador (o a quien gestione socios) que te restablezca el PIN desde la pestaña Socios, botón "Restablecer PIN". Te dará uno temporal y tendrás que cambiarlo por el tuyo la próxima vez que entres.'},
+  {id:'marcar-cuota', pregunta:'¿Quién puede ver y marcar las cuotas?', palabras:['cuota','cuotas','pagar','pagado','marcar','tesorero'],
+    respuesta:'Todos los socios pueden ver la pestaña Cuotas (quién ha pagado y quién falta cada mes), pero solo el tesorero y el administrador pueden marcar una cuota como pagada (se marca con una cruz), previa comprobación.'},
+  {id:'reservar', pregunta:'¿Cómo reservo la peña?', palabras:['reservar','reserva','reservas','calendario'],
+    respuesta:'Ve a la pestaña Reservas, rellena la fecha y el evento (las horas son opcionales) y pulsa "Reservar a mi nombre". Puedes cancelar tu propia reserva desde la lista de próximas reservas. En los calendarios (Reservas, Reuniones, Tareas) puedes pulsar la etiqueta de un día para ver los detalles de ese evento, muy útil desde el móvil.'},
+  {id:'tricount', pregunta:'¿Cómo funciona el Tricount (reparto de gastos)?', palabras:['tricount','reparto','gastos','evento','cena'],
+    respuesta:'En la pestaña Tricount crea un evento; para añadir participantes elige un socio en el desplegable y pulsa "+" (nadie entra automáticamente). Cada participante puede registrar los pagos que hizo y entre quién se reparten; la app calcula sola quién tiene que pagar a quién. Cada evento tiene su botón "Enviar por WhatsApp" para mandar al grupo los saldos y quién tiene que pagar a quién, sin tener que explicarlo a mano. Cuando el evento ya está cerrado puedes ocultarlo con el botón "Ocultar".'},
+  {id:'tareas', pregunta:'¿Cómo me apunto a una tarea?', palabras:['tarea','tareas','encargado','apuntarme','ticket','estado','pendiente','hecha'],
+    respuesta:'En la pestaña Tareas cualquier socio puede crear una tarea. En "Quién la hace" puedes añadir con el botón "+" a tantos socios como haga falta (no tiene por qué ser uno solo), o dejarla sin nadie y que alguien se apunte después con "+ Apuntarme". Una vez creada, cualquier socio puede añadir o quitar gente, editarla, cambiarle el estado o borrarla: el estado (Pendiente / En curso / Hecha) se elige directamente en un desplegable, no hace falta ir pasando por los tres en orden. La tarea nunca se borra sola al cambiar de estado: cuando la marcas como "Hecha" simplemente pasa de "Tareas activas" al "Historial de tareas completadas" más abajo en la misma pestaña, y solo desaparece de verdad si alguien pulsa "Borrar". También puedes enviar el listado de tareas activas al grupo de WhatsApp con un botón.'},
+  {id:'foto', pregunta:'¿Cómo cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
+    respuesta:'Desde la pestaña Socios (o Mi perfil) pulsa el botón "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lápiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviértela antes a JPG.'},
+  {id:'precios-bebidas', pregunta:'¿Quién puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
+    respuesta:'Cualquier socio puede consultar los precios en la pestaña Bebidas, para saber cuánto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Añadir precios nuevos, registrar consumo de otro socio o de un invitado, y gestionar el resto de consumos es cosa del administrador o el tesorero; cualquier socio puede registrar su propio consumo.'},
+  {id:'gastos-socios', pregunta:'¿Cómo registro un gasto que he pagado yo para la peña?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
+    respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tú como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tú o el administrador/tesorero podéis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavía está pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automáticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habías subido, se copia también allí) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahí, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en años posteriores; no depende ya de la solicitud original.'},
+  {id:'duplicados', pregunta:'¿Qué pasa si registro un gasto que ya estaba apuntado?', palabras:['duplicado','duplicar','repetido','repetir','ya existe','aviso'],
+    respuesta:'Al añadir o editar un movimiento (Caja > Registrar movimiento) o un gasto/ingreso de socio, la app comprueba si ya hay algo con la misma fecha y el mismo concepto (mirando tanto en Movimientos como en Gastos e ingresos de socios) y te avisa por si es un duplicado antes de guardarlo. No te lo bloquea del todo -si de verdad son dos cosas distintas el mismo día con el mismo nombre, puedes confirmar igualmente y se guarda-, es solo un aviso para evitar que se apunte dos veces lo mismo por error.'},
+  {id:'excel', pregunta:'¿Cómo exporto o importo datos con Excel?', palabras:['excel','exportar','importar','descargar','subir','xlsx','cuentas'],
+    respuesta:'Si tienes permiso para exportar datos, verás un botón "Exportar a Excel" en Resumen, Inventario, Bebidas y Caja > Movimientos. Descarga un único archivo con todas las hojas: socios, cuotas, movimientos, Tricount, tareas, etc, con el detalle completo de cada ingreso y gasto.\n\nEl botón "Importar Excel" (al lado del de exportar) lo puede usar cualquier socio, no hace falta ser administrador. Al subir un archivo, la app aplica cada hoja según los permisos que ya tengas en esa parte de la app: si por ejemplo no gestionas cuotas ni finanzas, esas hojas del Excel se ignoran (se avisa en el resumen que aparece después de importar cuántas filas se han omitido y por qué), pero si puedes editar tareas, inventario, reservas o Tricount (que están abiertos a todos), esas filas sí se aplican. Así cualquiera puede reutilizar el importador para corregir o cargar datos en lo que ya tiene permiso de tocar, sin arriesgarse a tocar roles, socios o finanzas sin querer.'},
+  {id:'whatsapp', pregunta:'¿Cómo envío información al grupo de WhatsApp?', palabras:['whatsapp','enviar','compartir','grupo','mensaje'],
+    respuesta:'Verás un botón "Enviar por WhatsApp" en casi todas las pestañas: Tareas, Reservas, Reuniones, Inventario, Lista de compra (uno por cada lista), Tricount (uno por cada evento, con los saldos y quién paga a quién), Bebidas (con la deuda pendiente), y en Caja tanto en "Gastos e ingresos de socios" como en "Movimientos", además de en Resumen > Cuentas. Al pulsarlo se prepara automáticamente un mensaje con la información más útil de esa pestaña (lo pendiente, lo próximo, etc.) y se abre WhatsApp para que elijas tú mismo a qué chat o grupo lo mandas. Está disponible para todos los socios, sin necesidad de ningún permiso especial.'},
+  {id:'roles', pregunta:'¿Qué son los roles y quién los gestiona?', palabras:['rol','roles','permiso','permisos','administrador'],
+    respuesta:'Los roles agrupan permisos (ver finanzas, gestionar cuotas, gestionar tareas...). Solo quien tiene permiso para gestionar roles (normalmente el administrador) puede crear roles nuevos y asignárselos a los socios, desde la pestaña Roles.'},
+  {id:'avisos', pregunta:'¿Qué es la campana de avisos?', palabras:['campana','aviso','avisos','notificacion','alerta'],
+    respuesta:'La campanita de la cabecera avisa de cuotas pendientes, bebidas por pagar y actividad reciente (reservas y reuniones). El número indica cuántos avisos hay ahora mismo; desde ahí también puedes exportarlos como un log de texto. Para cerrar el desplegable, pulsa la campanita otra vez o toca en cualquier otro sitio de la pantalla.'},
+  {id:'baja', pregunta:'¿Qué pasa si doy de baja a un socio?', palabras:['baja','eliminar','borrar','socio'],
     respuesta:'Dar de baja a un socio no borra su historial (cuotas pagadas, asistencia a reuniones, etc): simplemente deja de aparecer en el buscador de la pantalla de inicio y se marca como "de baja" en la lista de socios.'},
-  {id:'lista-compra', pregunta:'Como funciona la pestana Listas?', palabras:['compra','lista','listas','producto','productos','supermercado','pago','derrama','pagos'],
-    respuesta:'La pestana Listas tiene dos apartados. En "Lista de la compra" cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y anadir productos con su cantidad; todos los socios ven las mismas listas y pueden anadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya este comprado. En "Listas de pago" se usan para derramas o pagos extra: al crear la lista se genera una fila para cada socio activo con el importe indicado, aparece el numero de cuenta en la cabecera, y cada uno marca su fila como pagada cuando hace el ingreso. En ambos apartados se puede cambiar el titulo de la lista despues de creada con "Editar titulo", y cada lista tiene su propio boton "Enviar por WhatsApp".'},
-  {id:'inventario', pregunta:'Quien puede anadir o editar el material del inventario?', palabras:['inventario','material','estado','revision','comprar'],
-    respuesta:'Todos los socios ven el inventario. Anadir material nuevo es cosa de quien tiene el permiso de gestionar inventario, pero una vez que un material ya esta creado, cualquier socio puede editarlo (nombre, categoria, cantidad, estado o notas) y tambien borrarlo, por ejemplo para actualizar su estado a "Necesita revision" o "Hay que comprar". Hay un boton para enviar por WhatsApp solo lo que esta pendiente de revisar o comprar, sin tener que mandar el inventario entero.'},
+  {id:'lista-compra', pregunta:'¿Cómo funciona la pestaña Listas?', palabras:['compra','lista','listas','producto','productos','supermercado','pago','derrama','pagos','comida','cena','comidas','cenas','restaurante','invitado','invitados'],
+    respuesta:'La pestaña Listas tiene tres apartados. En "Lista de la compra" cualquier socio puede crear una lista nueva (por ejemplo "Supermercado" o "Fiesta mayor") y añadir productos con su cantidad; todos los socios ven las mismas listas y pueden añadir, editar o quitar cualquier producto, y marcarlo con el check cuando ya esté comprado. En "Lista para comidas/cenas" se organiza una quedada para comer o cenar: al crearla eliges el nombre, la fecha, la hora, qué se come (con notas para apuntar, por ejemplo, el nombre del bar) y ese dato se ve siempre en una etiqueta destacada, junto con cuánta gente va apuntada; el desplegable "¿Qué se come?" no está limitado a "Bocadillos" o "Hecho por nosotros", con el botón "+" se pueden añadir tantas opciones nuevas como haga falta (y "-" para quitar la seleccionada). Para apuntar o quitar socios, o para añadir invitados que no son socios, hay un desplegable "Apuntar o quitar gente" con un selector para ir añadiendo socios uno a uno. En "Lista para pagos" se usan para derramas o pagos extra: al crear la lista se genera una fila para cada socio activo con el importe indicado, aparece el número de cuenta en la cabecera, y cada uno marca su fila como pagada cuando hace el ingreso. En los tres apartados cualquier socio puede cambiar el título después de creada la lista con "Editar título" (en comidas/cenas hay además un botón "Editar" para cambiar también la fecha, la hora, el tipo y las notas), y cada lista tiene su propio botón "Enviar por WhatsApp".'},
+  {id:'inventario', pregunta:'¿Quién puede añadir o editar el material del inventario?', palabras:['inventario','material','estado','revision','comprar'],
+    respuesta:'Todos los socios ven el inventario. Añadir material nuevo es cosa de quien tiene el permiso de gestionar inventario, pero una vez que un material ya está creado, cualquier socio puede editarlo (nombre, categoría, cantidad, estado o notas) y también borrarlo, por ejemplo para actualizar su estado a "Necesita revisión" o "Hay que comprar". Hay un botón para enviar por WhatsApp solo lo que está pendiente de revisar o comprar, sin tener que mandar el inventario entero.'},
 ];
 function buscarFaq(query){
   const q = query.toLowerCase().trim();
@@ -75,9 +75,10 @@ function renderAyuda(){
   if(!ayudaAbierta) return btn;
   const sugerencias = buscarFaq(ayudaQuery);
   return `
+  <div class="help-backdrop" data-action="toggle-ayuda"></div>
   <div class="help-panel">
     <div class="help-panel-header">
-      <b>Ayuda rapida</b>
+      <b>Ayuda rápida</b>
       <button class="help-close" data-action="toggle-ayuda" title="Cerrar">&times;</button>
     </div>
     <div class="help-transcript" id="help-transcript">
@@ -88,7 +89,6 @@ function renderAyuda(){
     </div>
     <input type="text" id="help-search-input" class="help-search-input" placeholder="Escribe tu duda..." value="${escapeHtml(ayudaQuery)}" autocomplete="off">
     <div class="help-suggestions" id="help-suggestions">${renderHelpSuggestions(sugerencias)}</div>
-    <p class="meta" style="margin:8px 0 0; text-align:center;">Preguntas frecuentes con respuesta ya escrita: si tu duda no aparece, preguntale al administrador o al tesorero.</p>
   </div>
   ${btn}`;
 }
@@ -199,6 +199,7 @@ let state = null;
 let activeTab = 'resumen';
 let listasSubTab = 'compra';
 let consumosPeriodo = {tipo:'todos', valor:''};
+let consumosFiltroSocio = ''; // '' = todos, '__no_socio__' = solo invitados, o un id de socio
 let cuotasYear = new Date().getFullYear();
 let cuotasMesMovil = new Date().getMonth()+1;
 let resumenGraficoYear = new Date().getFullYear();
@@ -210,23 +211,25 @@ let reservasCalFecha = new Date();
 let reunionesCalFecha = new Date();
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
+let filtroSocioLiquidar = ''; // id de socio para filtrar "Gastos e ingresos de socios" (liquidacion del tesorero)
 let editandoMovimientoId = null;
 let editandoItemCompraId = null;
 let editandoItemPagoId = null;
 let editandoTareaId = null;
 let editandoInventarioId = null;
+let editandoListaComidaId = null;
 let nuevaTareaSocios = [];
-let viendoSocioId = null; // si esta a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
+let viendoSocioId = null; // si está a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
 let adjuntoAbierto = null; // {url, tipo} del ticket/factura abierto en el visor interno
 let ticketVersion = Date.now();
 let loaded = false;
-let chatMensajes = []; // mensajes cargados en memoria, mas recientes al final
+let chatMensajes = []; // mensajes cargados en memoria, más recientes al final
 let chatLastId = 0; // mayor id ya recibido del servidor
 let chatPollTimer = null;
 let chatAbierto = false;
-let chatArchivoSeleccionado = null; // File pendiente de adjuntar al proximo mensaje
+let chatArchivoSeleccionado = null; // File pendiente de adjuntar al próximo mensaje
 let emojiPickerAbierto = false;
-let editandoMensajeId = null; // id del mensaje propio que se esta editando ahora mismo
+let editandoMensajeId = null; // id del mensaje propio que se está editando ahora mismo
 const EMOJIS_CHAT = ['😀','😂','😅','😉','😊','😍','😘','😜','🤔','😎','😴','😭','😡','🥳','🤢','😱',
   '👍','👎','🙏','👏','💪','🤝','❤️','🔥','🎉','🍺','🍻','🍕','☕','⚽','🎲','🃏','☀️','🌧️','⏰','📅','✅','❌','⚠️'];
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
@@ -268,7 +271,7 @@ async function loadState(){
   try{
     state = await apiGet('/api/state');
     loaded = true;
-    // Si hay usuario favorito guardado y esta activo, pre-seleccionarlo
+    // Si hay usuario favorito guardado y está activo, pre-seleccionarlo
     if(!pendingLoginId){
       const favId = getFavoriteUser();
       if(favId && state.socios.some(s=>s.id===favId && s.activo)){
@@ -292,7 +295,7 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function money(n){ return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' EUR'; }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function enviarWhatsapp(texto){ window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank'); }
-/* ---------- filtros de periodo (mes / semana / dia) ---------- */
+/* ---------- filtros de período (mes / semana / día) ---------- */
 function isoWeekKey(fechaISO){
   if(!fechaISO) return '';
   const d = new Date(fechaISO+'T00:00:00');
@@ -349,10 +352,10 @@ function renderSelectorPeriodo(idPrefix, periodo, mesesOpciones){
   return `<span class="periodo-selector">
     <select id="${idPrefix}-tipo" data-periodo-prefix="${idPrefix}">
       <option value="todos" ${tipo==='todos'?'selected':''}>Todos</option>
-      <option value="anio" ${tipo==='anio'?'selected':''}>Por ano</option>
+      <option value="anio" ${tipo==='anio'?'selected':''}>Por año</option>
       <option value="mes" ${tipo==='mes'?'selected':''}>Por mes</option>
       <option value="semana" ${tipo==='semana'?'selected':''}>Por semana</option>
-      <option value="dia" ${tipo==='dia'?'selected':''}>Por dia</option>
+      <option value="dia" ${tipo==='dia'?'selected':''}>Por día</option>
     </select>
     ${tipo==='anio' ? `<select id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}">${anios.map(a=>`<option value="${a}" ${periodo.valor===a?'selected':''}>${a}</option>`).join('')}</select>` : ''}
     ${tipo==='mes' ? `<select id="${idPrefix}-valor" data-periodo-prefix="${idPrefix}">${mesesOpciones.map(k=>`<option value="${k}" ${periodo.valor===k?'selected':''}>${labelMes(k)}</option>`).join('')}</select>` : ''}
@@ -380,7 +383,7 @@ function encontrarPosibleDuplicado(concepto, fecha, excluirId){
 function confirmarSiPosibleDuplicado(concepto, fecha, excluirId){
   const dup = encontrarPosibleDuplicado(concepto, fecha, excluirId);
   if(!dup) return true;
-  return confirm(`Ya existe ${dup.origen} el ${fmtDate(dup.fecha)} con el mismo concepto ("${dup.concepto}", ${money(dup.importe)}). Puede que ya este registrado. Quieres anadirlo/guardarlo de todas formas?`);
+  return confirm(`Ya existe ${dup.origen} el ${fmtDate(dup.fecha)} con el mismo concepto ("${dup.concepto}", ${money(dup.importe)}). Puede que ya esté registrado. ¿Quieres añadirlo/guardarlo de todas formas?`);
 }
 function fmtDate(iso){
   if(!iso) return '';
@@ -388,7 +391,7 @@ function fmtDate(iso){
   return `${d}/${m}/${y}`;
 }
 function fmtHoras(r){
-  if(!r.hora_inicio && !r.hora_fin) return 'Todo el dia';
+  if(!r.hora_inicio && !r.hora_fin) return 'Todo el día';
   if(r.hora_inicio && r.hora_fin) return `${r.hora_inicio} - ${r.hora_fin}`;
   return r.hora_inicio ? `desde las ${r.hora_inicio}` : `hasta las ${r.hora_fin}`;
 }
@@ -634,7 +637,7 @@ function timeAgoEs(iso){
   const days = Math.floor(diffMs/86400000);
   if(days<=0) return 'hoy';
   if(days===1) return 'ayer';
-  return `hace ${days} dias`;
+  return `hace ${days} días`;
 }
 
 /* ============ CHAT DE SOCIOS (polling simple) ============ */
@@ -767,7 +770,7 @@ function render(){
   updateBackgroundVisibility();
   document.body.classList.toggle('no-scroll', !!adjuntoAbierto);
   const app = document.getElementById('app');
-  if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la pena</div>`; return; }
+  if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la peña</div>`; return; }
   if(!state.current_user){
     app.innerHTML = renderLogin() + renderAyuda();
     if(!loginDragInitialized){
@@ -781,6 +784,57 @@ function render(){
   if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me) + renderAyuda(); scrollHelpTranscript(); return; }
   app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel() + renderChatPanel() + renderAdjuntoViewer();
   scrollHelpTranscript();
+  enhanceCardHeaders();
+}
+/* ============ titulo subrayado (solo el texto, nunca los botones de accion) y
+   plegar/desplegar las tarjetas de "crear/anadir algo" ============ */
+let cardsColapsadas = {}; // {"add-movimiento|": true} -> plegada
+function tituloWrapDe(h2){
+  const primero = h2.firstElementChild;
+  // mientras se esta editando el titulo (un <form> en vez de texto) no hay nada que subrayar.
+  if(primero && primero.tagName==='FORM') return null;
+  // exclusion explicita: este titulo no lleva subrayado (p.ej. eventos de tricount).
+  if(primero && primero.classList.contains('sin-subrayado')) return null;
+  // si el primer hijo ya es un <span> que no es el punto ".pin", es que el titulo
+  // (punto + texto) ya viene envuelto junto -> lo reutilizamos tal cual.
+  if(primero && primero.tagName==='SPAN' && !primero.classList.contains('pin')){
+    primero.classList.add('h2-underline');
+    return primero;
+  }
+  // si no, el titulo es texto suelto (con el punto .pin al lado) -> lo envolvemos.
+  const wrap = document.createElement('span');
+  wrap.className = 'h2-underline';
+  while(h2.firstChild) wrap.appendChild(h2.firstChild);
+  h2.appendChild(wrap);
+  return wrap;
+}
+function enhanceCardHeaders(){
+  document.querySelectorAll('.card > h2').forEach(h2=>{
+    tituloWrapDe(h2);
+  });
+  document.querySelectorAll('.card:not(.no-collapse) > h2:first-child + form[data-form], .card:not(.no-collapse) > h2:first-child + * + form[data-form]').forEach(form=>{
+    const h2 = form.parentElement.querySelector(':scope > h2:first-child');
+    if(!h2) return;
+    const id = form.dataset.form + '|' + (form.dataset.id || '');
+    const arrow = document.createElement('button');
+    arrow.type = 'button';
+    arrow.className = 'card-toggle-arrow';
+    arrow.title = 'Plegar o desplegar';
+    arrow.innerHTML = '&#9650;';
+    h2.appendChild(arrow);
+    h2.style.justifyContent = 'space-between';
+    h2.style.cursor = 'pointer';
+    const aplicar = (colapsado)=>{
+      form.style.display = colapsado ? 'none' : '';
+      arrow.classList.toggle('collapsed', colapsado);
+    };
+    const estaColapsado = ()=> id in cardsColapsadas ? cardsColapsadas[id] : true;
+    aplicar(estaColapsado());
+    h2.addEventListener('click', ()=>{
+      cardsColapsadas[id] = !estaColapsado();
+      aplicar(cardsColapsadas[id]);
+    });
+  });
 }
 function renderAdjuntoViewer(){
   if(!adjuntoAbierto) return '';
@@ -808,7 +862,7 @@ function renderForcePin(me){
     <div style="margin-top:14px;">${avatarHtml(me,'lg')}</div>
     <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(me.nombre)}. Por seguridad, tienes que crear tu propio PIN antes de continuar.</p>
     <form data-form="force-pin" style="margin-top:16px; max-width:260px; margin-left:auto; margin-right:auto; text-align:left;">
-      <label class="f">Nuevo PIN (4 digitos, el que tu quieras)</label>
+      <label class="f">Nuevo PIN (4 dígitos, el que tú quieras)</label>
       <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****" autofocus
         
         style="width:100%; box-sizing:border-box; text-align:center; font-size:1.4rem; letter-spacing:0.5rem; text-indent:0.25rem; margin-bottom:10px;">
@@ -818,7 +872,7 @@ function renderForcePin(me){
         style="width:100%; box-sizing:border-box; text-align:center; font-size:1.4rem; letter-spacing:0.5rem; text-indent:0.25rem; margin-bottom:14px;">
       <button class="btn" type="submit" style="width:100%;">Guardar mi PIN y entrar</button>
     </form>
-    <button class="btn ghost small" data-action="logout" style="margin-top:14px;">Cerrar sesion</button>
+    <button class="btn ghost small" data-action="logout" style="margin-top:14px;">Cerrar sesión</button>
   </div>`;
 }
 
@@ -850,7 +904,7 @@ function renderLogin(){
         
             <div style="margin-top:14px;">${avatarHtml(s,'lg')}</div>
         
-            <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(s.nombre)}. ${s.tiene_pin ? 'Introduce tu PIN' : 'Todavia no tienes PIN configurado, puedes entrar directamente'}</p>
+            <p class="sub" style="margin-top:10px;">Hola, ${escapeHtml(s.nombre)}. ${s.tiene_pin ? 'Introduce tu PIN' : 'Todavía no tienes PIN configurado, puedes entrar directamente'}</p>
         
             <form data-form="pin-login" style="margin-top:16px; max-width:300px; margin-left:auto; margin-right:auto;">
         
@@ -885,9 +939,9 @@ function renderLogin(){
             <form data-form="bootstrap-admin" style="margin-top:24px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">
               <label class="f">Tu nombre</label>
               <input type="text" name="nombre" required placeholder="Nombre y apellido" style="margin-bottom:10px;">
-              <label class="f">Elige un PIN de 4 digitos</label>
+              <label class="f">Elige un PIN de 4 dígitos</label>
               <input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****" style="margin-bottom:10px;">
-              <button class="btn" type="submit" style="width:100%;">Crear pena y entrar como administrador</button>
+              <button class="btn" type="submit" style="width:100%;">Crear peña y entrar como administrador</button>
             </form>
           </div>
         </div>
@@ -949,19 +1003,19 @@ function renderApp(){
     <div class="header-panel">
       <div class="masthead">
         
-        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.2 7-12a7 7 0 0 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg>Ver ubicacion</a></div></div>
-        
+        <div class="logo-row">${logoBadge()}<div><h1>${escapeHtml(state.config.nombre)}</h1><a href="${PENA_LOCATION_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; color:var(--amber); font-weight:600; text-decoration:none; margin-top:2px; font-size:0.92rem;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-7.2 7-12a7 7 0 0 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg>Ver ubicación</a></div></div>
+
         ${can('manage_config') ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
 
-          <button class="edit-name-btn" data-action="edit-club-name">renombrar pena</button>
+          <button class="edit-name-btn" data-action="edit-club-name">renombrar peña</button>
 
           <button class="edit-name-btn" data-action="edit-cuota">cambiar cuota</button>
 
-          <button class="edit-name-btn" data-action="edit-cuenta">numero de cuenta</button>
+          <button class="edit-name-btn" data-action="edit-cuenta">número de cuenta</button>
 
         </div>` : ''}
-        
-        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">cerrar sesion</button>
+
+        <div class="user-bar">${me?avatarHtml(me,'sm'):''}<span class="live-dot"></span>Conectado como <b>${escapeHtml(me ? me.nombre : '')}</b>${isAdmin() ? '<span class="admin-badge">Admin</span>' : ''} - <button data-action="logout">Cerrar sesión</button>
           ${chatIconBtn()}
           <button type="button" class="bell-btn" data-action="toggle-alertas" title="Avisos">
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BELL_ICON_PATH}</svg>
@@ -1038,7 +1092,7 @@ function renderTab(){
 }
 
 function sortedRoles(){
-  // Igual que el orden alfabetico del backend, pero dejando "Otro" siempre al final.
+  // Igual que el orden alfabético del backend, pero dejando "Otro" siempre al final.
   const roles = [...(state.roles || [])];
   roles.sort((a,b)=>{
     if(a.id==='otro') return 1;
@@ -1072,7 +1126,7 @@ function renderRoles(){
     </form>
   </div>
   <div class="card">
-    ${roles.length===0 ? '<p class="empty">Todavia no hay roles.</p>' : roles.map(role=>renderRoleRow(role, labels)).join('')}
+    ${roles.length===0 ? '<p class="empty">Todavía no hay roles.</p>' : roles.map(role=>renderRoleRow(role, labels)).join('')}
   </div>
   <div class="card">
     <h2><span class="pin"></span>Asignar roles a socios</h2>
@@ -1080,7 +1134,7 @@ function renderRoles(){
     ${state.socios.map(s=>`
       <div class="list-item socio-role-row" style="align-items:flex-start; border-left-color:${socioSwatchColor(s.id)};">
         <div style="flex:1;">
-          <div style="font-weight:600; margin-bottom:8px;">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}</div>
+          <div style="font-weight:600; margin-bottom:8px;">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tú</span>':''}</div>
           <div class="role-options">
             ${roles.map(role=>`<label class="role-option"><input type="checkbox" data-role-option="${s.id}" value="${role.id}" ${(s.roles||[]).includes(role.id)?'checked':''}> ${escapeHtml(role.nombre)}</label>`).join('')}
           </div>
@@ -1107,7 +1161,7 @@ function renderRoleRow(role, labels){
     ${!role.es_sistema ? `<button class="btn danger small" data-action="delete-role" data-id="${role.id}">Borrar</button>` : ''}
   </div>`;
 }
-/* ============ calculos ============ */
+/* ============ cálculos ============ */
 function totalIngresosCuotas(periodo){ return state.cuotas.filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo)).reduce((a,c)=>a+Number(c.importe||0),0); }
 function totalIngresosMov(periodo){ return state.movimientos.filter(m=>m.tipo==='ingreso' && m.categoria!=='Socios' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalGastosMov(periodo){ return state.movimientos.filter(m=>m.tipo==='gasto' && m.categoria!=='Socios' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
@@ -1138,7 +1192,21 @@ function bebidasPendientesPorSocio(){
     .map(socio_id=>({socio_id, nombre: socioNombre(socio_id), total: pendientes[socio_id]}));
 }
 function consumosFiltrados(consumos){
-  return consumos.filter(c=>dentroDePeriodo(c.fecha, consumosPeriodo));
+  let out = consumos.filter(c=>dentroDePeriodo(c.fecha, consumosPeriodo));
+  if(consumosFiltroSocio.startsWith('inv:')) out = out.filter(c=>!c.es_socio && c.consumidor===consumosFiltroSocio.slice(4));
+  else if(consumosFiltroSocio) out = out.filter(c=>c.es_socio && c.socio_id===consumosFiltroSocio);
+  return out;
+}
+function consumidoresDisponibles(consumos){
+  const vistos = {};
+  const lista = [];
+  consumos.forEach(c=>{
+    const valor = c.es_socio ? c.socio_id : 'inv:'+c.consumidor;
+    if(vistos[valor]) return;
+    vistos[valor] = true;
+    lista.push({valor, nombre: c.consumidor, esSocio: c.es_socio});
+  });
+  return lista.sort((a,b)=>a.nombre.localeCompare(b.nombre));
 }
 function actualizarTotalConsumo(form){
   const el = form.querySelector('#consumo-total');
@@ -1153,9 +1221,9 @@ function actualizarTotalConsumo(form){
 }
 function totalFiestasGasto(periodo){ return state.fiestas_gastos.filter(f=>dentroDePeriodo(f.fecha, periodo)).reduce((a,f)=>a+Number(f.importe||0),0); }
 // Al verificar un gasto/ingreso de socio, el backend lo convierte en un movimiento
-// permanente con categoria "Socios" y borra la solicitud provisional: por eso estos
+// permanente con categoría "Socios" y borra la solicitud provisional: por eso estos
 // totales se calculan a partir de movimientos, no de gastos_socios (que solo guarda
-// las solicitudes todavia pendientes de verificar).
+// las solicitudes todavía pendientes de verificar).
 function totalIngresosSociosVerificados(periodo){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo==='ingreso' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
 function totalGastosSociosVerificados(periodo){ return state.movimientos.filter(m=>m.categoria==='Socios' && m.tipo!=='ingreso' && dentroDePeriodo(m.fecha, periodo)).reduce((a,m)=>a+Number(m.importe||0),0); }
 function gastosSociosPendientes(){ return (state.gastos_socios||[]).filter(g=>!g.abonado); }
@@ -1185,7 +1253,7 @@ function construirAlertas(){
       const c = state.cuotas.find(c=>c.socio_id===s.id && c.year===now.getFullYear() && c.month===now.getMonth()+1);
       if(!c || !c.pagado){
 
-        alertas.push({tipo:'warn', texto:`${s.nombre} todavia no ha pagado la cuota de ${MESES[now.getMonth()]}`, tab:'cuotas'});
+        alertas.push({tipo:'warn', texto:`${s.nombre} todavía no ha pagado la cuota de ${MESES[now.getMonth()]}`, tab:'cuotas'});
       }
     });
   }
@@ -1193,7 +1261,7 @@ function construirAlertas(){
   const gastosPendientes = gastosSociosPendientes();
   if(gastosPendientes.length){
     const total = gastosPendientes.reduce((a,g)=>a+Number(g.importe||0),0);
-    alertas.push({tipo:'warn', texto:`Hay ${gastosPendientes.length} gasto(s)/ingreso(s) de socios (${money(total)}) pendientes de verificar por el tesorero (pestana Gastos e ingresos).`, tab:'caja'});
+    alertas.push({tipo:'warn', texto:`Hay ${gastosPendientes.length} gasto(s)/ingreso(s) de socios (${money(total)}) pendientes de verificar por el tesorero (pestaña Gastos e ingresos).`, tab:'caja'});
   }
 
   const misPendientes = misBebidasPendientes();
@@ -1210,10 +1278,10 @@ function construirAlertas(){
 
   const recientes = [];
   state.reservas.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservo la pena para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`, tab:'reservas'});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`${socioNombre(r.socio_id)} reservó la peña para el ${fmtDate(r.fecha)} (${escapeHtml(r.evento)})`, tab:'reservas'});
   });
   state.reuniones.forEach(r=>{
-    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convoco una reunion para el ${fmtDate(r.fecha)}: ${escapeHtml(r.evento)}`, tab:'reuniones'});
+    if(r.creado_en) recientes.push({fecha:r.creado_en, texto:`Se convocó una reunión para el ${fmtDate(r.fecha)}: ${escapeHtml(r.evento)}`, tab:'reuniones'});
   });
   recientes.sort((a,b)=>b.fecha.localeCompare(a.fecha));
   recientes.slice(0,5).forEach(r=>alertas.push({tipo:'info', texto:r.texto, meta:timeAgoEs(r.fecha), tab:r.tab}));
@@ -1256,7 +1324,7 @@ function totalesPorPeriodo(periodo){
   return {ingresos, gastos};
 }
 
-/* ============ GRAFICAS: evolucion de ingresos y gastos ============ */
+/* ============ GRÁFICAS: evolución de ingresos y gastos ============ */
 function movimientosPorMes(){
   const map = {}; // 'YYYY-MM' -> {ingresos, gastos}
   function add(fecha, campo, importe){
@@ -1346,7 +1414,7 @@ function renderGraficoAnual(){
       <rect x="${xGas.toFixed(1)}" y="${yGas.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,hGas).toFixed(1)}" rx="2" class="bar-gasto"><title>${d.anio} - Gastos: ${money(d.gastos)}</title></rect>
       <text x="${(gx+groupW/2).toFixed(1)}" y="${H-7}" class="chart-label" text-anchor="middle">${d.anio}</text>`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg chart-svg-anual" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ingresos y gastos por ano">${barras}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg chart-svg-anual" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ingresos y gastos por año">${barras}</svg>`;
 }
 
 /* ============ RESUMEN ============ */
@@ -1387,7 +1455,7 @@ function renderResumen(){
   </div>
 
   <div class="card">
-    <h2><span class="pin"></span>Evolucion de ingresos y gastos en ${resumenGraficoYear}</h2>
+    <h2><span class="pin"></span>Evolución de ingresos y gastos en ${resumenGraficoYear}</h2>
     <div class="menu-row"><span class="label">Ingresos ${resumenGraficoYear}</span><span class="dots"></span><span class="value sage">${money(totalesAnio.ingresos)}</span></div>
     <div class="menu-row" style="margin-bottom:10px;"><span class="label">Gastos ${resumenGraficoYear}</span><span class="dots"></span><span class="value rust">- ${money(totalesAnio.gastos)}</span></div>
     <div class="chart-legend">
@@ -1401,8 +1469,8 @@ function renderResumen(){
 
   ${anios.length>1 ? `
   <div class="card">
-    <h2><span class="pin"></span>Comparativa por anos</h2>
-    <p class="meta" style="margin:0 0 10px;">Para ver como estaba la pena en anos anteriores.</p>
+    <h2><span class="pin"></span>Comparativa por años</h2>
+    <p class="meta" style="margin:0 0 10px;">Para ver cómo estaba la peña en años anteriores.</p>
     ${renderGraficoAnual()}
   </div>` : ''}
 
@@ -1431,11 +1499,11 @@ function renderResumen(){
       <div class="menu-row"><span class="label">Gastos de fiestas</span><span class="dots"></span><span class="value rust">- ${money(totalFiestasGasto(cuentasPeriodo))}</span></div>
       <div class="menu-row"><span class="label">Gastos generales</span><span class="dots"></span><span class="value rust">- ${money(totalGastosMov(cuentasPeriodo))}</span></div>
       <div class="menu-row" style="border-top:1px solid var(--line); margin-top:10px; padding-top:10px;"><span class="label"><strong>Saldo total</strong></span><span class="dots"></span><span class="value ${saldo<0?'rust':'sage'}"><strong>${saldo<0?'- ':'+'}${money(Math.abs(saldo))}</strong></span></div>
-      ${cuentasPeriodo.tipo!=='todos' ? '<p class="meta" style="margin-top:6px;">El saldo total es siempre de todo el historial; las demas cifras de arriba son solo del periodo elegido.</p>' : ''}
+      ${cuentasPeriodo.tipo!=='todos' ? '<p class="meta" style="margin-top:6px;">El saldo total es siempre de todo el historial; las demás cifras de arriba son solo del período elegido.</p>' : ''}
       ${pendientesSocios.length ? `<p class="readonly-note" style="margin-top:10px; cursor:pointer;" data-action="switch-tab" data-tab="caja" title="Ir a Gastos e ingresos">${pendientesSocios.length} gasto(s)/ingreso(s) de socios (${money(pendientesSociosTotal)}) pendientes de verificar por el tesorero o el administrador en "Gastos e ingresos". No suman al saldo hasta que se verifiquen.</p>` : ''}
     </div>
     <div class="card">
-      <h2><span class="pin"></span>Proxima reunion</h2>
+      <h2><span class="pin"></span>Próxima reunión</h2>
       ${proxima ? `
         
         <p style="margin:0 0 4px; font-weight:600;">${escapeHtml(proxima.evento)}</p>
@@ -1448,8 +1516,8 @@ function renderResumen(){
   </div>
 
   <div class="card">
-    <h2><span class="pin"></span>La pena esta reservada...</h2>
-    ${proximasReservas.length===0 ? '<p class="empty">No hay reservas proximas. La pena esta libre.</p>' : proximasReservas.map(r=>`
+    <h2><span class="pin"></span>La peña está reservada...</h2>
+    ${proximasReservas.length===0 ? '<p class="empty">No hay reservas próximas. La peña está libre.</p>' : proximasReservas.map(r=>`
       <div class="menu-row">
         
         <span class="label">${escapeHtml(r.evento)}<small>${socioNombre(r.socio_id)} - ${fmtHoras(r)}</small></span>
@@ -1476,16 +1544,16 @@ function renderSocios(){
   return `
   ${puedeGestionarSocios ? `
   <div class="card">
-    <h2><span class="pin"></span>Anadir socio</h2>
+    <h2><span class="pin"></span>Añadir socio</h2>
     <form data-form="add-socio" class="form-row" style="align-items:flex-end;">
       <div><label class="f">Nombre del nuevo socio</label><input type="text" name="nombre" required placeholder="Nombre y apellido"></div>
-      <div><label class="f">PIN (opcional)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" placeholder="en blanco = automatico"></div>
+      <div><label class="f">PIN (opcional)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" placeholder="en blanco = automático"></div>
       <div><label class="f">Foto (opcional)</label><input type="file" name="foto" accept="image/*"></div>
-      <div style="flex:none;"><button class="btn" type="submit">Anadir socio</button></div>
+      <div style="flex:none;"><button class="btn" type="submit">Añadir socio</button></div>
     </form>
   </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
   <div class="card">
-    ${state.socios.length===0 ? '<p class="empty">Todavia no hay socios.</p>' : state.socios.map(s=>{
+    ${state.socios.length===0 ? '<p class="empty">Todavía no hay socios.</p>' : state.socios.map(s=>{
       const perfil = state.perfiles[s.id] || {};
       const familia = perfil.familia || [];
       const puedeCambiarFoto = puedeGestionarSocios || s.id===state.current_user;
@@ -1497,9 +1565,9 @@ function renderSocios(){
 
           <div>
 
-            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tu</span>':''}${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
+            <div style="font-weight:600; ${!s.activo?'opacity:0.5; text-decoration:line-through;':''}">${escapeHtml(s.nombre)} ${s.id===state.current_user?'<span class="tag ok">tú</span>':''}${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}${!s.tiene_pin?'<span class="tag warn">sin PIN</span>':''}</div>
 
-            <div class="meta">${perfil.telefono ? 'Tel: '+escapeHtml(perfil.telefono) : 'Sin telefono'} ${familia.length? '- '+familia.length+' familiar(es)':''}</div>
+            <div class="meta">${perfil.telefono ? 'Tel: '+escapeHtml(perfil.telefono) : 'Sin teléfono'} ${familia.length? '- '+familia.length+' familiar(es)':''}</div>
 
           </div>
 
@@ -1544,14 +1612,14 @@ function renderCuotas(){
   }).join('');
   return `
   <div class="card">
-    <h2><span class="pin"></span>Cuotas mensuales <span style="font-size:0.9rem; color:var(--chalk-dim); font-family:'Work Sans';">(${money(state.config.cuota_mensual)}/mes)</span></h2>
-    <p class="readonly-note">${admin ? 'Solo el tesorero o el administrador pueden marcar una cuota como pagada, previa comprobacion.' : 'Solo lectura: aqui puedes ver quien ha pagado y quien falta. Marcar una cuota como pagada es cosa del tesorero o del administrador.'}</p>
+    <h2><span><span class="pin"></span>Cuotas mensuales</span> <span style="font-size:0.9rem; color:var(--chalk-dim); font-family:'Work Sans';">(${money(state.config.cuota_mensual)}/mes)</span></h2>
+    <p class="readonly-note">${admin ? 'Solo el tesorero o el administrador pueden marcar una cuota como pagada, previa comprobación.' : 'Solo lectura: aquí puedes ver quién ha pagado y quién falta. Marcar una cuota como pagada es cosa del tesorero o del administrador.'}</p>
     <div class="year-nav">
       <button data-action="cuota-year" data-dir="-1">&laquo; ${cuotasYear-1}</button>
       <b>${cuotasYear}</b>
       <button data-action="cuota-year" data-dir="1">${cuotasYear+1} &raquo;</button>
     </div>
-    ${state.socios.length===0 ? '<p class="empty">Anade socios primero en la pestana Socios.</p>' : `
+    ${state.socios.length===0 ? '<p class="empty">Añade socios primero en la pestaña Socios.</p>' : `
     <div class="cuotas-table-wrap">
     <table class="cuotas-table">
       <thead><tr><th>Socio</th>${MESES.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
@@ -1580,13 +1648,13 @@ function renderReservas(){
   const pasadas = state.reservas.filter(r=>r.fecha < todayISO()).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10);
   return `
   <div class="card">
-    <h2><span class="pin"></span>Reservar la pena</h2>
+    <h2><span class="pin"></span>Reservar la peña</h2>
     <form data-form="add-reserva">
       <div class="form-row">
 
         <div class="field-fecha"><label class="f">Fecha</label><input type="date" name="fecha" required value="${todayISO()}"></div>
 
-        <div class="field-ancho"><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleanos, comida familiar..."></div>
+        <div class="field-ancho"><label class="f">Evento</label><input type="text" name="evento" required placeholder="Ej: Cumpleaños, comida familiar..."></div>
       </div>
       <div class="form-row">
         
@@ -1594,17 +1662,17 @@ function renderReservas(){
         
         <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin"></div>
       </div>
-      <p class="meta" style="margin:-4px 0 10px;">Deja las horas en blanco si la reserva es para todo el dia.</p>
+      <p class="meta" style="margin:-4px 0 10px;">Deja las horas en blanco si la reserva es para todo el día.</p>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <button class="btn" type="submit">Reservar a mi nombre</button>
     </form>
   </div>
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Proximas reservas</span>
+      <span><span class="pin"></span>Próximas reservas</span>
       ${proximas.length ? `<button class="btn accent small" data-action="export-reservas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
-    ${proximas.length===0 ? '<p class="empty">La pena esta libre por ahora.</p>' : proximas.map(r=>`
+    ${proximas.length===0 ? '<p class="empty">La peña está libre por ahora.</p>' : proximas.map(r=>`
       <div class="list-item">
         
         <div>
@@ -1637,7 +1705,7 @@ function renderReuniones(){
   return `
   ${puedeGestionarEventos ? `
   <div class="card">
-    <h2><span class="pin"></span>Convocar reunion</h2>
+    <h2><span class="pin"></span>Convocar reunión</h2>
     <form data-form="add-reunion">
       <div class="form-row">
 
@@ -1651,8 +1719,8 @@ function renderReuniones(){
 
         <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin"></div>
       </div>
-      <div class="form-row"><div><label class="f">Notas / orden del dia</label><textarea name="notas" placeholder="De que se va a hablar..."></textarea></div></div>
-      <button class="btn" type="submit">Anadir reunion</button>
+      <div class="form-row"><div><label class="f">Notas / orden del día</label><textarea name="notas" placeholder="¿De qué se va a hablar...?"></textarea></div></div>
+      <button class="btn" type="submit">Añadir reunión</button>
     </form>
   </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
   <div class="card">
@@ -1664,7 +1732,7 @@ function renderReuniones(){
       <span><span class="pin"></span>Historial</span>
       ${ordenadas.length ? `<button class="btn accent small" data-action="export-reuniones-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
-    ${ordenadas.length===0 ? '<p class="empty">Aun no hay reuniones.</p>' : ordenadas.map(r=>{
+    ${ordenadas.length===0 ? '<p class="empty">Aún no hay reuniones.</p>' : ordenadas.map(r=>{
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
 
@@ -1696,7 +1764,7 @@ function renderNuevoEventoParticipantesWrap(){
   const disponibles = state.socios.filter(s=>s.activo && !nuevoEventoParticipantes.includes(s.id));
   return `
     <div class="role-options" style="margin-bottom:8px;">
-      ${nuevoEventoParticipantes.length ? nuevoEventoParticipantes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="participantes" value="${sid}"><button type="button" data-action="quitar-participante-nuevo-evento" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin participantes anadidos todavia.</span>'}
+      ${nuevoEventoParticipantes.length ? nuevoEventoParticipantes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<input type="hidden" name="participantes" value="${sid}"><button type="button" data-action="quitar-participante-nuevo-evento" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin participantes añadidos todavía.</span>'}
     </div>
     ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
       <div><select id="nuevo-evento-participante-select"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
@@ -1720,13 +1788,13 @@ function renderReparto(){
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <div style="margin-bottom:12px;">
-        <label class="f">Quien participa (marcate a ti mismo si vas a participar)</label>
+        <label class="f">¿Quién participa? (márcate a ti mismo si vas a participar)</label>
         <div id="nuevo-evento-participantes-wrap">${renderNuevoEventoParticipantesWrap()}</div>
       </div>
       <button class="btn" type="submit">Crear evento</button>
     </form>
   </div>
-  ${visibles.length===0 ? '<div class="card"><p class="empty">Todavia no hay eventos de Tricount.</p></div>' : visibles.map(ev=>renderGastoEvento(ev)).join('')}
+  ${visibles.length===0 ? '<div class="card"><p class="empty">Todavía no hay eventos de Tricount.</p></div>' : visibles.map(ev=>renderGastoEvento(ev)).join('')}
   ${ocultos.length ? `
   <div class="card">
     <details>
@@ -1754,7 +1822,7 @@ function renderGastoEvento(ev){
   return `
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
+      <span class="sin-subrayado"><span class="pin"></span>${escapeHtml(ev.nombre)} <span class="meta">- ${fmtDate(ev.fecha)}</span></span>
       <span style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--amber);">${money(ev.total)}</span>
         <button class="btn accent small" data-action="export-evento-whatsapp" data-id="${ev.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
@@ -1770,8 +1838,8 @@ function renderGastoEvento(ev){
     </div>
     ${noParticipantes.length ? `
     <div class="form-row" style="align-items:flex-end; margin-bottom:14px;">
-      <div><label class="f">Anadir participante</label><select data-nuevo-participante="${ev.id}"><option value="" selected>Elige un socio...</option>${noParticipantes.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
-      <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-evento" data-evento="${ev.id}">+ Anadir</button></div>
+      <div><label class="f">Añadir participante</label><select data-nuevo-participante="${ev.id}"><option value="" selected>Elige un socio...</option>${noParticipantes.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-participante-evento" data-evento="${ev.id}">+ Añadir</button></div>
     </div>` : ''}
 
     ${(ev.participantes||[]).length ? `
@@ -1792,7 +1860,7 @@ function renderGastoEvento(ev){
     </div>` : ''}
 
     <label class="f">Pagos registrados</label>
-    ${pagos.length===0 ? '<p class="empty">Sin pagos todavia.</p>' : pagos.map(p=>{
+    ${pagos.length===0 ? '<p class="empty">Sin pagos todavía.</p>' : pagos.map(p=>{
       const puedeBorrarPago = p.pagador_id===state.current_user || puedeGestionarEvento;
       const beneficiarios = (p.beneficiarios&&p.beneficiarios.length) ? p.beneficiarios.map(socioNombre).join(', ') : 'todos los participantes';
       return `<div class="list-item">
@@ -1813,7 +1881,7 @@ function renderGastoEvento(ev){
     <form data-form="add-pago-evento" data-evento="${ev.id}" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);">
       <label class="f">Registrar un pago</label>
       <div class="form-row">
-        <div><label class="f">Quien pago</label><select name="pagador_id">${(ev.participantes||[]).map(sid=>`<option value="${sid}" ${sid===state.current_user?'selected':''}>${escapeHtml(socioNombre(sid))}</option>`).join('')}</select></div>
+        <div><label class="f">Quién pagó</label><select name="pagador_id">${(ev.participantes||[]).map(sid=>`<option value="${sid}" ${sid===state.current_user?'selected':''}>${escapeHtml(socioNombre(sid))}</option>`).join('')}</select></div>
         <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Cena, bebidas, gasolina..."></div>
         <div><label class="f">Importe (&euro;)</label><input type="number" step="0.01" min="0.01" name="importe" required></div>
       </div>
@@ -1821,8 +1889,8 @@ function renderGastoEvento(ev){
       <div class="role-options" style="margin-bottom:10px;">
         ${(ev.participantes||[]).map(sid=>`<label class="role-option"><input type="checkbox" name="beneficiarios" value="${sid}" checked> ${escapeHtml(socioNombre(sid))}</label>`).join('')}
       </div>
-      <button class="btn ghost" type="submit">Anadir pago</button>
-    </form>` : '<p class="readonly-note" style="margin-top:14px;">Solo quien participa en el evento puede anadir pagos.</p>'}
+      <button class="btn ghost" type="submit">Añadir pago</button>
+    </form>` : '<p class="readonly-note" style="margin-top:14px;">Solo quien participa en el evento puede añadir pagos.</p>'}
   </div>`;
 }
 
@@ -1835,20 +1903,18 @@ function renderInventario(){
   return `
   ${puedeGestionarInventario ? `
   <div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Anadir material</span>
-      <span style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
-        ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
-        <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
-      </span>
-    </h2>
+    <h2><span class="pin"></span>Añadir material</h2>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin:-6px 0 14px;">
+      <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+      ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
+      <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
+    </div>
     <form data-form="add-inventario">
       <div class="form-row">
 
         <div><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: Nevera, plancha, mesas..."></div>
 
-        <div><label class="f">Categoria</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div><label class="f">Categoría</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
 
@@ -1858,9 +1924,9 @@ function renderInventario(){
 
         <div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div>
       </div>
-      <button class="btn" type="submit">Anadir al inventario</button>
+      <button class="btn" type="submit">Añadir al inventario</button>
     </form>
-  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede anadir material nuevo. <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
+  </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede añadir material nuevo. <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
   ${CAT_INV.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
@@ -1869,7 +1935,7 @@ function renderInventario(){
       ${items.map(i=>renderInventarioItem(i)).join('')}
     </div>`;
   }).join('')}
-  ${state.inventario.length===0 ? '<div class="card"><p class="empty">Todavia no hay material registrado.</p></div>' : ''}
+  ${state.inventario.length===0 ? '<div class="card"><p class="empty">Todavía no hay material registrado.</p></div>' : ''}
   `;
 }
 
@@ -1878,7 +1944,7 @@ function renderInventarioItem(i){
     return `<form data-form="edit-inventario" data-id="${i.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Nombre</label><input type="text" name="nombre" required value="${escapeHtml(i.nombre)}"></div>
-        <div><label class="f">Categoria</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}" ${i.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label class="f">Categoría</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}" ${i.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
       </div>
       <div class="form-row">
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="${i.cantidad}" min="0"></div>
@@ -1908,9 +1974,10 @@ function renderListasTab(){
   return `
   <div class="subtabs" style="margin-bottom:14px;">
     <button type="button" class="subtab-btn ${listasSubTab==='compra'?'active':''}" data-action="listas-subtab" data-sub="compra">Lista de la compra</button>
-    <button type="button" class="subtab-btn ${listasSubTab==='pago'?'active':''}" data-action="listas-subtab" data-sub="pago">Listas de pago</button>
+    <button type="button" class="subtab-btn ${listasSubTab==='comidas'?'active':''}" data-action="listas-subtab" data-sub="comidas">Lista para comidas/cenas</button>
+    <button type="button" class="subtab-btn ${listasSubTab==='pago'?'active':''}" data-action="listas-subtab" data-sub="pago">Lista para pagos</button>
   </div>
-  ${listasSubTab==='pago' ? renderListasPago() : renderListaCompra()}
+  ${listasSubTab==='pago' ? renderListasPago() : listasSubTab==='comidas' ? renderListasComidas() : renderListaCompra()}
   `;
 }
 
@@ -1922,7 +1989,7 @@ function renderNombreLista(lista, tipo){
       <button class="btn ghost small" type="button" data-action="cancelar-editar-nombre-lista">Cancelar</button>
     </form>`;
   }
-  return `<span><span class="pin"></span>${escapeHtml(lista.nombre)} <button type="button" class="link-btn meta" data-action="editar-nombre-lista" data-id="${lista.id}" title="Cambiar el titulo de la lista">Editar titulo</button></span>`;
+  return `<span><span class="pin"></span>${escapeHtml(lista.nombre)}</span> <button type="button" class="link-btn meta" data-action="editar-nombre-lista" data-id="${lista.id}" title="Cambiar el título de la lista">Editar título</button>`;
 }
 
 function renderListaCompra(){
@@ -1936,9 +2003,8 @@ function renderListaCompra(){
       </div>
       <button class="btn" type="submit">Crear lista</button>
     </form>
-    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas, cambiar el titulo y anadir o quitar productos. Se actualiza para todos automaticamente.</p>
   </div>
-  ${listas.length===0 ? '<div class="card"><p class="empty">Todavia no hay listas de la compra. Crea la primera arriba.</p></div>' : ''}
+  ${listas.length===0 ? '<div class="card"><p class="empty">Todavía no hay listas de la compra. Crea la primera arriba.</p></div>' : ''}
   ${listas.map(renderListaCompraCard).join('')}
   `;
 }
@@ -1948,15 +2014,15 @@ function renderListaCompraCard(lista){
   const pendientes = items.filter(i=>!i.comprado);
   const comprados = items.filter(i=>i.comprado);
   return `<div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
       ${renderNombreLista(lista, 'compra')}
-      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-left:auto;">
         <span class="meta">creada por ${escapeHtml(socioNombre(lista.creado_por))}</span>
         <button class="btn accent small" data-action="export-lista-compra-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         <button class="btn danger small" data-action="delete-lista-compra" data-id="${lista.id}">Borrar lista</button>
       </span>
     </h2>
-    ${items.length===0 ? '<p class="empty">Todavia no hay productos en esta lista.</p>' : ''}
+    ${items.length===0 ? '<p class="empty">Todavía no hay productos en esta lista.</p>' : ''}
     ${pendientes.map(i=>renderItemCompra(i)).join('')}
     ${comprados.length ? `<details style="margin-top:8px;">
       <summary>Comprados (${comprados.length})</summary>
@@ -1967,8 +2033,111 @@ function renderListaCompraCard(lista){
         <div style="flex:2;"><label class="f">Producto</label><input type="text" name="nombre" required placeholder="Ej: Leche, pan, hielo..."></div>
         <div><label class="f">Cantidad</label><input type="text" name="cantidad" placeholder="opcional"></div>
       </div>
-      <button class="btn ghost small" type="submit">Anadir producto</button>
+      <button class="btn ghost small" type="submit">Añadir producto</button>
     </form>
+  </div>`;
+}
+
+/* ============ LISTA PARA COMIDAS/CENAS ============ */
+function renderTipoComidaSelect(valorActual){
+  const tipos = state.tipos_comida || [];
+  return `<div style="display:flex; gap:6px;">
+    <select name="tipo" style="flex:1;">${tipos.map(t=>`<option ${valorActual===t.nombre?'selected':''}>${escapeHtml(t.nombre)}</option>`).join('')}</select>
+    <button type="button" class="btn ghost small" data-action="add-tipo-comida-inline" title="Añadir opción nueva">+</button>
+    <button type="button" class="btn ghost small" data-action="delete-tipo-comida-inline" title="Quitar la opción seleccionada">&minus;</button>
+  </div>`;
+}
+function renderListasComidas(){
+  const listas = state.listas_comida || [];
+  return `
+  <div class="card">
+    <h2><span class="pin"></span>Nueva lista de comida/cena</h2>
+    <form data-form="add-lista-comida">
+      <div class="form-row">
+        <div style="flex:2;"><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: Cena de fiestas, comida de Nochebuena..."></div>
+        <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}"></div>
+        <div><label class="f">Hora</label><input type="time" name="hora"></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">¿Qué se come?</label>${renderTipoComidaSelect()}</div>
+        <div style="flex:2;"><label class="f">Notas</label><input type="text" name="notas" placeholder="Ej: nombre del bar/restaurante..."></div>
+      </div>
+      <button class="btn" type="submit">Crear</button>
+    </form>
+  </div>
+  ${listas.length===0 ? '<div class="card"><p class="empty">Todavía no hay comidas o cenas planeadas. Crea la primera arriba.</p></div>' : ''}
+  ${listas.map(renderListaComidaCard).join('')}
+  `;
+}
+
+function renderListaComidaCard(lista){
+  if(editandoListaComidaId === lista.id){
+    return `<div class="card">
+      <form data-form="edit-lista-comida" data-id="${lista.id}">
+        <div class="form-row">
+          <div style="flex:2;"><label class="f">Nombre</label><input type="text" name="nombre" required value="${escapeHtml(lista.nombre)}"></div>
+          <div><label class="f">Fecha</label><input type="date" name="fecha" value="${lista.fecha||''}"></div>
+          <div><label class="f">Hora</label><input type="time" name="hora" value="${lista.hora||''}"></div>
+        </div>
+        <div class="form-row">
+          <div><label class="f">¿Qué se come?</label>${renderTipoComidaSelect(lista.tipo)}</div>
+          <div style="flex:2;"><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(lista.notas||'')}" placeholder="Ej: nombre del bar/restaurante..."></div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn small" type="submit">Guardar</button>
+          <button class="btn ghost small" type="button" data-action="cancelar-editar-lista-comida">Cancelar</button>
+        </div>
+      </form>
+    </div>`;
+  }
+  const asistentes = lista.asistentes || [];
+  const invitados = lista.invitados || [];
+  const totalPersonas = asistentes.length + invitados.length;
+  const disponibles = state.socios.filter(s=>s.activo && !asistentes.includes(s.id));
+  return `<div class="card">
+    <h2 style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>${escapeHtml(lista.nombre)}</span>
+      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-left:auto;">
+        <span class="meta">creada por ${escapeHtml(socioNombre(lista.creado_por))}</span>
+        <button class="btn ghost small" data-action="editar-lista-comida" data-id="${lista.id}">Editar</button>
+        <button class="btn accent small" data-action="export-lista-comida-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+        <button class="btn danger small" data-action="delete-lista-comida" data-id="${lista.id}">Borrar</button>
+      </span>
+    </h2>
+    ${(lista.fecha || lista.hora) ? `<div class="meta" style="margin:-4px 0 10px;">${lista.fecha ? fmtDate(lista.fecha) : ''}${lista.hora ? ' - '+lista.hora : ''}</div>` : ''}
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      ${lista.tipo ? `<span class="tag big sky">${escapeHtml(lista.tipo)}</span>` : ''}
+      ${lista.notas ? `<span class="meta">${escapeHtml(lista.notas)}</span>` : ''}
+    </div>
+    <div class="menu-row" style="margin-bottom:10px;">
+      <span class="label"><strong>Vienen</strong></span><span class="dots"></span>
+      <span class="value ${totalPersonas?'sage':''}"><strong>${totalPersonas} persona${totalPersonas===1?'':'s'}</strong></span>
+    </div>
+    ${totalPersonas ? `<div class="role-options" style="margin-bottom:12px;">
+      ${asistentes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}</span>`).join('')}
+      ${invitados.map(inv=>`<span class="role-option">${escapeHtml(inv.nombre)} <span class="meta">(invitado)</span></span>`).join('')}
+    </div>` : '<p class="empty" style="margin-bottom:12px;">Todavía no se ha apuntado nadie.</p>'}
+    <details>
+      <summary>Apuntar o quitar gente</summary>
+      <div style="margin-top:10px;">
+        <label class="f">Socios apuntados</label>
+        <div class="role-options" style="margin:6px 0 8px;">
+          ${asistentes.length ? asistentes.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<button type="button" data-action="toggle-asistencia-comida" data-lista="${lista.id}" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Nadie apuntado todavía.</span>'}
+        </div>
+        ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:12px;">
+          <div><select id="comida-socio-select-${lista.id}"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
+          <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-comida" data-lista="${lista.id}">+ Añadir</button></div>
+        </div>` : ''}
+        <label class="f">Invitados (no socios)</label>
+        <div class="role-options" style="margin:6px 0 8px;">
+          ${invitados.length ? invitados.map(inv=>`<span class="role-option">${escapeHtml(inv.nombre)}<button type="button" data-action="delete-invitado-comida" data-id="${inv.id}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin invitados añadidos.</span>'}
+        </div>
+        <form data-form="add-invitado-comida" data-lista="${lista.id}" style="display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:160px;"><input type="text" name="nombre" placeholder="Nombre del invitado" required></div>
+          <button class="btn ghost small" type="submit">+ Añadir invitado</button>
+        </form>
+      </div>
+    </details>
   </div>`;
 }
 
@@ -1979,7 +2148,6 @@ function renderListasPago(){
   <div class="card">
     <h2><span class="pin"></span>Nueva lista de pago</h2>
     <p class="meta" style="margin:-4px 0 10px;">Para derramas o pagos extra</p>
-    ${!numeroCuenta ? `<p class="readonly-note" style="margin-bottom:10px;">No hay numero de cuenta configurado. El administrador puede anadirlo con el boton "numero de cuenta" de la cabecera, para que salga en las listas de pago.</p>` : ''}
     <form data-form="add-lista-pago">
       <div class="form-row">
         <div style="flex:2;"><label class="f">Asunto</label><input type="text" name="nombre" required placeholder="Ej: Derrama piscina 2026"></div>
@@ -1987,9 +2155,8 @@ function renderListasPago(){
       </div>
       <button class="btn" type="submit">Crear lista de pago</button>
     </form>
-    <p class="readonly-note" style="margin-top:8px;">Todos los socios pueden crear listas de pago, cambiar el titulo, anadir filas y marcar o desmarcar pagos.</p>
   </div>
-  ${listas.length===0 ? '<div class="card"><p class="empty">Todavia no hay listas de pago. Crea la primera arriba.</p></div>' : ''}
+  ${listas.length===0 ? '<div class="card"><p class="empty">Todavía no hay listas de pago. Crea la primera arriba.</p></div>' : ''}
   ${listas.map(l=>renderListaPagoCard(l, numeroCuenta)).join('')}
   `;
 }
@@ -2001,24 +2168,23 @@ function renderListaPagoCard(lista, numeroCuenta){
   const sociosEnLista = new Set(items.map(i=>i.socio_id).filter(Boolean));
   const disponibles = state.socios.filter(s=>s.activo && !sociosEnLista.has(s.id));
   return `<div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
       ${renderNombreLista(lista, 'pago')}
-      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-left:auto;">
         <span class="meta">creada por ${escapeHtml(socioNombre(lista.creado_por))}</span>
         <button class="btn accent small" data-action="export-lista-pago-whatsapp" data-id="${lista.id}" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
         <button class="btn danger small" data-action="delete-lista-pago" data-id="${lista.id}">Borrar lista</button>
       </span>
     </h2>
-    ${numeroCuenta ? `<p class="meta" style="margin:-4px 0 10px;">Numero de cuenta: <strong>${escapeHtml(numeroCuenta)}</strong></p>` : ''}
+    ${numeroCuenta ? `<p class="meta" style="margin:-4px 0 10px;">Número de cuenta: <strong>${escapeHtml(numeroCuenta)}</strong></p>` : ''}
     <div class="menu-row" style="margin-bottom:6px;"><span class="label">Pendientes</span><span class="dots"></span><span class="value rust">${pendientes.length}</span></div>
-    ${items.length===0 ? '<p class="empty">Todavia no hay filas en esta lista.</p>' : ''}
+    ${items.length===0 ? '<p class="empty">Todavía no hay filas en esta lista.</p>' : ''}
     ${pendientes.map(i=>renderItemPago(i)).join('')}
     ${pagados.length ? `<details style="margin-top:8px;">
       <summary>Ya han pagado (${pagados.length})</summary>
       ${pagados.map(i=>renderItemPago(i)).join('')}
     </details>` : ''}
     <form data-form="add-item-pago" data-lista="${lista.id}" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);">
-      <p class="readonly-note" style="margin:0 0 10px;">No todos los socios tienen por que estar en esta lista: puedes anadir un socio que falte, o a alguien que no sea socio, y quitar filas con "Quitar".</p>
       <div class="form-row">
         <div><label class="f">Socio (opcional)</label><select name="socio_id">
           <option value="" selected>Otra persona (no socio)</option>
@@ -2027,7 +2193,7 @@ function renderListaPagoCard(lista, numeroCuenta){
         <div style="flex:2;"><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: alguien que no era socio al crear la lista"></div>
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0" placeholder="opcional"></div>
       </div>
-      <button class="btn ghost small" type="submit">Anadir fila</button>
+      <button class="btn ghost small" type="submit">Añadir fila</button>
     </form>
   </div>`;
 }
@@ -2078,7 +2244,7 @@ function renderItemCompra(i){
       <input type="checkbox" data-action="toggle-item-compra" data-id="${i.id}" ${i.comprado?'checked':''} style="margin-top:4px;">
       <span>
         <div style="font-weight:600; ${i.comprado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.cantidad ? `<span class="meta">- ${escapeHtml(i.cantidad)}</span>` : ''}</div>
-        <div class="meta">${i.comprado ? `Comprado por ${escapeHtml(socioNombre(i.comprado_por))}` : `Anadido por ${escapeHtml(socioNombre(i.anadido_por))}`}</div>
+        <div class="meta">${i.comprado ? `Comprado por ${escapeHtml(socioNombre(i.comprado_por))}` : `Añadido por ${escapeHtml(socioNombre(i.anadido_por))}`}</div>
       </span>
     </label>
     <div style="display:flex; gap:8px;">
@@ -2094,6 +2260,7 @@ function renderGastoSocioItem(g){
   const esIngreso = g.tipo==='ingreso';
   const estadoLabel = 'Pagado';
   if(editandoGastoSocioId===g.id){
+    const puedeCambiarSocio = can('manage_finances');
     return `<form data-form="edit-gasto-socio" data-id="${g.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto" ${!esIngreso?'selected':''}>Gasto</option><option value="ingreso" ${esIngreso?'selected':''}>Ingreso</option></select></div>
@@ -2101,7 +2268,12 @@ function renderGastoSocioItem(g){
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0.01" required value="${g.importe}"></div>
         <div><label class="f">Fecha</label><input type="date" name="fecha" required value="${g.fecha}"></div>
       </div>
-      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(g.notas||'')}"></div></div>
+      <div class="form-row">
+        <div><label class="f">Socio</label>${puedeCambiarSocio
+          ? `<select name="socio_id">${state.socios.map(s=>`<option value="${s.id}" ${g.socio_id===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}</select>`
+          : `<input type="text" value="${escapeHtml(g.socio_nombre||'')}" disabled>`}</div>
+        <div style="flex:2;"><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(g.notas||'')}"></div>
+      </div>
       <div style="display:flex; gap:8px;">
         <button class="btn small" type="submit">Guardar</button>
         <button class="btn ghost small" type="button" data-action="cancelar-editar-gasto-socio">Cancelar</button>
@@ -2135,7 +2307,7 @@ function renderMovimientoItem(m){
     return `<form data-form="edit-movimiento" data-id="${m.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto" ${m.tipo!=='ingreso'?'selected':''}>Gasto</option><option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option></select></div>
-        <div><label class="f">Categoria</label><select name="categoria">${categoriasMov.map(c=>`<option ${m.categoria===c.nombre?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('')}</select></div>
+        <div><label class="f">Categoría</label><select name="categoria">${categoriasMov.map(c=>`<option ${m.categoria===c.nombre?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('')}</select></div>
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${m.fecha}" required></div>
       </div>
       <div class="form-row">
@@ -2180,24 +2352,39 @@ function renderCaja(){
   const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const gastosSocios = [...(state.gastos_socios||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const categoriasMov = state.categorias_movimiento || [];
+  const gastosSociosMostrados = filtroSocioLiquidar ? gastosSocios.filter(g=>g.socio_id===filtroSocioLiquidar) : gastosSocios;
+  const totalFiltroNeto = filtroSocioLiquidar
+    ? gastosSociosMostrados.filter(g=>!g.abonado).reduce((acc,g)=>acc + (g.tipo==='ingreso' ? -1 : 1) * Number(g.importe||0), 0)
+    : 0;
   return `
   <div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Gastos e ingresos de socios</span>
-      ${gastosSocios.length ? `<button class="btn accent small" data-action="export-gastos-socios-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
-    </h2>
-    <p class="meta" style="margin:-4px 0 10px;">Registra aqui un gasto que hayas pagado de tu bolsillo para la pena (para que el tesorero te lo pueda abonar) o un ingreso para que quede registrado y lo pueda comprobar el tesorero.</p>
+    <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
+    <div style="margin:-6px 0 10px; display:flex; flex-direction:column; gap:8px;">
+      <p class="meta" style="margin:0;">Registra aquí un gasto que hayas pagado de tu bolsillo para la peña (para que el tesorero te lo pueda abonar) o un ingreso para que quede registrado y lo pueda comprobar el tesorero.</p>
+      ${gastosSocios.length ? `<button class="btn accent small" data-action="export-gastos-socios-whatsapp" style="font-family:'Work Sans'; align-self:flex-end;">Enviar por WhatsApp</button>` : ''}
+    </div>
     <form data-form="add-gasto-socio">
       <div class="form-row">
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
-        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Bombillas para el salon"></div>
+        <div style="flex:2;"><label class="f">Concepto</label><input type="text" name="concepto" required placeholder="Ej: Bombillas para el salón"></div>
         <div><label class="f">Importe (EUR)</label><input type="number" name="importe" step="0.01" min="0.01" required></div>
         <div><label class="f">Fecha</label><input type="date" name="fecha" value="${todayISO()}" required></div>
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <button class="btn" type="submit">Registrar</button>
     </form>
-    ${gastosSocios.length===0 ? '<p class="empty" style="margin-top:12px;">Todavia no hay gastos registrados.</p>' : gastosSocios.map(g=>renderGastoSocioItem(g)).join('')}
+    ${admin ? `<div class="consumos-filtro" style="margin-top:10px;">
+      <select id="gastos-socios-filtro-socio">
+        <option value="">Todos los socios</option>
+        ${state.socios.map(s=>`<option value="${s.id}" ${filtroSocioLiquidar===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
+      </select>
+      ${filtroSocioLiquidar ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-gastos-socio">Quitar filtro</button>` : ''}
+    </div>` : ''}
+    ${gastosSociosMostrados.length===0 ? `<p class="empty" style="margin-top:12px;">${filtroSocioLiquidar ? 'Este socio no tiene gastos o ingresos pendientes.' : 'Todavía no hay gastos registrados.'}</p>` : gastosSociosMostrados.map(g=>renderGastoSocioItem(g)).join('')}
+    ${admin && filtroSocioLiquidar && Math.abs(totalFiltroNeto)>0.004 ? `<div class="menu-row" style="margin-top:8px; padding-top:10px; border-top:1px solid var(--line); align-items:center;">
+      <span class="label"><strong>Total</strong></span><span class="dots"></span>
+      <span class="value ${totalFiltroNeto>=0?'sage':'rust'}"><strong>${totalFiltroNeto>=0?'Le debemos':'Nos debe'} ${money(Math.abs(totalFiltroNeto))}</strong></span>
+    </div>` : ''}
   </div>
   ${admin ? `
   <div class="card">
@@ -2207,11 +2394,11 @@ function renderCaja(){
 
         <div><label class="f">Tipo</label><select name="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
 
-        <div><label class="f">Categoria</label>
+        <div><label class="f">Categoría</label>
           <div style="display:flex; gap:6px;">
             <select name="categoria" style="flex:1;">${categoriasMov.map(c=>`<option>${escapeHtml(c.nombre)}</option>`).join('')}</select>
-            <button type="button" class="btn ghost small" data-action="add-categoria-mov-inline" title="Anadir categoria nueva">+</button>
-            <button type="button" class="btn ghost small" data-action="delete-categoria-mov-inline" title="Quitar la categoria seleccionada">&minus;</button>
+            <button type="button" class="btn ghost small" data-action="add-categoria-mov-inline" title="Añadir categoría nueva">+</button>
+            <button type="button" class="btn ghost small" data-action="delete-categoria-mov-inline" title="Quitar la categoría seleccionada">&minus;</button>
           </div>
         </div>
 
@@ -2248,7 +2435,7 @@ function renderCaja(){
     </h2>
     ${(()=>{
       const filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
-      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos'?'registrados':'en ese periodo'}.</p>`;
+      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos'?'registrados':'en ese período'}.</p>`;
       return filtrados.map(m=>renderMovimientoItem(m)).join('');
     })()}
   </div>`;
@@ -2273,8 +2460,9 @@ function renderBebidasConsumo(){
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const misPendientes = misBebidasPendientes();
   const misPendientesPorMes = misBebidasPendientesPorMes();
-  const sinFiltro = consumosPeriodo.tipo==='todos';
+  const sinFiltro = consumosPeriodo.tipo==='todos' && !consumosFiltroSocio;
   const mesesConsumos = mesesDisponibles(state.bebidas_consumos.map(c=>c.fecha ? c.fecha.slice(0,7) : null));
+  const opcionesConsumidores = consumidoresDisponibles(consumos);
   const consumosFiltradosList = consumosFiltrados(consumos);
   const consumosMostrados = sinFiltro ? consumosFiltradosList.slice(0,40) : consumosFiltradosList;
   const totalPagadoFiltrado = consumosFiltradosList.filter(c=>c.pagado).reduce((a,c)=>a+Number(c.importe||0),0);
@@ -2286,9 +2474,9 @@ function renderBebidasConsumo(){
     <form data-form="add-bebida-precio">
       <div class="form-row">
 
-        <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Cana, agua, refresco"></div>
+        <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Caña, agua, refresco"></div>
 
-        <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botellon" required></div>
+        <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botellón" required></div>
       </div>
       <div class="form-row">
 
@@ -2296,7 +2484,7 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Precio no socio (EUR)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required></div>
       </div>
-      <button class="btn" type="submit">Anadir precio</button>
+      <button class="btn" type="submit">Añadir precio</button>
     </form>
     ${precios.length ? precios.map(p=>`
       <div class="menu-row">
@@ -2306,7 +2494,7 @@ function renderBebidasConsumo(){
         <span class="dots"></span>
 
         <button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>
-      </div>`).join('') : '<p class="empty">Anade al menos una bebida con precio.</p>'}
+      </div>`).join('') : '<p class="empty">Añade al menos una bebida con precio.</p>'}
   </div>` : `
   <div class="card">
     <h2><span class="pin"></span>Precios</h2>
@@ -2315,17 +2503,17 @@ function renderBebidasConsumo(){
         <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)}</small></span>
         <span class="dots"></span>
         <span class="value">socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</span>
-      </div>`).join('') : '<p class="empty">Todavia no hay precios cargados.</p>'}
-    <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes anaden precios nuevos.</p>
+      </div>`).join('') : '<p class="empty">Todavía no hay precios cargados.</p>'}
+    <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes añaden precios nuevos.</p>
   </div>`}
   <div class="card">
     <h2><span class="pin"></span>${puedeGestionarBebidas ? 'Registrar consumo' : 'Registrar mi consumo'}</h2>
-    ${precios.length===0 ? '<p class="empty">Primero anade precios de bebidas arriba.</p>' : `
+    ${precios.length===0 ? '<p class="empty">Primero añade precios de bebidas arriba.</p>' : `
     <form data-form="add-consumo">
       ${puedeGestionarBebidas ? `
       <div class="form-row">
 
-        <div><label class="f">Quien consume</label>
+        <div><label class="f">¿Quién consume?</label>
 
           <select name="consumidorTipo">
 
@@ -2368,15 +2556,19 @@ function renderBebidasConsumo(){
     <div class="menu-row" style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px;"><span class="label"><strong>Total pendiente</strong></span><span class="dots"></span><span class="value rust"><strong>${money(misPendientes.reduce((a,c)=>a+Number(c.importe||0),0))}</strong></span></div>
   </div>` : ''}
   <div class="card">
-    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><span class="pin"></span>Ultimos consumos <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalPagadoFiltrado)} - pendiente: ${money(totalPendienteFiltrado)}</span></span>
-      <button class="btn accent small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
+    <h2 style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Últimos consumos</span> <span style="font-size:0.85rem; color:var(--chalk-dim); font-family:'Work Sans';">- pagado: ${money(totalPagadoFiltrado)} - pendiente: ${money(totalPendienteFiltrado)}</span>
+      <button class="btn accent small" data-action="export-bebidas-whatsapp" style="font-family:'Work Sans'; margin-left:auto;">Enviar por WhatsApp</button>
     </h2>
     <div class="consumos-filtro">
       ${renderSelectorPeriodo('consumos', consumosPeriodo, mesesConsumos)}
+      <select id="consumos-filtro-socio">
+        <option value="">Elige un consumidor</option>
+        ${opcionesConsumidores.map(o=>`<option value="${o.valor}" ${consumosFiltroSocio===o.valor?'selected':''}>${escapeHtml(o.nombre)}${o.esSocio?'':' (invitado)'}</option>`).join('')}
+      </select>
       ${!sinFiltro ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-consumos">Quitar filtro</button>` : ''}
     </div>
-    ${consumosMostrados.length===0 ? `<p class="empty">${sinFiltro ? 'Sin consumos todavia.' : 'Sin consumos en ese periodo.'}</p>` : consumosMostrados.map(c=>{
+    ${consumosMostrados.length===0 ? `<p class="empty">${sinFiltro ? 'Sin consumos todavía.' : 'Sin consumos en ese período.'}</p>` : consumosMostrados.map(c=>{
       const nombreBebida = c.bebida_nombre || '-';
       return `<div class="list-item">
 
@@ -2435,7 +2627,7 @@ function renderMiniCalendario(fechaRef, items, navAction){
       const clases = new Set(dia.map(it=>it.cls).filter(Boolean));
       const cls = clases.size===1 ? [...clases][0] : '';
       const detalle = dia.map(it=>it.detalle||it.label).join('\n\n———\n\n');
-      ticket = `<button type="button" class="cal-ticket ${cls}" data-action="ver-evento-cal" data-detalle="${escapeHtml(detalle)}" title="${dia.length} eventos este dia">${dia.length} eventos</button>`;
+      ticket = `<button type="button" class="cal-ticket ${cls}" data-action="ver-evento-cal" data-detalle="${escapeHtml(detalle)}" title="${dia.length} eventos este día">${dia.length} eventos</button>`;
     }
     celdas.push(`<div class="cal-day">
       <div class="cal-day-num">${d}</div>
@@ -2450,7 +2642,7 @@ function renderMiniCalendario(fechaRef, items, navAction){
     <button data-action="${navAction}" data-dir="1">siguiente &rarr;</button>
   </div>
   <div class="cal-grid">
-    ${['Lun','Mar','Mie','Jue','Vie','Sab','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')}
+    ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')}
     ${celdas.join('')}
   </div>`;
 }
@@ -2472,7 +2664,7 @@ function renderEncargados(){
   const tareas = state.tareas_tickets || [];
   const activas = tareas.filter(t=>t.estado!=='hecho');
   const historial = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
-  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+((t.socios_ids&&t.socios_ids.length)?': '+t.socios_ids.map(socioNombre).join(', '):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}\n${(t.socios_ids&&t.socios_ids.length)?'Quien la hace: '+t.socios_ids.map(socioNombre).join(', '):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
+  const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+((t.socios_ids&&t.socios_ids.length)?': '+t.socios_ids.map(socioNombre).join(', '):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}\n${(t.socios_ids&&t.socios_ids.length)?'Quién la hace: '+t.socios_ids.map(socioNombre).join(', '):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
   return `
   <div class="card">
     <h2><span class="pin"></span>Nueva tarea</h2>
@@ -2480,17 +2672,17 @@ function renderEncargados(){
       <div class="form-row">
         <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required placeholder="Ej: Compras, Limpieza..."></div>
         <div><label class="f">Fecha (opcional)</label><input type="date" name="fecha"></div>
-        <div><label class="f">Rotacion</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}">${r||'Ninguna'}</option>`).join('')}</select></div>
+        <div><label class="f">Rotación</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}">${r||'Ninguna'}</option>`).join('')}</select></div>
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div></div>
       <div style="margin-bottom:12px;">
-        <label class="f">Quien la hace</label>
+        <label class="f">¿Quién la hace?</label>
         <div id="nueva-tarea-socios-wrap">${renderNuevaTareaSociosWrap()}</div>
       </div>
       <datalist id="tareas-tipos-list">${state.tareas_fijas.map(t=>`<option value="${escapeHtml(t)}">`).join('')}</datalist>
       <button class="btn" type="submit">Crear tarea</button>
     </form>
-    <p class="readonly-note" style="margin-top:8px;">Cualquier socio puede crear tareas, asignarlas a quien quiera y editarlas o borrarlas despues.</p>
+    <p class="readonly-note" style="margin-top:8px;">Cualquier socio puede crear tareas, asignarlas a quien quiera y editarlas o borrarlas después.</p>
   </div>
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -2521,7 +2713,7 @@ function renderTicketRow(t){
       <div class="form-row">
         <div><label class="f">Tipo</label><input type="text" name="tipo" list="tareas-tipos-list" required value="${escapeHtml(t.tipo)}"></div>
         <div><label class="f">Fecha (opcional)</label><input type="date" name="fecha" value="${t.fecha||''}"></div>
-        <div><label class="f">Rotacion</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}" ${t.rotacion===r?'selected':''}>${r||'Ninguna'}</option>`).join('')}</select></div>
+        <div><label class="f">Rotación</label><select name="rotacion">${ROTACION_OPCIONES.map(r=>`<option value="${r}" ${t.rotacion===r?'selected':''}>${r||'Ninguna'}</option>`).join('')}</select></div>
       </div>
       <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(t.notas||'')}" placeholder="opcional"></div></div>
       <div style="display:flex; gap:8px;">
@@ -2533,7 +2725,7 @@ function renderTicketRow(t){
   return `<div class="list-item" style="display:block;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
       <div>
-        <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotacion: ${escapeHtml(t.rotacion)}</span>`:''}</div>
+        <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotación: ${escapeHtml(t.rotacion)}</span>`:''}</div>
         <div class="meta">${t.fecha?fmtDate(t.fecha):''}${t.completado_en?' - completada el '+fmtDate(t.completado_en.slice(0,10)):''}</div>
         ${t.notas?`<div class="meta" style="margin-top:2px; overflow-wrap:anywhere;">${escapeHtml(t.notas)}</div>`:''}
       </div>
@@ -2545,13 +2737,13 @@ function renderTicketRow(t){
       </div>
     </div>
     <div style="margin-top:8px;">
-      <label class="f">Quien la hace</label>
+      <label class="f">¿Quién la hace?</label>
       <div class="role-options" style="margin-bottom:6px;">
         ${asignados.length ? asignados.map(sid=>`<span class="role-option">${escapeHtml(socioNombre(sid))}<button type="button" data-action="quitar-socio-tarea" data-id="${t.id}" data-socio="${sid}" title="Quitar" style="background:none; border:none; color:var(--chalk-dim); padding:0; margin-left:2px;">x</button></span>`).join('') : '<span class="empty">Sin asignar</span>'}
       </div>
       ${disponibles.length ? `<div class="form-row" style="align-items:flex-end; margin-bottom:0;">
         <div><select data-nuevo-socio-tarea="${t.id}"><option value="" selected>Elige un socio...</option>${disponibles.map(s=>`<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('')}</select></div>
-        <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-tarea" data-id="${t.id}">+ Anadir</button></div>
+        <div style="flex:none;"><button type="button" class="btn ghost small" data-action="anadir-socio-tarea" data-id="${t.id}">+ Añadir</button></div>
       </div>` : ''}
     </div>
   </div>`;
@@ -2564,7 +2756,7 @@ function renderPerfil(){
   const perfil = state.perfiles[state.current_user] || {telefono:'', notas:'', familia:[]};
   const familia = perfil.familia || [];
   return `
-  <div class="card">
+  <div class="card no-collapse">
     <h2><span class="pin"></span>Mis datos</h2>
     <div class="foto-upload-row">
       ${avatarHtml(me,'lg','edit')}
@@ -2578,26 +2770,26 @@ function renderPerfil(){
         
         <div><label class="f">Mi nombre</label><input type="text" name="nombre" value="${escapeHtml(me.nombre||'')}" required></div>
         
-        <div><label class="f">Telefono</label><input type="tel" name="telefono" value="${escapeHtml(perfil.telefono||'')}" placeholder="600 000 000"></div>
+        <div><label class="f">Teléfono</label><input type="tel" name="telefono" value="${escapeHtml(perfil.telefono||'')}" placeholder="600 000 000"></div>
       </div>
-      <div class="form-row"><div><label class="f">Notas (alergias, preferencias, lo que quieras)</label><textarea name="notas" placeholder="Ej: alergico a los frutos secos">${escapeHtml(perfil.notas||'')}</textarea></div></div>
+      <div class="form-row"><div><label class="f">Notas (alergias, preferencias, lo que quieras)</label><textarea name="notas" placeholder="Ej: alérgico a los frutos secos">${escapeHtml(perfil.notas||'')}</textarea></div></div>
       <button class="btn" type="submit">Guardar mis datos</button>
     </form>
   </div>
   <div class="card">
     <h2><span class="pin"></span>Seguridad</h2>
     <form data-form="change-pin" class="form-row" style="align-items:flex-end;">
-      <div><label class="f">Nuevo PIN (4 digitos)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****"></div>
+      <div><label class="f">Nuevo PIN (4 dígitos)</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin" required placeholder="****"></div>
       <div><label class="f">Repite el PIN</label><input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" name="pin2" required placeholder="****"></div>
       <div style="flex:none;"><button class="btn ghost" type="submit">Cambiar mi PIN</button></div>
     </form>
   </div>
   <div class="card">
     <h2><span class="pin"></span>Mi familia</h2>
-    ${familia.length===0 ? '<p class="empty">Aun no has anadido a nadie.</p>' : familia.map(f=>`
+    ${familia.length===0 ? '<p class="empty">Aún no has añadido a nadie.</p>' : familia.map(f=>`
       <div class="familia-item">
-        
-        <span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'- '+escapeHtml(String(f.edad))+' anos':''}</span>
+
+        <span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'- '+escapeHtml(String(f.edad))+' años':''}</span>
         
         <button class="btn danger small" data-action="delete-familiar" data-id="${f.id}">Borrar</button>
       </div>
@@ -2607,11 +2799,11 @@ function renderPerfil(){
         
         <div><label class="f">Nombre</label><input type="text" name="nombre" required></div>
         
-        <div><label class="f">Relacion</label><select name="tipo">${TIPO_FAMILIA.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        
+        <div><label class="f">Relación</label><select name="tipo">${TIPO_FAMILIA.map(t=>`<option>${t}</option>`).join('')}</select></div>
+
         <div><label class="f">Edad</label><input type="number" name="edad" min="0"></div>
       </div>
-      <button class="btn ghost" type="submit">+ Anadir familiar</button>
+      <button class="btn ghost" type="submit">+ Añadir familiar</button>
     </form>
   </div>
   <div class="card">
@@ -2623,9 +2815,9 @@ function renderPerfil(){
 
         <div style="font-weight:600;">${escapeHtml(s.nombre)}</div>
 
-        <div class="meta">${p.telefono?'Tel: '+escapeHtml(p.telefono):'Sin telefono'} ${fam.length?'- '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
+        <div class="meta">${p.telefono?'Tel: '+escapeHtml(p.telefono):'Sin teléfono'} ${fam.length?'- '+fam.map(f=>escapeHtml(f.nombre)).join(', '):''}</div>
       </div></div>`;
-    }).join('') || '<p class="empty">No hay mas socios.</p>'}
+    }).join('') || '<p class="empty">No hay más socios.</p>'}
   </div>
   `;
 }
@@ -2644,15 +2836,15 @@ function renderPerfilSocio(sid){
       ${avatarHtml(s,'lg','view')}
       <div>
         <div style="font-weight:600;">${escapeHtml(s.nombre)} ${roleNames(s).map(rn=>`<span class="tag">${escapeHtml(rn)}</span>`).join('')}${!s.activo?'<span class="tag warn">de baja</span>':''}</div>
-        <p class="meta" style="margin-top:6px;">${perfil.telefono ? 'Telefono: '+escapeHtml(perfil.telefono) : 'Sin telefono'}</p>
+        <p class="meta" style="margin-top:6px;">${perfil.telefono ? 'Teléfono: '+escapeHtml(perfil.telefono) : 'Sin teléfono'}</p>
       </div>
     </div>
     ${perfil.notas ? `<p class="meta" style="margin-top:10px;"><b>Notas:</b> ${linkify(perfil.notas)}</p>` : ''}
   </div>
   <div class="card">
     <h2><span class="pin"></span>Familia de ${escapeHtml(s.nombre)}</h2>
-    ${familia.length===0 ? '<p class="empty">No ha anadido a nadie.</p>' : familia.map(f=>`
-      <div class="familia-item"><span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'- '+escapeHtml(String(f.edad))+' anos':''}</span></div>
+    ${familia.length===0 ? '<p class="empty">No ha añadido a nadie.</p>' : familia.map(f=>`
+      <div class="familia-item"><span>${escapeHtml(f.nombre)} <span class="tag">${f.tipo}</span> ${f.edad?'- '+escapeHtml(String(f.edad))+' años':''}</span></div>
     `).join('')}
   </div>
   <p class="readonly-note">Solo lectura: para cambiar estos datos tiene que hacerlo ${escapeHtml(s.nombre)} desde su propio "Mi perfil".</p>
@@ -2669,7 +2861,7 @@ function renderChatPanel(){
       <button class="help-close" data-action="cerrar-chat" title="Cerrar">&times;</button>
     </div>
     <div class="chat-messages" id="chat-messages">
-      ${chatMensajes.length===0 ? '<p class="empty">Todavia no hay mensajes. Escribe el primero!</p>' : chatMensajes.map(renderChatMsg).join('')}
+      ${chatMensajes.length===0 ? '<p class="empty">Todavía no hay mensajes. ¡Escribe el primero!</p>' : chatMensajes.map(renderChatMsg).join('')}
     </div>
     <div class="chat-compose-wrap">
       ${emojiPickerAbierto ? renderEmojiPicker() : ''}
@@ -2742,7 +2934,7 @@ document.addEventListener('click', async (e)=>{
     else if(action==='ver-socio'){ viendoSocioId = btn.dataset.id; activeTab = 'perfil'; render(); }
     else if(action==='volver-mi-perfil'){ viendoSocioId = null; render(); }
     else if(action==='edit-club-name'){
-      const nombre = prompt('Nombre de la pena:', state.config.nombre);
+      const nombre = prompt('Nombre de la peña:', state.config.nombre);
       if(nombre && nombre.trim()){
 
         await apiPost('/api/config', {nombre: nombre.trim(), cuota_mensual: state.config.cuota_mensual ?? 45, numero_cuenta: state.config.numero_cuenta || ''});
@@ -2770,7 +2962,7 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='edit-cuenta'){
-      const cuentaInput = prompt('Numero de cuenta para pagos (IBAN):', state.config.numero_cuenta || '');
+      const cuentaInput = prompt('Número de cuenta para pagos (IBAN):', state.config.numero_cuenta || '');
       if(cuentaInput !== null){
         await apiPost('/api/config', {
           nombre: state.config.nombre,
@@ -2792,7 +2984,7 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='cerrar-chat'){ chatAbierto = false; emojiPickerAbierto = false; render(); }
     else if(action==='delete-chat-msg'){
-      if(!confirm('Borrar este mensaje?')) return;
+      if(!confirm('¿Borrar este mensaje?')) return;
       await apiDelete(`/api/chat/${btn.dataset.id}`);
       chatMensajes = chatMensajes.filter(m=>String(m.id)!==String(btn.dataset.id));
       const el = document.querySelector(`.chat-msg[data-id="${btn.dataset.id}"]`);
@@ -2833,7 +3025,8 @@ document.addEventListener('click', async (e)=>{
       if(input) input.value = '';
       render();
     }
-    else if(action==='limpiar-filtro-consumos'){ consumosPeriodo = {tipo:'todos', valor:''}; render(); }
+    else if(action==='limpiar-filtro-consumos'){ consumosPeriodo = {tipo:'todos', valor:''}; consumosFiltroSocio = ''; render(); }
+    else if(action==='limpiar-filtro-gastos-socio'){ filtroSocioLiquidar = ''; render(); }
     else if(action==='cuota-year'){ cuotasYear += Number(btn.dataset.dir); render(); }
     else if(action==='resumen-grafico-year'){ resumenGraficoYear += Number(btn.dataset.dir); render(); }
     else if(action==='export-log-eventos'){ exportarLogEventos(); }
@@ -2874,21 +3067,21 @@ document.addEventListener('click', async (e)=>{
     else if(action==='toggle-activo'){
       if(btn.dataset.activo === '1'){
         
-        if(!confirm('Estas seguro de que quieres dar de baja a este socio?')) return;
+        if(!confirm('¿Estás seguro de que quieres dar de baja a este socio?')) return;
       }
       await apiPost(`/api/socios/${btn.dataset.id}/activo`);
       await loadState(); render();
     }
     else if(action==='delete-socio'){
-      if(!confirm('Eliminar este socio definitivamente? Se perderan sus datos relacionados.')) return;
+      if(!confirm('¿Eliminar este socio definitivamente? Se perderán sus datos relacionados.')) return;
       await apiDelete(`/api/socios/${btn.dataset.id}`);
       await loadState(); render();
     }
     else if(action==='reset-pin'){
-      if(!confirm('Restablecer el PIN de este socio? Se generara uno nuevo y tendra que cambiarlo al entrar.')) return;
+      if(!confirm('¿Restablecer el PIN de este socio? Se generará uno nuevo y tendrá que cambiarlo al entrar.')) return;
       const r = await apiPost(`/api/socios/${btn.dataset.id}/reset-pin`);
       await loadState(); render();
-      alert(`Nuevo PIN temporal: ${r.pin}\n\nPasalo al socio - tendra que cambiarlo la proxima vez que entre.`);
+      alert(`Nuevo PIN temporal: ${r.pin}\n\nPásalo al socio - tendrá que cambiarlo la próxima vez que entre.`);
     }
     else if(action==='toggle-asistencia'){
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
@@ -2925,7 +3118,7 @@ document.addEventListener('click', async (e)=>{
       if(wrap) wrap.innerHTML = renderNuevaTareaSociosWrap();
     }
     else if(action==='delete-tarea-ticket'){
-      if(confirm('Borrar esta tarea?')){
+      if(confirm('¿Borrar esta tarea?')){
         editandoTareaId = null;
         await apiDelete(`/api/tareas-tickets/${btn.dataset.id}`); await loadState(); render();
       }
@@ -2943,7 +3136,7 @@ document.addEventListener('click', async (e)=>{
       const porEstado = {pendiente:[], en_curso:[]};
       tareas.forEach(t=>{ (porEstado[t.estado]||(porEstado[t.estado]=[])).push(t); });
       const linea = t=>`- ${t.tipo}${(t.socios_ids&&t.socios_ids.length)?' (' + t.socios_ids.map(socioNombre).join(', ') + ')':' (sin asignar)'}${t.fecha?' - *'+fmtDate(t.fecha)+'*':''}${t.notas?' - '+t.notas:''}`;
-      let texto = `*Tareas de la pena* - ${fmtDate(todayISO())}\n`;
+      let texto = `*Tareas de la peña* - ${fmtDate(todayISO())}\n`;
       if(porEstado.pendiente && porEstado.pendiente.length){ texto += `\n*Pendientes:*\n${porEstado.pendiente.map(linea).join('\n')}\n`; }
       if(porEstado.en_curso && porEstado.en_curso.length){ texto += `\n*En curso:*\n${porEstado.en_curso.map(linea).join('\n')}\n`; }
       if(tareas.length===0){ texto += '\nNo hay tareas activas.'; }
@@ -2951,23 +3144,23 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='export-reservas-whatsapp'){
       const proximas = state.reservas.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-      let texto = `*Reservas de la pena* - ${fmtDate(todayISO())}\n\n`;
-      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento} - ${socioNombre(r.socio_id)}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reservas proximas.';
+      let texto = `*Reservas de la peña* - ${fmtDate(todayISO())}\n\n`;
+      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento} - ${socioNombre(r.socio_id)}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reservas próximas.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-reuniones-whatsapp'){
       const proximas = state.reuniones.filter(r=>r.fecha>=todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-      let texto = `*Reuniones de la pena* - ${fmtDate(todayISO())}\n\n`;
-      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reuniones proximas.';
+      let texto = `*Reuniones de la peña* - ${fmtDate(todayISO())}\n\n`;
+      texto += proximas.length ? proximas.map(r=>`- *${fmtDate(r.fecha)}* (${fmtHoras(r)}): ${r.evento}${r.notas?' - '+r.notas:''}`).join('\n') : 'No hay reuniones próximas.';
       enviarWhatsapp(texto);
     }
     else if(action==='export-inventario-whatsapp'){
       const pendientes = state.inventario.filter(i=>i.estado!=='Bien');
-      let texto = `*Inventario de la pena* - ${fmtDate(todayISO())}\n\n`;
+      let texto = `*Inventario de la peña* - ${fmtDate(todayISO())}\n\n`;
       if(pendientes.length){
         texto += '*Pendiente de revisar o comprar:*\n' + pendientes.map(i=>`- ${i.nombre} (${i.cantidad}) - ${i.estado}${i.notas?' - '+i.notas:''}`).join('\n');
       } else {
-        texto += 'Todo el material esta bien, no hay nada pendiente.';
+        texto += 'Todo el material está bien, no hay nada pendiente.';
       }
       enviarWhatsapp(texto);
     }
@@ -2986,7 +3179,7 @@ document.addEventListener('click', async (e)=>{
       const pendientes = items.filter(i=>!i.pagado);
       const pagados = items.filter(i=>i.pagado);
       let texto = `*Lista de pago: ${lista.nombre}* - ${fmtDate(todayISO())}\n\n`;
-      if(state.config && state.config.numero_cuenta){ texto += `Numero de cuenta: *${state.config.numero_cuenta}*\n\n`; }
+      if(state.config && state.config.numero_cuenta){ texto += `Número de cuenta: *${state.config.numero_cuenta}*\n\n`; }
       texto += `*Pendientes de pagar:*\n`;
       texto += pendientes.length ? pendientes.map(i=>`- ${i.nombre}${i.importe?' - *'+money(i.importe)+'*':''}`).join('\n') : 'Nadie pendiente, todos han pagado.';
       if(pagados.length){
@@ -3004,7 +3197,7 @@ document.addEventListener('click', async (e)=>{
         texto += nombres.map(n=>`- ${n}: *${money(porConsumidor[n])}*`).join('\n');
         texto += `\n\n*Total pendiente: ${money(pendientes.reduce((a,c)=>a+Number(c.importe||0),0))}*`;
       } else {
-        texto += 'No hay deuda pendiente, todo esta pagado.';
+        texto += 'No hay deuda pendiente, todo está pagado.';
       }
       enviarWhatsapp(texto);
     }
@@ -3031,7 +3224,7 @@ document.addEventListener('click', async (e)=>{
       const ingresosTotales = totalIngresosCuotas() + totalIngresosMov() + totalBebidasIngreso() + totalIngresosSociosVerificados();
       const gastosTotales = totalGastosMov() + totalFiestasGasto() + totalGastosSociosVerificados();
       const saldo = ingresosTotales - gastosTotales;
-      let texto = `*Cuentas de la pena${periodo.tipo==='todos'?'':' - '+labelPeriodo(periodo)}* - ${fmtDate(todayISO())}\n\n`;
+      let texto = `*Cuentas de la peña${periodo.tipo==='todos'?'':' - '+labelPeriodo(periodo)}* - ${fmtDate(todayISO())}\n\n`;
 
       const cuotasPagadas = state.cuotas.filter(c=>c.pagado && dentroDePeriodo(c.fecha, periodo))
         .sort((a,b)=> (b.year-a.year) || (b.month-a.month) || socioNombre(a.socio_id).localeCompare(socioNombre(b.socio_id)));
@@ -3085,10 +3278,10 @@ document.addEventListener('click', async (e)=>{
       texto += '\n\n';
 
       texto += `*Saldo total: ${saldo<0?'-':'+'}${money(Math.abs(saldo))}*`;
-      if(periodo.tipo!=='todos'){ texto += ' (de todo el historial; el resto de cifras de arriba son solo del periodo elegido)'; }
+      if(periodo.tipo!=='todos'){ texto += ' (de todo el historial; el resto de cifras de arriba son solo del período elegido)'; }
       const pendientes = gastosSociosPendientes();
       if(pendientes.length){
-        texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavia al saldo.`;
+        texto += `\n\n${pendientes.length} gasto(s)/ingreso(s) de socios (${money(pendientes.reduce((a,g)=>a+Number(g.importe||0),0))}) pendientes de verificar, no suman todavía al saldo.`;
       }
       enviarWhatsapp(texto);
     }
@@ -3107,15 +3300,15 @@ document.addEventListener('click', async (e)=>{
         }).join('\n') + '\n\n';
       }
       texto += transferencias.length
-        ? '*Quien paga a quien:*\n' + transferencias.map(t=>`- ${socioNombre(t.de)} -> ${socioNombre(t.a)}: *${money(t.importe)}*`).join('\n')
-        : 'No queda ningun pago pendiente entre los participantes.';
+        ? '*Quién paga a quién:*\n' + transferencias.map(t=>`- ${socioNombre(t.de)} -> ${socioNombre(t.a)}: *${money(t.importe)}*`).join('\n')
+        : 'No queda ningún pago pendiente entre los participantes.';
       enviarWhatsapp(texto);
     }
     else if(action==='delete-reunion'){
-      if(confirm('Borrar esta reunion?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar esta reunión?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-inventario'){
-      if(confirm('Borrar este material?')){
+      if(confirm('¿Borrar este material?')){
         editandoInventarioId = null;
         await apiDelete(`/api/inventario/${btn.dataset.id}`); await loadState(); render();
       }
@@ -3129,7 +3322,7 @@ document.addEventListener('click', async (e)=>{
       render();
     }
     else if(action==='delete-lista-compra'){
-      if(confirm('Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='toggle-item-compra'){
       await apiPost(`/api/listas-compra/items/${btn.dataset.id}/toggle`);
@@ -3150,6 +3343,7 @@ document.addEventListener('click', async (e)=>{
     else if(action==='listas-subtab'){
       listasSubTab = btn.dataset.sub;
       editandoNombreListaId = null;
+      editandoListaComidaId = null;
       render();
     }
     else if(action==='editar-nombre-lista'){
@@ -3160,8 +3354,67 @@ document.addEventListener('click', async (e)=>{
       editandoNombreListaId = null;
       render();
     }
+    else if(action==='delete-lista-comida'){
+      if(confirm('¿Borrar esta comida/cena, con sus asistentes e invitados?')){ await apiDelete(`/api/listas-comida/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='editar-lista-comida'){
+      editandoListaComidaId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-lista-comida'){
+      editandoListaComidaId = null;
+      render();
+    }
+    else if(action==='anadir-socio-comida'){
+      const select = document.getElementById(`comida-socio-select-${btn.dataset.lista}`);
+      if(!select || !select.value) return;
+      await apiPost(`/api/listas-comida/${btn.dataset.lista}/asistencia`, {socio_id: select.value});
+      await loadState(); render();
+    }
+    else if(action==='toggle-asistencia-comida'){
+      await apiPost(`/api/listas-comida/${btn.dataset.lista}/asistencia`, {socio_id: btn.dataset.socio});
+      await loadState(); render();
+    }
+    else if(action==='delete-invitado-comida'){
+      await apiDelete(`/api/listas-comida/invitados/${btn.dataset.id}`);
+      await loadState(); render();
+    }
+    else if(action==='add-tipo-comida-inline'){
+      const formType = btn.closest('form').dataset.form;
+      const nombre = prompt('Nueva opción (qué se come):');
+      if(!nombre || !nombre.trim()) return;
+      try{
+        await apiPost('/api/tipos-comida', {nombre: nombre.trim()});
+      }catch(err){ alert(err.message || 'No se pudo añadir la opción.'); return; }
+      await loadState();
+      render();
+      const sel = document.querySelector(`form[data-form="${formType}"] [name=tipo]`);
+      if(sel) sel.value = nombre.trim();
+    }
+    else if(action==='delete-tipo-comida-inline'){
+      const form = btn.closest('form');
+      const sel = form ? form.querySelector('[name=tipo]') : null;
+      if(!sel || !sel.value) return;
+      const tipoObj = (state.tipos_comida||[]).find(t=>t.nombre===sel.value);
+      if(!tipoObj) return;
+      if(!confirm(`¿Borrar la opción "${sel.value}"?`)) return;
+      try{
+        await apiDelete(`/api/tipos-comida/${tipoObj.id}`);
+      }catch(err){ alert(err.message || 'No se pudo borrar la opción.'); return; }
+      await loadState(); render();
+    }
+    else if(action==='export-lista-comida-whatsapp'){
+      const lista = (state.listas_comida||[]).find(l=>l.id===btn.dataset.id);
+      if(!lista) return;
+      const nombres = [...(lista.asistentes||[]).map(sid=>socioNombre(sid)), ...(lista.invitados||[]).map(inv=>inv.nombre)];
+      let texto = `*${lista.nombre}*${lista.fecha ? ' - '+fmtDate(lista.fecha) : ''}${lista.hora ? ' '+lista.hora : ''}\n`;
+      texto += lista.tipo==='casero' ? 'Lo hacemos nosotros' : 'De bar o restaurante';
+      texto += lista.notas ? ` (${lista.notas})\n\n` : '\n\n';
+      texto += nombres.length ? nombres.map(n=>`- ${n}`).join('\n') : 'Todavía no se ha apuntado nadie.';
+      enviarWhatsapp(texto);
+    }
     else if(action==='delete-lista-pago'){
-      if(confirm('Borrar esta lista de pago y todas sus filas?')){ await apiDelete(`/api/listas-pago/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar esta lista de pago y todas sus filas?')){ await apiDelete(`/api/listas-pago/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='toggle-item-pago'){
       await apiPost(`/api/listas-pago/items/${btn.dataset.id}/toggle`);
@@ -3180,10 +3433,10 @@ document.addEventListener('click', async (e)=>{
       render();
     }
     else if(action==='delete-movimiento'){
-      if(confirm('Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-ticket-movimiento'){
-      if(confirm('Quitar el ticket o factura de este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}/ticket`); await loadState(); render(); }
+      if(confirm('¿Quitar el ticket o factura de este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}/ticket`); await loadState(); render(); }
     }
     else if(action==='editar-movimiento'){
       editandoMovimientoId = btn.dataset.id;
@@ -3194,7 +3447,7 @@ document.addEventListener('click', async (e)=>{
       render();
     }
     else if(action==='movimiento-no-pagado'){
-      if(confirm('Este movimiento volvera a "Gastos e ingresos de socios" como pendiente de verificar. Continuar?')){
+      if(confirm('Este movimiento volverá a "Gastos e ingresos de socios" como pendiente de verificar. ¿Continuar?')){
         await apiPost(`/api/movimientos/${btn.dataset.id}/no-pagado`);
         editandoMovimientoId = null;
         await loadState(); render();
@@ -3215,8 +3468,8 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-gasto-socio'){
       const g = (state.gastos_socios||[]).find(x=>x.id===btn.dataset.id);
       const aviso = g && g.abonado
-        ? 'Borrar esta solicitud de la lista? Ya esta pagado/verificado, asi que el movimiento correspondiente se queda igualmente en el historial de Movimientos.'
-        : 'Borrar este gasto?';
+        ? '¿Borrar esta solicitud de la lista? Ya está pagado/verificado, así que el movimiento correspondiente se queda igualmente en el historial de Movimientos.'
+        : '¿Borrar este gasto?';
       if(confirm(aviso)){
         editandoGastoSocioId = null;
         await apiDelete(`/api/gastos-socios/${btn.dataset.id}`);
@@ -3224,17 +3477,17 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='delete-ticket-gasto-socio'){
-      if(confirm('Quitar el ticket o factura de este gasto?')){ await apiDelete(`/api/gastos-socios/${btn.dataset.id}/ticket`); await loadState(); render(); }
+      if(confirm('¿Quitar el ticket o factura de este gasto?')){ await apiDelete(`/api/gastos-socios/${btn.dataset.id}/ticket`); await loadState(); render(); }
     }
     else if(action==='delete-bebida-precio'){
-      if(confirm('Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar esta bebida?')){ await apiDelete(`/api/bebidas/precios/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='add-categoria-mov-inline'){
-      const nombre = prompt('Nueva categoria:');
+      const nombre = prompt('Nueva categoría:');
       if(!nombre || !nombre.trim()) return;
       try{
         await apiPost('/api/categorias-movimiento', {nombre: nombre.trim()});
-      }catch(err){ alert(err.message || 'No se pudo anadir la categoria.'); return; }
+      }catch(err){ alert(err.message || 'No se pudo añadir la categoría.'); return; }
       await loadState();
       render();
       const sel = document.querySelector('form[data-form="add-movimiento"] [name=categoria]');
@@ -3246,25 +3499,25 @@ document.addEventListener('click', async (e)=>{
       if(!sel || !sel.value) return;
       const categoria = (state.categorias_movimiento||[]).find(c=>c.nombre===sel.value);
       if(!categoria) return;
-      if(!confirm(`Borrar la categoria "${sel.value}"?`)) return;
+      if(!confirm(`¿Borrar la categoría "${sel.value}"?`)) return;
       try{
         await apiDelete(`/api/categorias-movimiento/${categoria.id}`);
-      }catch(err){ alert(err.message || 'No se pudo borrar la categoria.'); return; }
+      }catch(err){ alert(err.message || 'No se pudo borrar la categoría.'); return; }
       await loadState();
       render();
     }
     else if(action==='delete-consumo'){
-      if(confirm('Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='toggle-consumo-pagado'){
       await apiPost(`/api/bebidas/consumos/${btn.dataset.id}/pagado`);
       await loadState(); render();
     }
     else if(action==='delete-reserva'){
-      if(confirm('Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-gasto-evento'){
-      if(confirm('Borrar este evento y todos sus pagos?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar este evento y todos sus pagos?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='toggle-ocultar-evento'){
       await apiPost(`/api/gastos-eventos/${btn.dataset.id}/ocultar`);
@@ -3293,7 +3546,7 @@ document.addEventListener('click', async (e)=>{
       if(wrap) wrap.innerHTML = renderNuevoEventoParticipantesWrap();
     }
     else if(action==='delete-pago-evento'){
-      if(confirm('Borrar este pago?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.evento}/pagos/${btn.dataset.id}`); await loadState(); render(); }
+      if(confirm('¿Borrar este pago?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.evento}/pagos/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='delete-familiar'){
       await apiDelete(`/api/familiares/${btn.dataset.id}`); await loadState(); render();
@@ -3394,6 +3647,11 @@ document.addEventListener('input', (e)=>{
 });
 
 document.addEventListener('change', async (e)=>{
+  if(e.target.id==='gastos-socios-filtro-socio'){
+    filtroSocioLiquidar = e.target.value;
+    render();
+    return;
+  }
   if(e.target.id==='chat-file-input'){
     const file = e.target.files[0];
     if(file){
@@ -3407,6 +3665,11 @@ document.addEventListener('change', async (e)=>{
   }
   if(e.target.id==='cuota-mes-movil'){
     cuotasMesMovil = Number(e.target.value);
+    render();
+    return;
+  }
+  if(e.target.id==='consumos-filtro-socio'){
+    consumosFiltroSocio = e.target.value;
     render();
     return;
   }
@@ -3452,7 +3715,7 @@ document.addEventListener('change', async (e)=>{
     const tid = e.target.dataset.estadoTarea;
     const r = await apiPost(`/api/tareas-tickets/${tid}`, {estado: e.target.value});
     await loadState(); render();
-    if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotacion, se ha creado la siguiente automaticamente.'); }
+    if(r && r.nueva_tarea_generada){ alert('Tarea completada. Como tiene rotación, se ha creado la siguiente automáticamente.'); }
     return;
   }
   if(e.target.matches('[data-autoupload-foto]')){
@@ -3496,7 +3759,7 @@ document.addEventListener('change', async (e)=>{
       const resultado = await res.json();
       if(!res.ok) throw new Error(resultado.error || 'No se pudo importar.');
       const resumen = resultado.resumen || {};
-      let msg = 'Importacion completada:\n';
+      let msg = 'Importación completada:\n';
       for(const hoja of Object.keys(resumen)){
         const r = resumen[hoja];
         msg += `- ${hoja}: ${r.creados} creados, ${r.actualizados} actualizados`;
@@ -3530,7 +3793,7 @@ document.addEventListener('submit', async (e)=>{
     }
     else if(type==='force-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }
-      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 digitos.'); return; }
+      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 dígitos.'); return; }
       await apiPost('/api/perfil/pin', {pin: data.pin});
       await loadState(); activeTab='resumen'; render();
       await chatOnLogin();
@@ -3588,11 +3851,11 @@ document.addEventListener('submit', async (e)=>{
         
         try{ await uploadFoto(r.id, file); }
         
-        catch(fe){ alert('El socio se creo, pero la foto no se pudo subir: '+fe.message); }
+        catch(fe){ alert('El socio se creó, pero la foto no se pudo subir: '+fe.message); }
       }
       if(r.pin_generado){
-        
-        alert(`Socio creado. Su PIN de acceso es: ${r.pin_generado}\n\nApuntalo y pasaselo - podra cambiarlo luego desde "Mi perfil".`);
+
+        alert(`Socio creado. Su PIN de acceso es: ${r.pin_generado}\n\nApúntalo y pásaselo - podrá cambiarlo luego desde "Mi perfil".`);
       }
     }
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
@@ -3642,6 +3905,15 @@ document.addEventListener('submit', async (e)=>{
       await apiPost(`/api/listas-pago/${form.dataset.id}`, data);
       editandoNombreListaId = null;
     }
+    else if(type==='add-lista-comida'){ await apiPost('/api/listas-comida', data); }
+    else if(type==='edit-lista-comida'){
+      await apiPost(`/api/listas-comida/${form.dataset.id}`, data);
+      editandoListaComidaId = null;
+    }
+    else if(type==='add-invitado-comida'){
+      await apiPost(`/api/listas-comida/${form.dataset.lista}/invitados`, data);
+      form.reset();
+    }
     else if(type==='add-lista-pago'){ await apiPost('/api/listas-pago', data); }
     else if(type==='add-item-pago'){
       await apiPost(`/api/listas-pago/${form.dataset.lista}/items`, data);
@@ -3677,7 +3949,7 @@ document.addEventListener('submit', async (e)=>{
     else if(type==='save-perfil'){ await apiPost('/api/perfil', data); }
     else if(type==='change-pin'){
       if(data.pin !== data.pin2){ alert('Los dos PIN no coinciden.'); return; }
-      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 digitos.'); return; }
+      if(!/^[0-9]{4}$/.test(data.pin)){ alert('El PIN debe tener 4 dígitos.'); return; }
       await apiPost('/api/perfil/pin', {pin: data.pin});
       form.reset();
       alert('PIN actualizado.');
@@ -3698,12 +3970,12 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 
-/* ============ actualizacion en segundo plano (casi tiempo real) ============ */
+/* ============ actualización en segundo plano (casi tiempo real) ============ */
 function isTyping(){
   const el = document.activeElement;
   if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT')) return true;
   // Si hay un desplegable abierto (elegir permisos, eventos ocultos...) no
-  // refresques: el refresco automatico reconstruye el HTML y lo cerraria,
+  // refresques: el refresco automático reconstruye el HTML y lo cerraría,
   // haciendo perder lo que se estuviera rellenando.
   if(document.querySelector('details[open]')) return true;
   if(document.querySelector('.crop-modal')) return true;
@@ -3719,7 +3991,7 @@ document.addEventListener('keydown', (e)=>{
   if(e.key==='Escape' && adjuntoAbierto){ adjuntoAbierto = null; render(); }
 });
 
-/* ============ boton flotante "subir arriba" ============ */
+/* ============ botón flotante "subir arriba" ============ */
 function initScrollTopButton(){
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -3733,7 +4005,7 @@ function initScrollTopButton(){
   }, {passive:true});
 }
 
-/* ============ deslizar hacia abajo para actualizar (la app instalada no tiene boton de recargar) ============ */
+/* ============ deslizar hacia abajo para actualizar (la app instalada no tiene botón de recargar) ============ */
 function initPullToRefresh(){
   const el = document.createElement('div');
   el.className = 'pull-refresh-indicator';
@@ -3786,6 +4058,54 @@ function initPullToRefresh(){
   }, {passive:true});
 }
 
+/* ============ flechitas para mover el cursor en campos de texto largos (movil) ============ */
+function initCursorNudge(){
+  const wrap = document.createElement('div');
+  wrap.className = 'cursor-nudge';
+  wrap.innerHTML = `<button type="button" class="cursor-nudge-btn" data-dir="-1" tabindex="-1" title="Mover cursor a la izquierda">&lsaquo;</button><button type="button" class="cursor-nudge-btn" data-dir="1" tabindex="-1" title="Mover cursor a la derecha">&rsaquo;</button>`;
+  document.body.appendChild(wrap);
+  let target = null;
+
+  function overflowing(el){ return el.scrollWidth > el.clientWidth + 2; }
+  function place(el){
+    const r = el.getBoundingClientRect();
+    wrap.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 84)) + 'px';
+    wrap.style.top = (r.bottom + 6) + 'px';
+  }
+  function hide(){ wrap.classList.remove('visible'); target = null; }
+  function refresh(el){
+    if(window.innerWidth > 720 || el.type==='password' || !overflowing(el)){ hide(); return; }
+    target = el;
+    place(el);
+    wrap.classList.add('visible');
+  }
+
+  document.addEventListener('focusin', (e)=>{
+    const el = e.target;
+    if(el.matches && el.matches('input[type=text],input[type=tel],input[type=number],textarea')) refresh(el);
+    else hide();
+  });
+  document.addEventListener('focusout', (e)=>{
+    if(e.target===target) setTimeout(()=>{ if(document.activeElement!==target) hide(); }, 150);
+  });
+  document.addEventListener('input', (e)=>{ if(e.target===target) refresh(target); });
+  window.addEventListener('resize', ()=>{ if(target) refresh(target); });
+  window.addEventListener('scroll', ()=>{ if(target) place(target); }, {passive:true, capture:true});
+
+  wrap.querySelectorAll('.cursor-nudge-btn').forEach(btn=>{
+    btn.addEventListener('touchstart', (e)=>e.preventDefault(), {passive:false});
+    btn.addEventListener('mousedown', (e)=>e.preventDefault());
+    btn.addEventListener('click', ()=>{
+      if(!target) return;
+      const dir = parseInt(btn.dataset.dir, 10);
+      const pos = target.selectionStart==null ? target.value.length : target.selectionStart;
+      const next = Math.min(target.value.length, Math.max(0, pos + dir));
+      target.focus();
+      target.setSelectionRange(next, next);
+    });
+  });
+}
+
 /* ============ INIT ============ */
 (async function init(){
   render();
@@ -3794,6 +4114,7 @@ function initPullToRefresh(){
   initBackgroundSlideshow();
   initScrollTopButton();
   initPullToRefresh();
+  initCursorNudge();
   await loadState();
   render();
   if(state && state.current_user){
@@ -3836,7 +4157,7 @@ document.addEventListener('click', async (e)=>{
 document.addEventListener('click', async (e)=>{
   const btn = e.target.closest('[data-action="delete-role"]');
   if(!btn) return;
-  if(!confirm('Borrar este rol? Los socios que lo tengan lo perderan.')) return;
+  if(!confirm('¿Borrar este rol? Los socios que lo tengan lo perderán.')) return;
   try{
     await apiDelete(`/api/roles/${btn.dataset.id}`);
     await loadState();
