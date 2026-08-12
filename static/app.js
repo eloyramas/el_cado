@@ -2356,6 +2356,14 @@ function renderCaja(){
   const totalFiltroNeto = filtroSocioLiquidar
     ? gastosSociosMostrados.filter(g=>!g.abonado).reduce((acc,g)=>acc + (g.tipo==='ingreso' ? -1 : 1) * Number(g.importe||0), 0)
     : 0;
+  const sociosConGastos = [];
+  const vistosGasto = {};
+  gastosSocios.forEach(g=>{
+    if(!g.socio_id || vistosGasto[g.socio_id]) return;
+    vistosGasto[g.socio_id] = true;
+    sociosConGastos.push({id: g.socio_id, nombre: g.socio_nombre || socioNombre(g.socio_id)});
+  });
+  sociosConGastos.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   return `
   <div class="card">
     <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
@@ -2375,8 +2383,8 @@ function renderCaja(){
     </form>
     ${admin ? `<div class="consumos-filtro" style="margin-top:10px;">
       <select id="gastos-socios-filtro-socio">
-        <option value="">Todos los socios</option>
-        ${state.socios.map(s=>`<option value="${s.id}" ${filtroSocioLiquidar===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
+        <option value="">Elige un socio</option>
+        ${sociosConGastos.map(s=>`<option value="${s.id}" ${filtroSocioLiquidar===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
       </select>
       ${filtroSocioLiquidar ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-gastos-socio">Quitar filtro</button>` : ''}
     </div>` : ''}
