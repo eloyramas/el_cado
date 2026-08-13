@@ -7,7 +7,7 @@ BACKUPS_DIR = os.path.join(BASE_DIR, "backups")
 os.makedirs(BACKUPS_DIR, exist_ok=True)
 
 fecha = datetime.now().strftime("%Y%m%d_%H%M")
-destino = os.path.join(BACKUPS_DIR, f"backup_{fecha}")
+destino = os.path.join(BACKUPS_DIR, f"{fecha}_backup")
 os.makedirs(destino, exist_ok=True)
 
 # Copiar la base de datos
