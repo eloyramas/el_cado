@@ -520,10 +520,8 @@ def new_id():
     return uuid.uuid4().hex[:12]
 
 
-from zoneinfo import ZoneInfo
-
 def now_iso():
-    return datetime.now(ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds")
+    return datetime.now().isoformat(timespec="seconds")
 
 
 def calcular_balances_evento(participantes, pagos):

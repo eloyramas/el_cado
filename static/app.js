@@ -127,19 +127,7 @@ function updateBackgroundVisibility(){
   document.body.classList.toggle('bg-hidden', !!loggedIn);
 }
 
-async function loadBackgroundImages(){
-  try{
-    const res = await fetch('/api/backgrounds');
-    if(res.ok){
-      const json = await res.json();
-      if(Array.isArray(json.backgrounds) && json.backgrounds.length>0){
-        
-        BG_IMAGES = json.backgrounds;
-        
-        return;
-      }
-    }
-  }catch(e){/* fallback */}
+function loadBackgroundImages(){
   BG_IMAGES = DEFAULT_BG_IMAGES;
 }
 
@@ -206,6 +194,7 @@ let resumenGraficoYear = new Date().getFullYear();
 let resumenPeriodo = {tipo:'mes', valor: todayISO().slice(0,7)};
 let cajaPeriodo = {tipo:'mes', valor: todayISO().slice(0,7)};
 let cuentasPeriodo = {tipo:'todos', valor:''};
+let tareasHistorialPeriodo = {tipo:'todos', valor:''};
 let editandoNombreListaId = null;
 let reservasCalFecha = new Date();
 let reunionesCalFecha = new Date();
@@ -2671,7 +2660,9 @@ function renderNuevaTareaSociosWrap(){
 function renderEncargados(){
   const tareas = state.tareas_tickets || [];
   const activas = tareas.filter(t=>t.estado!=='hecho');
-  const historial = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
+  const historialTodas = [...tareas.filter(t=>t.estado==='hecho')].sort((a,b)=>(b.completado_en||'').localeCompare(a.completado_en||''));
+  const mesesHistorial = mesesDisponibles(historialTodas.map(t=>t.completado_en ? t.completado_en.slice(0,7) : null));
+  const historial = historialTodas.filter(t=>dentroDePeriodo(t.completado_en ? t.completado_en.slice(0,10) : '', tareasHistorialPeriodo));
   const calItems = activas.filter(t=>t.fecha).map(t=>({fecha:t.fecha, label:t.tipo+((t.socios_ids&&t.socios_ids.length)?': '+t.socios_ids.map(socioNombre).join(', '):''), cls:ESTADO_CLASS[t.estado], detalle:`${t.tipo}\n${fmtDate(t.fecha)}\n${(t.socios_ids&&t.socios_ids.length)?'Quién la hace: '+t.socios_ids.map(socioNombre).join(', '):'Sin asignar'}\nEstado: ${t.estado}${t.notas?'\n'+t.notas:''}`}));
   return `
   <div class="card">
@@ -2690,7 +2681,6 @@ function renderEncargados(){
       <datalist id="tareas-tipos-list">${state.tareas_fijas.map(t=>`<option value="${escapeHtml(t)}">`).join('')}</datalist>
       <button class="btn" type="submit">Crear tarea</button>
     </form>
-    <p class="readonly-note" style="margin-top:8px;">Cualquier socio puede crear tareas, asignarlas a quien quiera y editarlas o borrarlas después.</p>
   </div>
   <div class="card">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -2703,9 +2693,12 @@ function renderEncargados(){
     <h2><span class="pin"></span>Calendario de tareas</h2>
     ${renderMiniCalendario(tareasCalFecha, calItems, 'tareas-mes')}
   </div>
-  ${historial.length ? `<div class="card">
-    <h2><span class="pin"></span>Historial de tareas completadas</h2>
-    ${historial.map(t=>renderTicketRow(t)).join('')}
+  ${historialTodas.length ? `<div class="card">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Historial de tareas completadas</span>
+      ${renderSelectorPeriodo('tareas-historial', tareasHistorialPeriodo, mesesHistorial)}
+    </h2>
+    ${historial.length===0 ? '<p class="empty">No hay tareas completadas en ese período.</p>' : historial.map(t=>renderTicketRow(t)).join('')}
   </div>` : ''}
   `;
 }
@@ -3683,7 +3676,7 @@ document.addEventListener('change', async (e)=>{
   }
   if(e.target.dataset && e.target.dataset.periodoPrefix){
     const prefix = e.target.dataset.periodoPrefix;
-    const periodos = {caja:cajaPeriodo, cuentas:cuentasPeriodo, consumos:consumosPeriodo, resumen:resumenPeriodo};
+    const periodos = {caja:cajaPeriodo, cuentas:cuentasPeriodo, consumos:consumosPeriodo, resumen:resumenPeriodo, 'tareas-historial':tareasHistorialPeriodo};
     const periodo = periodos[prefix];
     if(periodo){
       if(e.target.id===`${prefix}-tipo`){
@@ -4118,7 +4111,7 @@ function initCursorNudge(){
 (async function init(){
   render();
   initChatToastContainer();
-  await loadBackgroundImages();
+  loadBackgroundImages();
   initBackgroundSlideshow();
   initScrollTopButton();
   initPullToRefresh();
