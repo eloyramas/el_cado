@@ -216,7 +216,9 @@ let reunionesCalFecha = new Date();
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let filtroSocioLiquidar = ''; // id de socio para filtrar "Gastos e ingresos de socios" (liquidacion del tesorero)
+let seleccionGastosSocios = new Set(); // ids de gastos/ingresos de socios pendientes marcados para pagar en bloque
 let editandoMovimientoId = null;
+let filtroSocioMovimientos = ''; // id de socio para filtrar "Movimientos"
 let editandoItemCompraId = null;
 let editandoItemPagoId = null;
 let editandoTareaId = null;
@@ -769,6 +771,22 @@ async function chatOnLogin(){
   if(chatMensajes.length===0) await loadChatInicial();
   updateChatBadge();
   startChatPolling();
+}
+
+// Al editar/cancelar un gasto o movimiento, render() reconstruye toda la
+// pantalla y la fila puede quedar más arriba o más abajo que antes (p.ej. si
+// el formulario de edición ocupa más o menos que la fila normal). Esto ancla
+// la fila con ese id a la misma posición en la pantalla antes y después del
+// cambio, para que no "salte" ni haya que volver a buscarla.
+function anclarScroll(id){
+  if(!id) return ()=>{};
+  const el = document.querySelector(`.list-item[data-id="${id}"]`);
+  if(!el) return ()=>{};
+  const y0 = el.getBoundingClientRect().top;
+  return ()=>{
+    const nuevo = document.querySelector(`.list-item[data-id="${id}"]`);
+    if(nuevo) window.scrollBy(0, nuevo.getBoundingClientRect().top - y0);
+  };
 }
 
 /* ============ RENDER ROOT ============ */
@@ -2287,11 +2305,15 @@ function renderGastoSocioItem(g){
       </div>
     </form>`;
   }
-  return `<div class="list-item gasto-socio-item">
-    <div>
-      <div style="font-weight:600;">${escapeHtml(g.concepto)} <span class="tag">${esIngreso?'Ingreso':'Gasto'}</span> ${g.abonado?`<span class="tag ok">${estadoLabel}</span>`:'<span class="tag warn">Pendiente</span>'}</div>
-      <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
-      ${g.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/${g.id}.${g.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${g.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
+  const puedeSeleccionar = can('manage_finances') && !g.abonado;
+  return `<div class="list-item gasto-socio-item" data-id="${g.id}">
+    <div style="display:flex; gap:8px; align-items:flex-start; min-width:0;">
+      ${puedeSeleccionar ? `<input type="checkbox" data-action="toggle-seleccion-gasto-socio" data-id="${g.id}" ${seleccionGastosSocios.has(g.id)?'checked':''} style="margin-top:4px; flex:none;" title="Seleccionar para marcar en bloque">` : ''}
+      <div style="min-width:0; overflow-wrap:anywhere;">
+        <div style="font-weight:600;">${escapeHtml(g.concepto)} <span class="tag">${esIngreso?'Ingreso':'Gasto'}</span> ${g.abonado?`<span class="tag ok">${estadoLabel}</span>`:'<span class="tag warn">Pendiente</span>'}</div>
+        <div class="meta">${escapeHtml(g.socio_nombre||'-')} - ${fmtDate(g.fecha)}${g.notas?' - '+escapeHtml(g.notas):''}</div>
+        ${g.ticket ? `<button type="button" class="link-btn meta" style="color:var(--amber); margin-top:2px;" data-action="ver-adjunto" data-url="/static/tickets/${g.id}.${g.ticket_ext||'jpg'}?v=${ticketVersion}" data-tipo="${g.ticket_ext||'jpg'}">Ver ticket o factura</button>` : ''}
+      </div>
     </div>
     <div class="gasto-socio-right">
       <span class="gasto-socio-importe" style="color:${esIngreso?'var(--sage)':'var(--rust)'};">${esIngreso?'+':'-'} ${money(g.importe)}</span>
@@ -2333,7 +2355,7 @@ function renderMovimientoItem(m){
       </div>
     </form>`;
   }
-  return `<div class="list-item" style="flex-wrap:wrap;">
+  return `<div class="list-item" data-id="${m.id}" style="flex-wrap:wrap;">
     <div>
       <div style="font-weight:600;">${escapeHtml(m.concepto)}</div>
       <div class="meta">
@@ -2371,6 +2393,18 @@ function renderCaja(){
     sociosConGastos.push({id: g.socio_id, nombre: g.socio_nombre || socioNombre(g.socio_id)});
   });
   sociosConGastos.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const pendientesMostrados = gastosSociosMostrados.filter(g=>!g.abonado);
+  const idsPendientesMostrados = pendientesMostrados.map(g=>g.id);
+  const numSeleccionados = idsPendientesMostrados.filter(id=>seleccionGastosSocios.has(id)).length;
+  const todosSeleccionados = idsPendientesMostrados.length>0 && numSeleccionados===idsPendientesMostrados.length;
+  const sociosConMovimientos = [];
+  const vistosMov = {};
+  state.movimientos.forEach(m=>{
+    if(!m.socio_id || vistosMov[m.socio_id]) return;
+    vistosMov[m.socio_id] = true;
+    sociosConMovimientos.push({id: m.socio_id, nombre: m.socio_nombre || socioNombre(m.socio_id)});
+  });
+  sociosConMovimientos.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   return `
   <div class="card">
     <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
@@ -2394,6 +2428,13 @@ function renderCaja(){
         ${sociosConGastos.map(s=>`<option value="${s.id}" ${filtroSocioLiquidar===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
       </select>
       ${filtroSocioLiquidar ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-gastos-socio">Quitar filtro</button>` : ''}
+    </div>` : ''}
+    ${admin && idsPendientesMostrados.length>0 ? `<div class="menu-row" style="margin-top:10px; padding:8px 0; border-top:1px solid var(--line); align-items:center; flex-wrap:wrap; gap:8px;">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" data-action="toggle-seleccion-todos-gastos-socios" ${todosSeleccionados?'checked':''}>
+        <span class="meta" style="margin:0;">${numSeleccionados>0 ? `${numSeleccionados} seleccionado${numSeleccionados===1?'':'s'}` : 'Seleccionar todos los pendientes'}</span>
+      </label>
+      ${numSeleccionados>0 ? `<button type="button" class="btn accent small" data-action="marcar-varios-gastos-socios-pagados">Marcar seleccionados como pagados</button>` : ''}
     </div>` : ''}
     ${gastosSociosMostrados.length===0 ? `<p class="empty" style="margin-top:12px;">${filtroSocioLiquidar ? 'Este socio no tiene gastos o ingresos pendientes.' : 'Todavía no hay gastos registrados.'}</p>` : gastosSociosMostrados.map(g=>renderGastoSocioItem(g)).join('')}
     ${admin && filtroSocioLiquidar && Math.abs(totalFiltroNeto)>0.004 ? `<div class="menu-row" style="margin-top:8px; padding-top:10px; border-top:1px solid var(--line); align-items:center;">
@@ -2438,7 +2479,7 @@ function renderCaja(){
       <button class="btn" type="submit">Guardar movimiento</button>
     </form>
   </div>` : `<p class="readonly-note">Solo lectura, para ver consultar con el administrador.</p>`}
-  <div class="card">
+  <div class="card no-collapse">
     <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>Movimientos</span>
       <span style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -2448,9 +2489,17 @@ function renderCaja(){
         <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
+    ${sociosConMovimientos.length ? `<div class="consumos-filtro" style="margin-bottom:10px;">
+      <select id="movimientos-filtro-socio">
+        <option value="">Todos los socios</option>
+        ${sociosConMovimientos.map(s=>`<option value="${s.id}" ${filtroSocioMovimientos===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
+      </select>
+      ${filtroSocioMovimientos ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-movimientos-socio">Quitar filtro</button>` : ''}
+    </div>` : ''}
     ${(()=>{
-      const filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
-      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos'?'registrados':'en ese período'}.</p>`;
+      let filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
+      if(filtroSocioMovimientos) filtrados = filtrados.filter(m=>m.socio_id===filtroSocioMovimientos);
+      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos' && !filtroSocioMovimientos ?'registrados':'para ese filtro'}.</p>`;
       return filtrados.map(m=>renderMovimientoItem(m)).join('');
     })()}
   </div>`;
@@ -3307,8 +3356,10 @@ document.addEventListener('click', async (e)=>{
     }
     else if(action==='export-movimientos-whatsapp'){
       const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-      const filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
-      let texto = `*Movimientos${cajaPeriodo.tipo==='todos'?'':' - '+labelPeriodo(cajaPeriodo)}* - ${fmtDate(todayISO())}\n\n`;
+      let filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
+      if(filtroSocioMovimientos) filtrados = filtrados.filter(m=>m.socio_id===filtroSocioMovimientos);
+      const socioTexto = filtroSocioMovimientos ? ' - '+socioNombre(filtroSocioMovimientos) : '';
+      let texto = `*Movimientos${cajaPeriodo.tipo==='todos'?'':' - '+labelPeriodo(cajaPeriodo)}${socioTexto}* - ${fmtDate(todayISO())}\n\n`;
       texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}*${money(m.importe)}* - ${m.categoria} - ${m.concepto}${m.socio_id?' - '+socioNombre(m.socio_id):(m.no_socio_nombre?' - '+m.no_socio_nombre:'')} - *${fmtDate(m.fecha)}*`).join('\n') : 'Sin movimientos.';
       enviarWhatsapp(texto);
     }
@@ -3540,12 +3591,16 @@ document.addEventListener('click', async (e)=>{
       if(confirm('¿Quitar el ticket o factura de este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}/ticket`); await loadState(); render(); }
     }
     else if(action==='editar-movimiento'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoMovimientoId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-movimiento'){
+      const restaurar = anclarScroll(editandoMovimientoId);
       editandoMovimientoId = null;
       render();
+      restaurar();
     }
     else if(action==='movimiento-no-pagado'){
       if(confirm('Este movimiento volverá a "Gastos e ingresos de socios" como pendiente de verificar. ¿Continuar?')){
@@ -3558,13 +3613,43 @@ document.addEventListener('click', async (e)=>{
       await apiPost(`/api/gastos-socios/${btn.dataset.id}/abonado`);
       await loadState(); render();
     }
-    else if(action==='editar-gasto-socio'){
-      editandoGastoSocioId = btn.dataset.id;
+    else if(action==='toggle-seleccion-gasto-socio'){
+      const id = btn.dataset.id;
+      if(seleccionGastosSocios.has(id)) seleccionGastosSocios.delete(id); else seleccionGastosSocios.add(id);
       render();
     }
+    else if(action==='toggle-seleccion-todos-gastos-socios'){
+      const gastosSocios = [...(state.gastos_socios||[])];
+      const mostrados = filtroSocioLiquidar ? gastosSocios.filter(g=>g.socio_id===filtroSocioLiquidar) : gastosSocios;
+      const idsPendientes = mostrados.filter(g=>!g.abonado).map(g=>g.id);
+      const todosYaSeleccionados = idsPendientes.length>0 && idsPendientes.every(id=>seleccionGastosSocios.has(id));
+      if(todosYaSeleccionados) idsPendientes.forEach(id=>seleccionGastosSocios.delete(id));
+      else idsPendientes.forEach(id=>seleccionGastosSocios.add(id));
+      render();
+    }
+    else if(action==='marcar-varios-gastos-socios-pagados'){
+      const ids = [...seleccionGastosSocios];
+      if(ids.length===0) return;
+      if(confirm(`¿Marcar como pagados los ${ids.length} gastos/ingresos seleccionados?`)){
+        await apiPost('/api/gastos-socios/marcar-varios-pagados', {ids});
+        seleccionGastosSocios.clear();
+        await loadState(); render();
+      }
+    }
+    else if(action==='limpiar-filtro-movimientos-socio'){
+      filtroSocioMovimientos = ''; render();
+    }
+    else if(action==='editar-gasto-socio'){
+      const restaurar = anclarScroll(btn.dataset.id);
+      editandoGastoSocioId = btn.dataset.id;
+      render();
+      restaurar();
+    }
     else if(action==='cancelar-editar-gasto-socio'){
+      const restaurar = anclarScroll(editandoGastoSocioId);
       editandoGastoSocioId = null;
       render();
+      restaurar();
     }
     else if(action==='delete-gasto-socio'){
       const g = (state.gastos_socios||[]).find(x=>x.id===btn.dataset.id);
@@ -3753,6 +3838,11 @@ document.addEventListener('change', async (e)=>{
     render();
     return;
   }
+  if(e.target.id==='movimientos-filtro-socio'){
+    filtroSocioMovimientos = e.target.value;
+    render();
+    return;
+  }
   if(e.target.id==='chat-file-input'){
     const file = e.target.files[0];
     if(file){
@@ -3881,6 +3971,8 @@ document.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const type = form.dataset.form;
   const data = Object.fromEntries(new FormData(form).entries());
+  const idParaAnclar = (type==='edit-gasto-socio' || type==='edit-movimiento') ? form.dataset.id : null;
+  const restaurarScroll = anclarScroll(idParaAnclar);
 
   try{
     if(type==='bootstrap-admin'){ await apiPost('/api/socios', data); }
@@ -4069,6 +4161,7 @@ document.addEventListener('submit', async (e)=>{
 
     await loadState();
     render();
+    restaurarScroll();
     if(state && state.current_user) chatOnLogin();
   }catch(err){ alert(err.message || 'Ha ocurrido un error'); }
 });
@@ -4094,8 +4187,10 @@ function isTyping(){
 }
 setInterval(async ()=>{
   if(document.hidden || isTyping()) return;
+  const restaurar = anclarScroll(editandoMovimientoId || editandoGastoSocioId);
   await loadState();
   render();
+  restaurar();
 }, 30000);
 
 document.addEventListener('keydown', (e)=>{

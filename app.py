@@ -2046,6 +2046,48 @@ def toggle_abonado_gasto_socio(gid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/gastos-socios/marcar-varios-pagados", methods=["POST"])
+def marcar_varios_pagados_gastos_socios():
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesión.", 401)
+    if not has_permission(sid, "manage_finances"):
+        return err("Solo el tesorero o el administrador pueden marcarlo, una vez comprobado.")
+    data = request.get_json(force=True) or {}
+    ids = data.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        return err("No se ha seleccionado ningún gasto o ingreso.", 400)
+    db = get_db()
+    marcados = 0
+    for gid in ids:
+        row = db.execute("SELECT * FROM gastos_socios WHERE id = ?", (gid,)).fetchone()
+        if not row or row["abonado"]:
+            continue
+        mid = new_id()
+        db.execute(
+            "INSERT INTO movimientos (id, tipo, categoria, concepto, importe, fecha, socio_id, gasto_socio_id, ticket, ticket_ext) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                mid, row["tipo"], "Socios", row["concepto"], row["importe"], row["fecha"], row["socio_id"], gid,
+                row["ticket"], row["ticket_ext"],
+            ),
+        )
+        if row["ticket"]:
+            _copiar_ticket(gid, f"mov-{mid}", row["ticket_ext"])
+        db.execute("DELETE FROM gastos_socios WHERE id = ?", (gid,))
+        marcados += 1
+    db.commit()
+    for gid in ids:
+        for ext in ("jpg", "pdf"):
+            ticket_path = os.path.join(TICKETS_DIR, f"{gid}.{ext}")
+            try:
+                if os.path.exists(ticket_path):
+                    os.remove(ticket_path)
+            except OSError:
+                pass
+    return jsonify({"ok": True, "marcados": marcados})
+
+
 @app.route("/api/gastos-socios/<gid>", methods=["DELETE"])
 def delete_gasto_socio(gid):
     sid = require_login()
