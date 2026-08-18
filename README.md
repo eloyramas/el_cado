@@ -140,6 +140,30 @@ guarda, y el formulario/HTML en `app.js`.
   también puede añadir/cambiar la foto de cualquiera desde "Socios". Se
   usa como avatar en la pantalla de login, así que entrar es tan fácil
   como tocar tu cara en vez de leer una lista de nombres.
+- **Bebidas descuentan stock del inventario**: al añadir o editar un precio
+  de bebida (pestaña Bebidas -> Precios) puedes vincularlo opcionalmente a
+  un artículo del Inventario ("Descontar stock de"). A partir de ahí, cada
+  vez que alguien registra ese consumo se resta la cantidad del inventario
+  automáticamente, y al borrar un consumo se devuelve. Si el stock llega a
+  0, ese artículo pasa solo a estado "Hay que comprar" (aparece en los
+  avisos de la campanita) y la app **no deja registrar más consumo** de esa
+  bebida hasta que se actualice el inventario -así evitas que alguien
+  apunte algo que en realidad ya no queda, o que el inventario se quede
+  desfasado sin que nadie se entere.
+- **Modo tablet para un dispositivo fijo en la peña**: pensado para dejar
+  una tablet o móvil viejo enchufado en la barra. Abre la web una vez desde
+  ese dispositivo con `?tablet=bebidas` al final de la URL (por ejemplo
+  `http://192.168.1.35:5000/?tablet=bebidas` en tu wifi, o la URL pública
+  si la has desplegado - ver punto 6). Desde ese momento el propio
+  dispositivo recuerda el modo tablet aunque vuelvas a abrir la web sin el
+  parámetro o la guardes como acceso directo: solo se ve la pantalla de
+  entrar (elegir tu cara y tu PIN) y, una vez dentro, una única pantalla
+  para apuntar tu bebida y cantidad - nada de pestañas, cuentas, ni datos
+  de otros socios. En cuanto registras el consumo, la sesión se cierra
+  sola a los pocos segundos y vuelve a la pantalla de entrada, lista para
+  el siguiente. Para quitarle el modo tablet a ese dispositivo (por
+  ejemplo si quieres volver a usarlo como la app completa), abre la web una
+  vez con `?tablet=off`.
 - **Lista de la compra** (pestaña nueva): cualquier socio puede crear
   listas compartidas (por ejemplo "Supermercado" o "Fiesta mayor") y
   añadir productos con su cantidad. Todos los socios ven las mismas

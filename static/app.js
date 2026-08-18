@@ -12,6 +12,21 @@ const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/b
 const PENA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
 let avatarVersion = Date.now();
 
+/* ============ MODO TABLET (kiosko de bebidas) ============
+   Pensado para un dispositivo fijo en la peña: al entrar con
+   ?tablet=bebidas se guarda en este dispositivo (localStorage) para que
+   siga activo aunque se abra desde un acceso directo sin la URL completa.
+   En este modo solo se ve login -> registrar mi consumo -> se cierra la
+   sesión sola a los pocos segundos, sin dejar ningún dato a la vista.
+   Para desactivarlo en ese dispositivo, abre la web con ?tablet=off. */
+(function(){
+  const params = new URLSearchParams(location.search);
+  const modo = params.get('tablet');
+  if(modo==='bebidas') localStorage.setItem('tabletMode', 'bebidas');
+  else if(modo==='off') localStorage.removeItem('tabletMode');
+})();
+const TABLET_MODE = localStorage.getItem('tabletMode')==='bebidas';
+
 /* ============ AYUDA (FAQ con guion, sin IA externa) ============ */
 const FAQ_ENTRIES = [
   {id:'entrar', pregunta:'¿Cómo entro / inicio sesión?', palabras:['entrar','entro','sesion','login','iniciar','acceder'],
@@ -206,6 +221,7 @@ let editandoItemCompraId = null;
 let editandoItemPagoId = null;
 let editandoTareaId = null;
 let editandoInventarioId = null;
+let editandoBebidaPrecioId = null;
 let editandoListaComidaId = null;
 let nuevaTareaSocios = [];
 let viendoSocioId = null; // si está a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
@@ -722,7 +738,7 @@ function showChatToast(mensaje){
   }, 6000);
 }
 async function pollChat(){
-  if(document.hidden || !state || !state.current_user) return;
+  if(TABLET_MODE || document.hidden || !state || !state.current_user) return;
   try{
     const r = await apiGet(`/api/chat?since=${chatLastId}`);
     const nuevos = r.mensajes || [];
@@ -742,13 +758,14 @@ async function pollChat(){
   }catch(e){ console.error('No se pudo actualizar el chat', e); }
 }
 function startChatPolling(){
-  if(chatPollTimer) return;
+  if(TABLET_MODE || chatPollTimer) return;
   chatPollTimer = setInterval(pollChat, CHAT_POLL_MS);
 }
 function stopChatPolling(){
   if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
 }
 async function chatOnLogin(){
+  if(TABLET_MODE) return;
   if(chatMensajes.length===0) await loadChatInicial();
   updateChatBadge();
   startChatPolling();
@@ -761,7 +778,7 @@ function render(){
   const app = document.getElementById('app');
   if(!loaded){ app.innerHTML = `<div class="loading-screen">Abriendo la peña</div>`; return; }
   if(!state.current_user){
-    app.innerHTML = renderLogin() + renderAyuda();
+    app.innerHTML = renderLogin() + (TABLET_MODE ? '' : renderAyuda());
     if(!loginDragInitialized){
       loginDragInitialized = true;
       initLoginDrag();
@@ -771,6 +788,7 @@ function render(){
   }
   const me = state.socios.find(s=>s.id===state.current_user);
   if(me && me.must_change_pin){ app.innerHTML = renderForcePin(me) + renderAyuda(); scrollHelpTranscript(); return; }
+  if(TABLET_MODE){ app.innerHTML = renderTabletKiosk(me); return; }
   app.innerHTML = renderApp() + renderAyuda() + renderAlertasPanel() + renderChatPanel() + renderAdjuntoViewer();
   scrollHelpTranscript();
   enhanceCardHeaders();
@@ -2439,6 +2457,89 @@ function renderCaja(){
 }
 
 /* ============ BEBIDAS ============ */
+function inventarioDeBebida(p){
+  return p.inventario_id ? state.inventario.find(i=>i.id===p.inventario_id) : null;
+}
+function renderBebidaOption(p){
+  const item = inventarioDeBebida(p);
+  const sinStock = item && item.cantidad<=0;
+  return `<option value="${p.id}" ${sinStock?'disabled':''}>${escapeHtml(p.nombre)}${sinStock?' (sin stock)':''}</option>`;
+}
+function renderInventarioLinkSelect(selectedId){
+  return `<select name="inventario_id"><option value="">Sin vincular (stock ilimitado)</option>${state.inventario.map(i=>`<option value="${i.id}" ${selectedId===i.id?'selected':''}>${escapeHtml(i.nombre)} (${i.cantidad} en inventario)</option>`).join('')}</select>`;
+}
+function renderBebidaPrecioRow(p, puedeGestionar){
+  const item = inventarioDeBebida(p);
+  const sinStock = item && item.cantidad<=0;
+  if(puedeGestionar && editandoBebidaPrecioId===p.id){
+    return `<form data-form="edit-bebida-precio" data-id="${p.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div><label class="f">Bebida</label><input type="text" name="nombre" required value="${escapeHtml(p.nombre)}"></div>
+        <div><label class="f">Unidad</label><input type="text" name="unidad" required value="${escapeHtml(p.unidad)}"></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">Precio socio (EUR)</label><input type="number" step="0.01" min="0" name="precio_socio" required value="${p.precio_socio}"></div>
+        <div><label class="f">Precio no socio (EUR)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required value="${p.precio_no_socio}"></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">Descontar stock de (opcional)</label>${renderInventarioLinkSelect(p.inventario_id||'')}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-bebida-precio">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `
+      <div class="menu-row">
+
+        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} - socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}${item?` - stock: ${item.cantidad}`:''}</small></span>
+
+        <span class="dots"></span>
+
+        ${sinStock ? '<span class="tag warn">Sin stock</span>' : ''}
+        ${puedeGestionar ? `<button class="btn ghost small" data-action="editar-bebida-precio" data-id="${p.id}">Editar</button>` : ''}
+        ${puedeGestionar ? `<button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>` : ''}
+      </div>`;
+}
+
+function renderTabletKiosk(me){
+  const precios = state.bebidas_precios;
+  const hayAlgunaConStock = precios.some(p=>{ const item = inventarioDeBebida(p); return !item || item.cantidad>0; });
+  return `
+  <div class="login-wrap tablet-kiosk">
+    <div class="masthead" style="border:none; margin-bottom:0;">
+      <div class="logo-row">${logoBadge()}<h1>${escapeHtml(state.config.nombre)}</h1></div>
+    </div>
+    <div style="margin-top:14px;">${me?avatarHtml(me,'lg'):''}</div>
+    <p class="sub" style="margin-top:10px;">Hola, <strong>${escapeHtml(me?me.nombre:'')}</strong>. Apunta lo que te acabas de servir.</p>
+    ${precios.length===0 ? '<p class="empty">Todavía no hay bebidas con precio cargadas. Pide a un administrador que las añada.</p>' : !hayAlgunaConStock ? '<p class="empty">No queda stock de ninguna bebida. Avisa para reponer el inventario.</p>' : `
+    <form data-form="add-consumo" style="margin-top:16px; max-width:280px; margin-left:auto; margin-right:auto; text-align:left;">
+      <label class="f">Bebida</label>
+      <select name="bebida_id" style="width:100%; margin-bottom:10px;">${precios.map(p=>renderBebidaOption(p)).join('')}</select>
+      <label class="f">Cantidad</label>
+      <input type="number" name="cantidad" value="1" min="1" style="width:100%; box-sizing:border-box; margin-bottom:10px;">
+      <div id="consumo-total" class="meta" style="margin:0 0 14px; font-weight:600; font-size:1rem; color:var(--amber); text-align:center;">Total: ${money(precios.length ? Number(precios[0].precio_socio) : 0)}</div>
+      <button class="btn" type="submit" style="width:100%;">Apuntar mi consumo</button>
+    </form>`}
+    <button class="btn ghost small" data-action="logout" style="margin-top:16px;">Cerrar sesión</button>
+  </div>`;
+}
+async function tabletConfirmarYSalir(detalle){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+  <div class="login-wrap tablet-kiosk">
+    <div class="masthead" style="border:none; margin-bottom:0;">${logoBadge()}</div>
+    <p class="sub" style="margin-top:18px; font-size:1.15rem;">Apuntado: <strong>${escapeHtml(detalle)}</strong></p>
+    <p class="meta">Cerrando sesión...</p>
+  </div>`;
+  await new Promise(resolve=>setTimeout(resolve, 1800));
+  try{ await apiPost('/api/logout'); }catch(e){ /* seguimos igualmente a la pantalla de login */ }
+  pendingLoginId = null;
+  await loadState();
+  render();
+}
+
 function renderBebidas(){
   return `
   <div class="subtabs" style="justify-content:flex-end; flex-wrap:wrap;">
@@ -2481,26 +2582,17 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Precio no socio (EUR)</label><input type="number" step="0.01" min="0" name="precio_no_socio" required></div>
       </div>
+      <div class="form-row">
+        <div><label class="f">Descontar stock de (opcional)</label>${renderInventarioLinkSelect('')}</div>
+      </div>
+      <p class="readonly-note" style="margin:0 0 10px;">Si la vinculas a un artículo del inventario, cada consumo registrado le restará stock automáticamente y avisará cuando se agote.</p>
       <button class="btn" type="submit">Añadir precio</button>
     </form>
-    ${precios.length ? precios.map(p=>`
-      <div class="menu-row">
-
-        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} - socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</small></span>
-
-        <span class="dots"></span>
-
-        <button class="btn danger small" data-action="delete-bebida-precio" data-id="${p.id}">Borrar</button>
-      </div>`).join('') : '<p class="empty">Añade al menos una bebida con precio.</p>'}
+    ${precios.length ? precios.map(p=>renderBebidaPrecioRow(p, true)).join('') : '<p class="empty">Añade al menos una bebida con precio.</p>'}
   </div>` : `
   <div class="card">
     <h2><span class="pin"></span>Precios</h2>
-    ${precios.length ? precios.map(p=>`
-      <div class="menu-row">
-        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)}</small></span>
-        <span class="dots"></span>
-        <span class="value">socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}</span>
-      </div>`).join('') : '<p class="empty">Todavía no hay precios cargados.</p>'}
+    ${precios.length ? precios.map(p=>renderBebidaPrecioRow(p, false)).join('') : '<p class="empty">Todavía no hay precios cargados.</p>'}
     <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes añaden precios nuevos.</p>
   </div>`}
   <div class="card">
@@ -2532,7 +2624,7 @@ function renderBebidasConsumo(){
       </div>` : ''}
       <div class="form-row">
 
-        <div><label class="f">Bebida</label><select name="bebida_id">${precios.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
+        <div><label class="f">Bebida</label><select name="bebida_id">${precios.map(p=>renderBebidaOption(p)).join('')}</select></div>
 
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
@@ -3322,6 +3414,14 @@ document.addEventListener('click', async (e)=>{
       editandoInventarioId = null;
       render();
     }
+    else if(action==='editar-bebida-precio'){
+      editandoBebidaPrecioId = btn.dataset.id;
+      render();
+    }
+    else if(action==='cancelar-editar-bebida-precio'){
+      editandoBebidaPrecioId = null;
+      render();
+    }
     else if(action==='delete-lista-compra'){
       if(confirm('¿Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
     }
@@ -3884,9 +3984,19 @@ document.addEventListener('submit', async (e)=>{
       editandoMovimientoId = null;
     }
     else if(type==='add-bebida-precio'){ await apiPost('/api/bebidas/precios', data); }
+    else if(type==='edit-bebida-precio'){
+      await apiPost(`/api/bebidas/precios/${form.dataset.id}`, data);
+      editandoBebidaPrecioId = null;
+    }
     else if(type==='add-consumo'){
       data.es_socio = data.consumidorTipo ? data.consumidorTipo==='socio' : true;
+      if(TABLET_MODE){ data.socio_id = state.current_user; data.es_socio = true; }
+      const bebidaNombre = (state.bebidas_precios.find(p=>p.id===data.bebida_id)||{}).nombre || 'bebida';
       await apiPost('/api/bebidas/consumos', data);
+      if(TABLET_MODE){
+        await tabletConfirmarYSalir(`${data.cantidad || 1} x ${bebidaNombre}`);
+        return;
+      }
     }
     else if(type==='add-reserva'){ await apiPost('/api/reservas', data); }
     else if(type==='add-lista-compra'){ await apiPost('/api/listas-compra', data); }
@@ -4118,7 +4228,7 @@ function initCursorNudge(){
   initCursorNudge();
   await loadState();
   render();
-  if(state && state.current_user){
+  if(state && state.current_user && !TABLET_MODE){
     await loadChatInicial();
     updateChatBadge();
     const n = chatUnreadCount();

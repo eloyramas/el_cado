@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS bebidas_precios (
     nombre TEXT NOT NULL,
     unidad TEXT NOT NULL,
     precio_socio REAL NOT NULL,
-    precio_no_socio REAL NOT NULL
+    precio_no_socio REAL NOT NULL,
+    inventario_id TEXT
 );
 CREATE TABLE IF NOT EXISTS bebidas_consumos (
     id TEXT PRIMARY KEY,
@@ -440,6 +441,10 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE listas_comida ADD COLUMN hora TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE bebidas_precios ADD COLUMN inventario_id TEXT")
         except sqlite3.OperationalError:
             pass
         if db.execute("SELECT COUNT(*) AS n FROM categorias_movimiento").fetchone()["n"] == 0:
@@ -1386,6 +1391,7 @@ def delete_inventario(iid):
     if not sid:
         return err("No has iniciado sesión.", 401)
     db = get_db()
+    db.execute("UPDATE bebidas_precios SET inventario_id = NULL WHERE inventario_id = ?", (iid,))
     db.execute("DELETE FROM inventario WHERE id = ?", (iid,))
     db.commit()
     return jsonify({"ok": True})
@@ -1565,25 +1571,63 @@ def delete_ticket_movimiento(mid):
 
 
 # -------------------------------------------------------------- bebidas: precios --
+def _resolver_inventario_id(db, data):
+    """Devuelve el id de inventario vinculado (o None), validando que exista."""
+    inventario_id = (data.get("inventario_id") or "").strip() or None
+    if inventario_id and not db.execute("SELECT 1 FROM inventario WHERE id = ?", (inventario_id,)).fetchone():
+        return "invalido"
+    return inventario_id
+
+
 @app.route("/api/bebidas/precios", methods=["POST"])
 def add_bebida_precio():
     if not require_permission("manage_bebidas"):
         return err("No tienes permiso para gestionar bebidas.")
     data = request.get_json(force=True)
     db = get_db()
+    inventario_id = _resolver_inventario_id(db, data)
+    if inventario_id == "invalido":
+        return err("El artículo de inventario vinculado no existe.", 400)
     bid = new_id()
     db.execute(
-        "INSERT INTO bebidas_precios (id, nombre, unidad, precio_socio, precio_no_socio) VALUES (?,?,?,?,?)",
+        "INSERT INTO bebidas_precios (id, nombre, unidad, precio_socio, precio_no_socio, inventario_id) VALUES (?,?,?,?,?,?)",
         (
             bid,
             (data.get("nombre") or "").strip(),
             (data.get("unidad") or "").strip(),
             float(data.get("precio_socio") or 0),
             float(data.get("precio_no_socio") or 0),
+            inventario_id,
         ),
     )
     db.commit()
     return jsonify({"ok": True, "id": bid})
+
+
+@app.route("/api/bebidas/precios/<bid>", methods=["POST"])
+def update_bebida_precio(bid):
+    if not require_permission("manage_bebidas"):
+        return err("No tienes permiso para gestionar bebidas.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM bebidas_precios WHERE id = ?", (bid,)).fetchone():
+        return err("Bebida no encontrada", 404)
+    data = request.get_json(force=True)
+    inventario_id = _resolver_inventario_id(db, data)
+    if inventario_id == "invalido":
+        return err("El artículo de inventario vinculado no existe.", 400)
+    db.execute(
+        "UPDATE bebidas_precios SET nombre=?, unidad=?, precio_socio=?, precio_no_socio=?, inventario_id=? WHERE id=?",
+        (
+            (data.get("nombre") or "").strip(),
+            (data.get("unidad") or "").strip(),
+            float(data.get("precio_socio") or 0),
+            float(data.get("precio_no_socio") or 0),
+            inventario_id,
+            bid,
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/bebidas/precios/<bid>", methods=["DELETE"])
@@ -1628,6 +1672,22 @@ def add_consumo():
     # junto con la cuota (del 1 al 5 de cada mes): nunca se marca pagado al registrarlo.
     pagado = 0
 
+    if bebida["inventario_id"]:
+        item = db.execute("SELECT * FROM inventario WHERE id = ?", (bebida["inventario_id"],)).fetchone()
+        if item:
+            if item["cantidad"] < cantidad:
+                return err(
+                    f"No queda stock suficiente de \"{item['nombre']}\" (quedan {item['cantidad']}). "
+                    "Actualiza el inventario antes de seguir apuntando consumo.",
+                    409,
+                )
+            nueva_cantidad = item["cantidad"] - cantidad
+            nuevo_estado = "Hay que comprar" if nueva_cantidad <= 0 else item["estado"]
+            db.execute(
+                "UPDATE inventario SET cantidad = ?, estado = ? WHERE id = ?",
+                (nueva_cantidad, nuevo_estado, item["id"]),
+            )
+
     cid = new_id()
     db.execute(
         "INSERT INTO bebidas_consumos (id, fecha, consumidor, es_socio, socio_id, bebida_id, cantidad, importe, pagado) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -1642,6 +1702,14 @@ def delete_consumo(cid):
     if not require_permission("manage_bebidas"):
         return err("No tienes permiso para gestionar bebidas.")
     db = get_db()
+    consumo = db.execute("SELECT * FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
+    if consumo:
+        bebida = db.execute("SELECT inventario_id FROM bebidas_precios WHERE id = ?", (consumo["bebida_id"],)).fetchone()
+        if bebida and bebida["inventario_id"]:
+            db.execute(
+                "UPDATE inventario SET cantidad = cantidad + ? WHERE id = ?",
+                (consumo["cantidad"], bebida["inventario_id"]),
+            )
     db.execute("DELETE FROM bebidas_consumos WHERE id = ?", (cid,))
     db.commit()
     return jsonify({"ok": True})
