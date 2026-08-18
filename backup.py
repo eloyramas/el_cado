@@ -16,7 +16,7 @@ if os.path.exists(db_path):
     shutil.copy2(db_path, destino)
 
 # Copiar fotos y tickets
-for carpeta in ["static/avatars", "static/tickets"]:
+for carpeta in ["static/avatars", "static/tickets", "static/chat"]:
     origen = os.path.join(BASE_DIR, carpeta)
     if os.path.isdir(origen):
         shutil.copytree(origen, os.path.join(destino, carpeta), dirs_exist_ok=True)
