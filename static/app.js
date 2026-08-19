@@ -47,6 +47,8 @@ const FAQ_ENTRIES = [
     respuesta:'Cualquier socio puede consultar los precios en la pestaña Bebidas, para saber cuánto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Añadir precios nuevos, registrar consumo de otro socio o de un invitado, y gestionar el resto de consumos es cosa del administrador o el tesorero; cualquier socio puede registrar su propio consumo.'},
   {id:'gastos-socios', pregunta:'¿Cómo registro un gasto que he pagado yo para la peña?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
     respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tú como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tú o el administrador/tesorero podéis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavía está pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automáticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habías subido, se copia también allí) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahí, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en años posteriores; no depende ya de la solicitud original.'},
+  {id:'filtrar-movimientos', pregunta:'¿Puedo filtrar la lista de Movimientos?', palabras:['filtrar','filtro','movimientos','socio','categoria','categoría','caja'],
+    respuesta:'Sí. Encima del listado de Caja > Movimientos tienes dos desplegables: uno para quedarte solo con los movimientos de un socio concreto, y otro para quedarte solo con los de una categoría concreta (por ejemplo "Bebidas" o "Cuotas"). Se pueden combinar los dos filtros a la vez, y el botón "Quitar filtros" los limpia. El envío por WhatsApp de esa lista respeta también los filtros que tengas puestos en ese momento.'},
   {id:'duplicados', pregunta:'¿Qué pasa si registro un gasto que ya estaba apuntado?', palabras:['duplicado','duplicar','repetido','repetir','ya existe','aviso'],
     respuesta:'Al añadir o editar un movimiento (Caja > Registrar movimiento) o un gasto/ingreso de socio, la app comprueba si ya hay algo con la misma fecha y el mismo concepto (mirando tanto en Movimientos como en Gastos e ingresos de socios) y te avisa por si es un duplicado antes de guardarlo. No te lo bloquea del todo -si de verdad son dos cosas distintas el mismo día con el mismo nombre, puedes confirmar igualmente y se guarda-, es solo un aviso para evitar que se apunte dos veces lo mismo por error.'},
   {id:'excel', pregunta:'¿Cómo exporto o importo datos con Excel?', palabras:['excel','exportar','importar','descargar','subir','xlsx','cuentas'],
@@ -219,6 +221,7 @@ let filtroSocioLiquidar = ''; // id de socio para filtrar "Gastos e ingresos de 
 let seleccionGastosSocios = new Set(); // ids de gastos/ingresos de socios pendientes marcados para pagar en bloque
 let editandoMovimientoId = null;
 let filtroSocioMovimientos = ''; // id de socio para filtrar "Movimientos"
+let filtroCategoriaMovimientos = ''; // nombre de categoría para filtrar "Movimientos"
 let editandoItemCompraId = null;
 let editandoItemPagoId = null;
 let editandoTareaId = null;
@@ -780,11 +783,13 @@ async function chatOnLogin(){
 // cambio, para que no "salte" ni haya que volver a buscarla.
 function anclarScroll(id){
   if(!id) return ()=>{};
-  const el = document.querySelector(`.list-item[data-id="${id}"]`);
+  const sel = `.list-item[data-id="${id}"], .menu-row[data-id="${id}"], .card[data-id="${id}"], form[data-form][data-id="${id}"], [data-anchor-id="${id}"]`;
+  const buscar = ()=> document.querySelector(sel);
+  const el = buscar();
   if(!el) return ()=>{};
   const y0 = el.getBoundingClientRect().top;
   return ()=>{
-    const nuevo = document.querySelector(`.list-item[data-id="${id}"]`);
+    const nuevo = buscar();
     if(nuevo) window.scrollBy(0, nuevo.getBoundingClientRect().top - y0);
   };
 }
@@ -838,6 +843,11 @@ function enhanceCardHeaders(){
     tituloWrapDe(h2);
   });
   document.querySelectorAll('.card:not(.no-collapse) > h2:first-child + form[data-form], .card:not(.no-collapse) > h2:first-child + * + form[data-form]').forEach(form=>{
+    // los formularios de edicion de un elemento ya existente (edit-*) no son
+    // la tarjeta plegable de "anadir nuevo": si un item editado resulta ser
+    // el primer hijo tras el h2 (p.ej. el primer producto de una lista), no
+    // debe tratarse como plegable ni quedar oculto por defecto.
+    if(form.dataset.form && form.dataset.form.startsWith('edit-')) return;
     const h2 = form.parentElement.querySelector(':scope > h2:first-child');
     if(!h2) return;
     const id = form.dataset.form + '|' + (form.dataset.id || '');
@@ -1982,9 +1992,9 @@ function renderInventarioItem(i){
       </div>
     </form>`;
   }
-  return `<div class="list-item">
+  return `<div class="list-item" data-id="${i.id}">
     <div>
-      <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta">- ${i.cantidad}</span></div>
+      <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta">· ${i.cantidad}</span></div>
       <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -2008,13 +2018,13 @@ function renderListasTab(){
 
 function renderNombreLista(lista, tipo){
   if(editandoNombreListaId === lista.id){
-    return `<form data-form="edit-nombre-lista-${tipo}" data-id="${lista.id}" style="display:flex; gap:6px; align-items:center; flex:1; min-width:200px;">
+    return `<form data-form="edit-nombre-lista-${tipo}" data-id="${lista.id}" data-anchor-id="${lista.id}" style="display:flex; gap:6px; align-items:center; flex:1; min-width:200px;">
       <input type="text" name="nombre" required value="${escapeHtml(lista.nombre)}" style="flex:1;">
       <button class="btn small" type="submit">Guardar</button>
       <button class="btn ghost small" type="button" data-action="cancelar-editar-nombre-lista">Cancelar</button>
     </form>`;
   }
-  return `<span><span class="pin"></span>${escapeHtml(lista.nombre)}</span> <button type="button" class="link-btn meta" data-action="editar-nombre-lista" data-id="${lista.id}" title="Cambiar el título de la lista">Editar título</button>`;
+  return `<span data-anchor-id="${lista.id}" style="display:contents;"><span><span class="pin"></span>${escapeHtml(lista.nombre)}</span> <button type="button" class="link-btn meta" data-action="editar-nombre-lista" data-id="${lista.id}" title="Cambiar el título de la lista">Editar título</button></span>`;
 }
 
 function renderListaCompra(){
@@ -2119,7 +2129,7 @@ function renderListaComidaCard(lista){
   const invitados = lista.invitados || [];
   const totalPersonas = asistentes.length + invitados.length;
   const disponibles = state.socios.filter(s=>s.activo && !asistentes.includes(s.id));
-  return `<div class="card">
+  return `<div class="card" data-id="${lista.id}">
     <h2 style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
       <span><span class="pin"></span>${escapeHtml(lista.nombre)}</span>
       <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-left:auto;">
@@ -2236,11 +2246,11 @@ function renderItemPago(i){
       </div>
     </form>`;
   }
-  return `<div class="list-item">
+  return `<div class="list-item" data-id="${i.id}">
     <label style="display:flex; align-items:flex-start; gap:10px; flex:1; cursor:pointer;">
       <input type="checkbox" data-action="toggle-item-pago" data-id="${i.id}" ${i.pagado?'checked':''} style="margin-top:4px;">
       <span>
-        <div style="font-weight:600; ${i.pagado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.importe ? `<span class="meta">- ${money(i.importe)}</span>` : ''}</div>
+        <div style="font-weight:600; ${i.pagado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.importe ? `<span class="meta">· ${money(i.importe)}</span>` : ''}</div>
         <div class="meta">${i.pagado ? `Pagado${i.pagado_en?' el '+fmtDate(i.pagado_en.slice(0,10)):''}` : 'Pendiente de pago'}</div>
       </span>
     </label>
@@ -2264,11 +2274,11 @@ function renderItemCompra(i){
       </div>
     </form>`;
   }
-  return `<div class="list-item">
+  return `<div class="list-item" data-id="${i.id}">
     <label style="display:flex; align-items:flex-start; gap:10px; flex:1; cursor:pointer;">
       <input type="checkbox" data-action="toggle-item-compra" data-id="${i.id}" ${i.comprado?'checked':''} style="margin-top:4px;">
       <span>
-        <div style="font-weight:600; ${i.comprado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.cantidad ? `<span class="meta">- ${escapeHtml(i.cantidad)}</span>` : ''}</div>
+        <div style="font-weight:600; ${i.comprado?'text-decoration:line-through; opacity:.65;':''}">${escapeHtml(i.nombre)} ${i.cantidad ? `<span class="meta">· ${escapeHtml(i.cantidad)}</span>` : ''}</div>
         <div class="meta">${i.comprado ? `Comprado por ${escapeHtml(socioNombre(i.comprado_por))}` : `Añadido por ${escapeHtml(socioNombre(i.anadido_por))}`}</div>
       </span>
     </label>
@@ -2405,6 +2415,14 @@ function renderCaja(){
     sociosConMovimientos.push({id: m.socio_id, nombre: m.socio_nombre || socioNombre(m.socio_id)});
   });
   sociosConMovimientos.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const categoriasConMovimientos = [];
+  const vistasCategoria = {};
+  state.movimientos.forEach(m=>{
+    if(!m.categoria || vistasCategoria[m.categoria]) return;
+    vistasCategoria[m.categoria] = true;
+    categoriasConMovimientos.push(m.categoria);
+  });
+  categoriasConMovimientos.sort((a,b)=>a.localeCompare(b));
   return `
   <div class="card">
     <h2><span class="pin"></span>Gastos e ingresos de socios</h2>
@@ -2489,17 +2507,22 @@ function renderCaja(){
         <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label>
       </span>
     </h2>
-    ${sociosConMovimientos.length ? `<div class="consumos-filtro" style="margin-bottom:10px;">
-      <select id="movimientos-filtro-socio">
+    ${sociosConMovimientos.length || categoriasConMovimientos.length ? `<div class="consumos-filtro" style="margin-bottom:10px;">
+      ${sociosConMovimientos.length ? `<select id="movimientos-filtro-socio">
         <option value="">Todos los socios</option>
         ${sociosConMovimientos.map(s=>`<option value="${s.id}" ${filtroSocioMovimientos===s.id?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('')}
-      </select>
-      ${filtroSocioMovimientos ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-movimientos-socio">Quitar filtro</button>` : ''}
+      </select>` : ''}
+      ${categoriasConMovimientos.length ? `<select id="movimientos-filtro-categoria">
+        <option value="">Todas las categorías</option>
+        ${categoriasConMovimientos.map(c=>`<option value="${escapeHtml(c)}" ${filtroCategoriaMovimientos===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+      </select>` : ''}
+      ${filtroSocioMovimientos || filtroCategoriaMovimientos ? `<button type="button" class="btn ghost small" data-action="limpiar-filtro-movimientos-socio">Quitar filtros</button>` : ''}
     </div>` : ''}
     ${(()=>{
       let filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
       if(filtroSocioMovimientos) filtrados = filtrados.filter(m=>m.socio_id===filtroSocioMovimientos);
-      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos' && !filtroSocioMovimientos ?'registrados':'para ese filtro'}.</p>`;
+      if(filtroCategoriaMovimientos) filtrados = filtrados.filter(m=>m.categoria===filtroCategoriaMovimientos);
+      if(filtrados.length===0) return `<p class="empty">Sin movimientos ${cajaPeriodo.tipo==='todos' && !filtroSocioMovimientos && !filtroCategoriaMovimientos ?'registrados':'para ese filtro'}.</p>`;
       return filtrados.map(m=>renderMovimientoItem(m)).join('');
     })()}
   </div>`;
@@ -2540,7 +2563,7 @@ function renderBebidaPrecioRow(p, puedeGestionar){
     </form>`;
   }
   return `
-      <div class="menu-row">
+      <div class="menu-row" data-id="${p.id}">
 
         <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} - socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}${item?` - stock: ${item.cantidad}`:''}</small></span>
 
@@ -2864,7 +2887,7 @@ function renderTicketRow(t){
       </div>
     </form>`;
   }
-  return `<div class="list-item" style="display:block;">
+  return `<div class="list-item" data-id="${t.id}" style="display:block;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
       <div>
         <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(t.tipo)} <span class="tag ${estadoClass}">${estadoLabel}</span>${t.rotacion?`<span class="tag">rotación: ${escapeHtml(t.rotacion)}</span>`:''}</div>
@@ -3266,12 +3289,16 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='editar-tarea'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoTareaId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-tarea'){
+      const restaurar = anclarScroll(editandoTareaId);
       editandoTareaId = null;
       render();
+      restaurar();
     }
     else if(action==='export-tareas-whatsapp'){
       const tareas = (state.tareas_tickets||[]).filter(t=>t.estado!=='hecho');
@@ -3358,8 +3385,10 @@ document.addEventListener('click', async (e)=>{
       const ordenados = [...state.movimientos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
       let filtrados = ordenados.filter(m=>dentroDePeriodo(m.fecha, cajaPeriodo));
       if(filtroSocioMovimientos) filtrados = filtrados.filter(m=>m.socio_id===filtroSocioMovimientos);
+      if(filtroCategoriaMovimientos) filtrados = filtrados.filter(m=>m.categoria===filtroCategoriaMovimientos);
       const socioTexto = filtroSocioMovimientos ? ' - '+socioNombre(filtroSocioMovimientos) : '';
-      let texto = `*Movimientos${cajaPeriodo.tipo==='todos'?'':' - '+labelPeriodo(cajaPeriodo)}${socioTexto}* - ${fmtDate(todayISO())}\n\n`;
+      const categoriaTexto = filtroCategoriaMovimientos ? ' - '+filtroCategoriaMovimientos : '';
+      let texto = `*Movimientos${cajaPeriodo.tipo==='todos'?'':' - '+labelPeriodo(cajaPeriodo)}${socioTexto}${categoriaTexto}* - ${fmtDate(todayISO())}\n\n`;
       texto += filtrados.length ? filtrados.map(m=>`- ${m.tipo==='ingreso'?'+':'-'}*${money(m.importe)}* - ${m.categoria} - ${m.concepto}${m.socio_id?' - '+socioNombre(m.socio_id):(m.no_socio_nombre?' - '+m.no_socio_nombre:'')} - *${fmtDate(m.fecha)}*`).join('\n') : 'Sin movimientos.';
       enviarWhatsapp(texto);
     }
@@ -3458,20 +3487,28 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='editar-inventario'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoInventarioId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-inventario'){
+      const restaurar = anclarScroll(editandoInventarioId);
       editandoInventarioId = null;
       render();
+      restaurar();
     }
     else if(action==='editar-bebida-precio'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoBebidaPrecioId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-bebida-precio'){
+      const restaurar = anclarScroll(editandoBebidaPrecioId);
       editandoBebidaPrecioId = null;
       render();
+      restaurar();
     }
     else if(action==='delete-lista-compra'){
       if(confirm('¿Borrar esta lista y todos sus productos?')){ await apiDelete(`/api/listas-compra/${btn.dataset.id}`); await loadState(); render(); }
@@ -3485,12 +3522,16 @@ document.addEventListener('click', async (e)=>{
       await loadState(); render();
     }
     else if(action==='editar-item-compra'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoItemCompraId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-item-compra'){
+      const restaurar = anclarScroll(editandoItemCompraId);
       editandoItemCompraId = null;
       render();
+      restaurar();
     }
     else if(action==='listas-subtab'){
       listasSubTab = btn.dataset.sub;
@@ -3499,23 +3540,31 @@ document.addEventListener('click', async (e)=>{
       render();
     }
     else if(action==='editar-nombre-lista'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoNombreListaId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-nombre-lista'){
+      const restaurar = anclarScroll(editandoNombreListaId);
       editandoNombreListaId = null;
       render();
+      restaurar();
     }
     else if(action==='delete-lista-comida'){
       if(confirm('¿Borrar esta comida/cena, con sus asistentes e invitados?')){ await apiDelete(`/api/listas-comida/${btn.dataset.id}`); await loadState(); render(); }
     }
     else if(action==='editar-lista-comida'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoListaComidaId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-lista-comida'){
+      const restaurar = anclarScroll(editandoListaComidaId);
       editandoListaComidaId = null;
       render();
+      restaurar();
     }
     else if(action==='anadir-socio-comida'){
       const select = document.getElementById(`comida-socio-select-${btn.dataset.lista}`);
@@ -3577,12 +3626,16 @@ document.addEventListener('click', async (e)=>{
       await loadState(); render();
     }
     else if(action==='editar-item-pago'){
+      const restaurar = anclarScroll(btn.dataset.id);
       editandoItemPagoId = btn.dataset.id;
       render();
+      restaurar();
     }
     else if(action==='cancelar-editar-item-pago'){
+      const restaurar = anclarScroll(editandoItemPagoId);
       editandoItemPagoId = null;
       render();
+      restaurar();
     }
     else if(action==='delete-movimiento'){
       if(confirm('¿Borrar este movimiento?')){ await apiDelete(`/api/movimientos/${btn.dataset.id}`); await loadState(); render(); }
@@ -3637,7 +3690,7 @@ document.addEventListener('click', async (e)=>{
       }
     }
     else if(action==='limpiar-filtro-movimientos-socio'){
-      filtroSocioMovimientos = ''; render();
+      filtroSocioMovimientos = ''; filtroCategoriaMovimientos = ''; render();
     }
     else if(action==='editar-gasto-socio'){
       const restaurar = anclarScroll(btn.dataset.id);
@@ -3843,6 +3896,11 @@ document.addEventListener('change', async (e)=>{
     render();
     return;
   }
+  if(e.target.id==='movimientos-filtro-categoria'){
+    filtroCategoriaMovimientos = e.target.value;
+    render();
+    return;
+  }
   if(e.target.id==='chat-file-input'){
     const file = e.target.files[0];
     if(file){
@@ -3971,7 +4029,7 @@ document.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const type = form.dataset.form;
   const data = Object.fromEntries(new FormData(form).entries());
-  const idParaAnclar = (type==='edit-gasto-socio' || type==='edit-movimiento') ? form.dataset.id : null;
+  const idParaAnclar = (type.startsWith('edit-') && type!=='edit-chat-msg') ? form.dataset.id : null;
   const restaurarScroll = anclarScroll(idParaAnclar);
 
   try{
