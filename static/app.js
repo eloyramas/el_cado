@@ -2938,7 +2938,7 @@ function renderBebidasConsumo(){
 
           ${puedeGestionarBebidas ? `<button class="btn ghost small" data-action="toggle-consumo-pagado" data-id="${c.id}">${c.pagado?'Marcar pendiente':'Marcar pagado'}</button>` : ''}
 
-          ${puedeGestionarBebidas ? `<button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>` : ''}
+          ${(puedeGestionarBebidas || (c.socio_id===state.current_user && !c.pagado)) ? `<button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button>` : ''}
 
         </div>
       </div>`;
