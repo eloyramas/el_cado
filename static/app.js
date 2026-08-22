@@ -2114,7 +2114,7 @@ function renderInventario(){
   return `
   ${puedeGestionarInventario ? `
   <div class="card">
-    <h2><span class="pin"></span>Añadir material</h2>
+    <h2><span class="pin"></span>Añadir</h2>
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin:-6px 0 14px;">
       <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>
       ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''}
@@ -2137,7 +2137,7 @@ function renderInventario(){
 
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="0"></div>
 
-        <div><label class="f">Estado</label><select name="estado"><option>Bien</option><option>Necesita revision</option><option>Hay que comprar</option></select></div>
+        <div><label class="f">Estado (opcional)</label><select name="estado"><option value=""></option><option>Bien</option><option>Necesita revision</option><option>Hay que comprar</option></select></div>
 
         <div><label class="f">Notas</label><input type="text" name="notas" placeholder="opcional"></div>
       </div>
@@ -2166,7 +2166,7 @@ function renderInventarioItem(i){
       </div>
       <div class="form-row">
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="${i.cantidad}" min="0"></div>
-        <div><label class="f">Estado</label><select name="estado"><option ${i.estado==='Bien'?'selected':''}>Bien</option><option ${i.estado==='Necesita revision'?'selected':''}>Necesita revision</option><option ${i.estado==='Hay que comprar'?'selected':''}>Hay que comprar</option></select></div>
+        <div><label class="f">Estado (opcional)</label><select name="estado"><option value="" ${!i.estado?'selected':''}></option><option ${i.estado==='Bien'?'selected':''}>Bien</option><option ${i.estado==='Necesita revision'?'selected':''}>Necesita revision</option><option ${i.estado==='Hay que comprar'?'selected':''}>Hay que comprar</option></select></div>
         <div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(i.notas||'')}" placeholder="opcional"></div>
       </div>
       <div style="display:flex; gap:8px;">
@@ -2179,7 +2179,7 @@ function renderInventarioItem(i){
   return `<div class="list-item" data-id="${i.id}">
     <div>
       <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta" style="${stockBajo?'color:var(--rust); font-weight:700;':''}">· ${i.cantidad}</span></div>
-      <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${stockBajo?'<span class="tag warn">Quedan pocas unidades</span>':''} ${i.notas?escapeHtml(i.notas):''}</div>
+      <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':i.estado==='Bien'?'<span class="tag ok">Bien</span>':''} ${stockBajo?'<span class="tag warn">Quedan pocas unidades</span>':''} ${i.notas?escapeHtml(i.notas):''}</div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
       <button class="btn ghost small" data-action="editar-inventario" data-id="${i.id}">Editar</button>
@@ -3544,7 +3544,7 @@ document.addEventListener('click', async (e)=>{
       enviarWhatsapp(texto);
     }
     else if(action==='export-inventario-whatsapp'){
-      const pendientes = state.inventario.filter(i=>i.estado!=='Bien');
+      const pendientes = state.inventario.filter(i=>i.estado==='Necesita revision' || i.estado==='Hay que comprar');
       let texto = `*Inventario de la peña* - ${fmtDate(todayISO())}\n\n`;
       if(pendientes.length){
         texto += '*Pendiente de revisar o comprar:*\n' + pendientes.map(i=>`- ${i.nombre} (${i.cantidad}) - ${i.estado}${i.notas?' - '+i.notas:''}`).join('\n');
