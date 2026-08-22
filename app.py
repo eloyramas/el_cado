@@ -1937,9 +1937,9 @@ def add_consumo():
     if not bebida:
         return err("Bebida no encontrada", 404)
 
-    puede_gestionar = has_permission(sid, "manage_bebidas")
-    # Un socio sin el permiso de gestionar bebidas solo puede anotar su propio
-    # consumo: no puede elegir a otro socio ni añadir invitados.
+    puede_gestionar = is_admin_user(sid)
+    # Solo el administrador puede anotar el consumo de otro socio o de un
+    # invitado; el resto (incluido el tesorero) solo puede anotar el suyo propio.
     es_socio = bool(data.get("es_socio")) if puede_gestionar else True
     cantidad = int(data.get("cantidad") or 1)
     socio_id = None

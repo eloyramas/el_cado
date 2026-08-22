@@ -46,7 +46,7 @@ const FAQ_ENTRIES = [
   {id:'foto', pregunta:'¿Cómo cambio mi foto de perfil?', palabras:['foto','avatar','imagen','perfil'],
     respuesta:'Desde la pestaña Socios (o Mi perfil) pulsa el botón "Foto" junto a tu nombre y elige una imagen. Se abre un recuadro donde puedes arrastrarla y hacer zoom para encuadrarla a tu gusto antes de guardarla. Si quieres reencuadrar la foto que ya tienes subida (sin elegir una nueva), pulsa el lápiz que aparece en la esquina de la foto. Si es una foto de iPhone en formato HEIC, conviértela antes a JPG.'},
   {id:'precios-bebidas', pregunta:'¿Quién puede ver y cambiar los precios de las bebidas?', palabras:['bebida','bebidas','precio','precios','consumo','tesorero'],
-    respuesta:'Cualquier socio puede consultar los precios en la pestaña Bebidas, para saber cuánto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Añadir precios nuevos, registrar consumo de otro socio o de un invitado, y gestionar el resto de consumos es cosa del administrador o el tesorero; cualquier socio puede registrar su propio consumo.'},
+    respuesta:'Cualquier socio puede consultar los precios en la pestaña Bebidas, para saber cuánto le va a costar antes de servirse (el total se calcula solo al elegir la bebida y la cantidad). Añadir precios nuevos y gestionar el resto de consumos (marcarlos como pagados, borrarlos) es cosa del administrador o el tesorero. Registrar el consumo de otro socio o de un invitado es solo cosa del administrador; cualquier socio puede registrar su propio consumo.'},
   {id:'gastos-socios', pregunta:'¿Cómo registro un gasto que he pagado yo para la peña?', palabras:['gasto','gastos','ticket','abonar','abonado','reembolso','verificar','movimiento','movimientos','historial'],
     respuesta:'En Caja > "Gastos e ingresos de socios", rellena el concepto, el importe y la fecha (vale tanto para un gasto que hayas pagado tú como para un ingreso que hayas hecho). Una vez creado, puedes subir una foto o PDF del ticket o factura desde el propio gasto de la lista. Solo tú o el administrador/tesorero podéis editar o borrar esa solicitud; no las de otros socios.\n\nEsta lista es provisional, solo para lo que todavía está pendiente de revisar: en cuanto el tesorero o el administrador lo comprueban y lo marcan como "Abonado"/verificado, la app crea automáticamente un Movimiento permanente en Caja > Movimientos con esos mismos datos (y el ticket o factura, si lo habías subido, se copia también allí) y esa solicitud desaparece sola de esta lista, para que se quede siempre limpia y solo con lo pendiente de verdad. A partir de ahí, el Movimiento generado se queda fijo en el historial de Caja como referencia de lo gastado/ingresado, para consultarlo en años posteriores; no depende ya de la solicitud original.'},
   {id:'filtrar-movimientos', pregunta:'¿Puedo filtrar la lista de Movimientos?', palabras:['filtrar','filtro','movimientos','socio','categoria','categoría','caja'],
@@ -248,9 +248,13 @@ let chatPollTimer = null;
 let chatAbierto = false;
 let chatArchivoSeleccionado = null; // File pendiente de adjuntar al próximo mensaje
 let emojiPickerAbierto = false;
+let chatDraftTexto = ''; // texto sin enviar del chat: se guarda aquí para no perderlo cuando algo obliga a redibujar (abrir el selector de emoticonos, adjuntar un archivo...)
 let editandoMensajeId = null; // id del mensaje propio que se está editando ahora mismo
-const EMOJIS_CHAT = ['😀','😂','😅','😉','😊','😍','😘','😜','🤔','😎','😴','😭','😡','🥳','🤢','😱',
-  '👍','👎','🙏','👏','💪','🤝','❤️','🔥','🎉','🍺','🍻','🍕','☕','⚽','🎲','🃏','☀️','🌧️','⏰','📅','✅','❌','⚠️'];
+const EMOJIS_CHAT = ['😀','😂','🤣','😅','😉','😊','😍','😘','😜','🤔','😎','😴','😭','😢','😡','🥳','🤗','🥶','🤢','😱',
+  '👍','👎','🙌','👏','💪','🤙','🤝','🙏','❤️','🔥','🎉','💯',
+  '🍺','🍻','🥂','🍷','🍕','🍔','☕','🥘',
+  '⚽','🏆','🎲','🃏','🎶','📸',
+  '☀️','🌧️','⏰','📅','✅','❌','⚠️'];
 let pendingLoginId = null; // socio seleccionado, esperando que escriba su PIN
 let loginSearchQuery = ''; // texto escrito en "Escribe tu nombre" de la pantalla de login
 let loginDragInitialized = false;
@@ -2810,6 +2814,7 @@ function renderBebidas(){
 
 function renderBebidasConsumo(){
   const puedeGestionarBebidas = can('manage_bebidas');
+  const puedeElegirConsumidor = isAdmin();
   const precios = state.bebidas_precios;
   const consumos = [...state.bebidas_consumos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const misPendientes = misBebidasPendientes();
@@ -2852,10 +2857,10 @@ function renderBebidasConsumo(){
     <p class="readonly-note" style="margin-top:10px;">Solo lectura: el administrador o el tesorero son quienes añaden precios nuevos.</p>
   </div>`}
   <div class="card">
-    <h2><span class="pin"></span>${puedeGestionarBebidas ? 'Registrar consumo' : 'Registrar mi consumo'}</h2>
+    <h2><span class="pin"></span>${puedeElegirConsumidor ? 'Registrar consumo' : 'Registrar mi consumo'}</h2>
     ${precios.length===0 ? '<p class="empty">Primero añade precios de bebidas arriba.</p>' : `
     <form data-form="add-consumo">
-      ${puedeGestionarBebidas ? `
+      ${puedeElegirConsumidor ? `
       <div class="form-row">
 
         <div><label class="f">¿Quién consume?</label>
@@ -2885,8 +2890,8 @@ function renderBebidasConsumo(){
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="1" min="1"></div>
       </div>
       <div id="consumo-total" class="meta" style="margin:2px 0 6px; font-weight:600; font-size:0.95rem; color:var(--amber);">Total: ${money(precios.length ? Number(precios[0].precio_socio) : 0)}</div>
-      <p class="readonly-note" style="margin:0 0 10px;">Se suma a ${puedeGestionarBebidas ? 'la deuda del socio' : 'tu deuda'}: todo el consumo se paga por transferencia junto con la cuota, del 1 al 5 de cada mes.</p>
-      <button class="btn" type="submit">${puedeGestionarBebidas ? 'Registrar consumo' : 'Registrar mi consumo'}</button>
+      <p class="readonly-note" style="margin:0 0 10px;">Se suma a ${puedeElegirConsumidor ? 'la deuda del socio' : 'tu deuda'}: todo el consumo se paga por transferencia junto con la cuota, del 1 al 5 de cada mes.</p>
+      <button class="btn" type="submit">${puedeElegirConsumidor ? 'Registrar consumo' : 'Registrar mi consumo'}</button>
     </form>
     `}
   </div>
@@ -3226,7 +3231,7 @@ function renderChatPanel(){
           <span class="chat-attach-name">📎 ${escapeHtml(chatArchivoSeleccionado.name)}</span>
           <button type="button" class="chat-attach-remove" data-action="quitar-adjunto-chat" title="Quitar adjunto">&times;</button>
         </div>` : ''}
-        <textarea id="chat-input" name="texto" placeholder="Escribe un mensaje..." rows="1" maxlength="2000"></textarea>
+        <textarea id="chat-input" name="texto" placeholder="Escribe un mensaje..." rows="1" maxlength="2000">${escapeHtml(chatDraftTexto)}</textarea>
         <div class="chat-compose-row">
           <button type="button" class="chat-tool-btn" data-action="toggle-emoji-picker" title="Emoticonos">${toolIcon(SMILE_ICON_PATH)}</button>
           <button type="button" class="chat-tool-btn" data-action="chat-attach-click" title="Adjuntar archivo">${toolIcon(PAPERCLIP_ICON_PATH)}</button>
@@ -3378,6 +3383,7 @@ document.addEventListener('click', async (e)=>{
         const start = ta.selectionStart ?? ta.value.length;
         const end = ta.selectionEnd ?? ta.value.length;
         ta.value = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+        chatDraftTexto = ta.value;
         const pos = start + emoji.length;
         ta.focus();
         ta.setSelectionRange(pos, pos);
@@ -4133,6 +4139,9 @@ document.addEventListener('input', (e)=>{
   else if(e.target.name==='cantidad' && e.target.form && e.target.form.dataset.form==='add-consumo'){
     actualizarTotalConsumo(e.target.form);
   }
+  else if(e.target.id==='chat-input'){
+    chatDraftTexto = e.target.value;
+  }
 });
 
 document.addEventListener('change', async (e)=>{
@@ -4334,6 +4343,7 @@ document.addEventListener('submit', async (e)=>{
       chatMensajes.push(msg);
       chatLastId = Math.max(chatLastId, msg.id);
       chatArchivoSeleccionado = null;
+      chatDraftTexto = '';
       emojiPickerAbierto = false;
       const fileInput = document.getElementById('chat-file-input');
       if(fileInput) fileInput.value = '';
