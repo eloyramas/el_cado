@@ -4,9 +4,11 @@
    en tiempo real (se refresca solo cada 8s). */
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const CAT_INV = ['Cocina','Mobiliario','Electronica','Otros'];
 const TIPO_FAMILIA = ['Pareja','Hijo/a','Otro'];
 const DIA_LIMITE_CUOTA = 5; // a partir de qué día del mes se avisa de cuota pendiente
+const UMBRAL_STOCK_BAJO = 10; // por debajo de esta cantidad, un material se marca en rojo y avisa
+const CATEGORIA_STOCK_BAJO = 'bebidas'; // el aviso de poco stock solo aplica a esta categoría de inventario
+function esCategoriaStockBajo(categoria){ return (categoria||'').trim().toLowerCase() === CATEGORIA_STOCK_BAJO; }
 let BG_IMAGES = [];
 const DEFAULT_BG_IMAGES = ['/static/backgrounds/bg-1.jpg','/static/backgrounds/bg-2.jpg','/static/backgrounds/bg-3.jpg','/static/backgrounds/bg-4.jpg','/static/backgrounds/bg-5.jpg','/static/backgrounds/bg-6.jpg'];
 const PENA_LOCATION_URL = 'https://maps.app.goo.gl/z4ZBJix572Trhqf49';
@@ -215,6 +217,10 @@ let tareasHistorialPeriodo = {tipo:'todos', valor:''};
 let editandoNombreListaId = null;
 let reservasCalFecha = new Date();
 let reunionesCalFecha = new Date();
+let reunionesAsistenciaAbierta = {}; // {reunionId: true} -> desplegable de asistentes abierto
+let reunionesActaAbierta = {}; // {reunionId: true} -> desplegable del acta abierto
+let editandoActaId = null; // id de la reunión cuya acta se está redactando ahora mismo
+let editandoConsumoId = null; // id del consumo de bebida (propio) que se está editando ahora mismo
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let filtroSocioLiquidar = ''; // id de socio para filtrar "Gastos e ingresos de socios" (liquidacion del tesorero)
@@ -228,6 +234,7 @@ let editandoTareaId = null;
 let editandoInventarioId = null;
 let editandoBebidaPrecioId = null;
 let editandoListaComidaId = null;
+let estatutosEditando = false;
 let nuevaTareaSocios = [];
 let viendoSocioId = null; // si está a un id distinto del propio, "Mi perfil" muestra ese socio en modo lectura
 let adjuntoAbierto = null; // {url, tipo} del ticket/factura abierto en el visor interno
@@ -612,6 +619,28 @@ async function uploadTicketMovimiento(movId, file){
   const res = await fetch(`/api/movimientos/${movId}/ticket`, {method:'POST', body:fd});
   if(!res.ok){
     let msg = 'No se pudo subir el ticket o factura.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  ticketVersion = Date.now();
+}
+async function uploadActaArchivo(rid, file){
+  const fd = new FormData();
+  fd.append('archivo', file);
+  const res = await fetch(`/api/reuniones/${rid}/acta-archivo`, {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el archivo del acta.';
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  ticketVersion = Date.now();
+}
+async function uploadEstatutosArchivo(file){
+  const fd = new FormData();
+  fd.append('archivo', file);
+  const res = await fetch('/api/estatutos/archivos', {method:'POST', body:fd});
+  if(!res.ok){
+    let msg = 'No se pudo subir el documento.';
     try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
     throw new Error(msg);
   }
@@ -1071,6 +1100,7 @@ function renderApp(){
         ${tabBtn('encargados','Tareas','check')}
         ${tabBtn('reparto','Tricount','split')}
         ${isAdmin() ? tabBtn('roles','Roles','key') : ''}
+        ${tabBtn('estatutos','Estatutos','doc')}
         ${tabBtn('perfil','Mi perfil','user')}
       </div>
     </div>
@@ -1086,6 +1116,7 @@ const TAB_ICON_PATHS = {
   'box': '<path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
   'wallet': '<rect x="2.5" y="6" width="19" height="14" rx="2.4"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="14.5" r="1.3"/>',
   'cup': '<path d="M6 3h11l-1 12.5a4.5 4.5 0 0 1-4.5 4.1h-1A4.5 4.5 0 0 1 6 15.5L5 3z"/><path d="M17 6.5h2a2.5 2.5 0 0 1 0 5h-2.4"/><path d="M8 20.5h7"/>',
+  'doc': '<path d="M6 2.5h8l4 4v15h-12z"/><path d="M14 2.5v4h4"/><path d="M8.5 12.5h7"/><path d="M8.5 16h7"/><path d="M8.5 9h3"/>',
   'check': '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l2.6 2.6L16.5 9"/>',
   'key': '<circle cx="8" cy="15" r="4.2"/><path d="M11 12l9-9"/><path d="M16 6l3 3"/><path d="M13.5 8.5l2.3 2.3"/>',
   'user': '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
@@ -1114,6 +1145,7 @@ function renderTab(){
     case 'cuotas': return renderCuotas();
     case 'reservas': return renderReservas();
     case 'reuniones': return renderReuniones();
+    case 'estatutos': return renderEstatutos();
     case 'reparto': return renderReparto();
     case 'inventario': return renderInventario();
     case 'compra': return renderListasTab();
@@ -1310,6 +1342,10 @@ function construirAlertas(){
       alertas.push({tipo:'warn', texto:`${p.nombre} tiene ${money(p.total)} pendientes de bebidas.`, tab:'bebidas'});
     });
   }
+
+  state.inventario.filter(i=>esCategoriaStockBajo(i.categoria) && Number(i.cantidad) < UMBRAL_STOCK_BAJO).sort((a,b)=>a.cantidad-b.cantidad).forEach(i=>{
+    alertas.push({tipo:'warn', texto:`Quedan pocas unidades de "${i.nombre}" (${i.cantidad}) - hay que reponer.`, tab:'inventario'});
+  });
 
   const recientes = [];
   state.reservas.forEach(r=>{
@@ -1779,18 +1815,107 @@ function renderReuniones(){
 
           ${r.notas ? `<div class="meta" style="margin-top:2px;">${escapeHtml(r.notas)}</div>` : ''}
 
-          <details style="margin-top:8px;">
+          <details data-asistencia-details="${r.id}" style="margin-top:8px;" ${reunionesAsistenciaAbierta[r.id]?'open':''}>
             <summary>Asistentes (${asistentes.length})</summary>
             <div class="role-options" style="margin-top:8px;">
               ${state.socios.map(s=>`<button class="tag ${asistentes.includes(s.id)?'ok':''}" data-action="toggle-asistencia" data-reunion="${r.id}" data-socio="${s.id}" style="border:none;">${asistentes.includes(s.id)?'&check; ':''}${escapeHtml(s.nombre)}</button>`).join(' ')}
             </div>
           </details>
 
+          ${renderActaReunion(r, puedeGestionarEventos)}
+
         </div>
 
         ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
       </div>`;
     }).join('')}
+  </div>`;
+}
+
+const ACTA_EXT_PREVISUALIZABLE = ['jpg','jpeg','png','pdf'];
+function renderActaReunion(r, puedeGestionar){
+  const tieneTexto = !!(r.acta_texto && r.acta_texto.trim());
+  const tieneArchivo = !!r.acta_ext;
+  if(!tieneTexto && !tieneArchivo && !puedeGestionar) return '';
+  const editando = editandoActaId === r.id;
+  const urlArchivo = tieneArchivo ? `/static/actas/${r.id}.${r.acta_ext}?v=${ticketVersion}` : '';
+  const previsualizable = tieneArchivo && ACTA_EXT_PREVISUALIZABLE.includes(r.acta_ext);
+  const nombreArchivo = r.acta_nombre || `documento.${r.acta_ext}`;
+  return `
+  <details data-acta-details="${r.id}" style="margin-top:8px;" ${reunionesActaAbierta[r.id]?'open':''}>
+    <summary>Acta de la reunión${(tieneTexto||tieneArchivo)?'':' (sin redactar)'}</summary>
+    <div style="margin-top:8px;">
+      ${tieneTexto ? `<div class="meta" style="white-space:pre-wrap;">${escapeHtml(r.acta_texto)}</div>` : ''}
+      ${tieneArchivo ? `<div style="margin-top:6px;">${previsualizable
+        ? `<button type="button" class="link-btn meta" style="color:var(--amber);" data-action="ver-adjunto" data-url="${urlArchivo}" data-tipo="${r.acta_ext==='pdf'?'pdf':'jpg'}">${escapeHtml(nombreArchivo)}</button>`
+        : `<a class="link-btn meta" style="color:var(--amber);" href="${urlArchivo}" target="_blank" rel="noopener noreferrer">${escapeHtml(nombreArchivo)}</a>`}</div>` : ''}
+      ${!tieneTexto && !tieneArchivo && !editando ? '<p class="empty" style="margin:0;">Todavía no hay acta de esta reunión.</p>' : ''}
+      ${puedeGestionar ? (editando ? `
+        <form data-form="edit-acta" data-id="${r.id}" style="margin-top:8px;">
+          <textarea name="texto" placeholder="Escribe aquí lo hablado en la reunión...">${escapeHtml(r.acta_texto||'')}</textarea>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn small" type="submit">Guardar acta</button>
+            <button class="btn ghost small" type="button" data-action="cancelar-edit-acta">Cancelar</button>
+          </div>
+        </form>
+      ` : `
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <button class="btn ghost small" type="button" data-action="editar-acta" data-id="${r.id}">${tieneTexto?'Editar acta':'Redactar acta'}</button>
+          <label class="btn ghost small" style="cursor:pointer;">${tieneArchivo?'Cambiar archivo':'Subir archivo (Word, Excel, imagen)'}<input type="file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/jpeg,image/png" data-autoupload-acta="${r.id}" style="display:none;"></label>
+          ${tieneArchivo ? `<button class="btn danger small" type="button" data-action="quitar-acta-archivo" data-id="${r.id}">Quitar archivo</button>` : ''}
+        </div>
+      `) : ''}
+    </div>
+  </details>`;
+}
+
+/* ============ ESTATUTOS ============ */
+const ESTATUTOS_EXT_PREVISUALIZABLE = ['jpg','jpeg','png','pdf'];
+function renderEstatutosArchivo(a){
+  const url = `/static/estatutos/${a.id}.${a.ext}?v=${ticketVersion}`;
+  const previsualizable = ESTATUTOS_EXT_PREVISUALIZABLE.includes(a.ext);
+  const nombre = a.nombre_original || `documento.${a.ext}`;
+  return `<div class="list-item" data-id="${a.id}">
+    ${previsualizable
+      ? `<button type="button" class="link-btn meta" style="color:var(--amber); text-align:left;" data-action="ver-adjunto" data-url="${url}" data-tipo="${a.ext==='pdf'?'pdf':'jpg'}">${escapeHtml(nombre)}</button>`
+      : `<a class="link-btn meta" style="color:var(--amber);" href="${url}" target="_blank" rel="noopener noreferrer">${escapeHtml(nombre)}</a>`}
+    ${can('manage_estatutos') ? `<button class="btn danger small" type="button" style="font-family:'Work Sans';" data-action="quitar-estatutos-archivo" data-id="${a.id}">Quitar</button>` : ''}
+  </div>`;
+}
+function renderEstatutos(){
+  const puedeEditar = can('manage_estatutos');
+  const estatutos = state.estatutos || {contenido:'', actualizado_en:null, actualizado_por:null, archivos:[]};
+  const tieneContenido = !!(estatutos.contenido && estatutos.contenido.trim());
+  const archivos = estatutos.archivos || [];
+  return `
+  <div class="card">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span><span class="pin"></span>Estatutos de la peña</span>
+      ${puedeEditar && !estatutosEditando ? `<div style="display:flex; gap:8px; flex-wrap:wrap; font-family:'Work Sans';">
+        <button class="btn ghost small" type="button" style="font-family:'Work Sans';" data-action="editar-estatutos">${tieneContenido?'Editar texto':'Redactar texto'}</button>
+        ${tieneContenido ? `<button class="btn danger small" type="button" style="font-family:'Work Sans';" data-action="borrar-estatutos-contenido">Eliminar texto</button>` : ''}
+      </div>` : ''}
+    </h2>
+    ${estatutos.actualizado_en ? `<p class="meta" style="margin-top:-6px; margin-bottom:10px;">Última actualización: ${new Date(estatutos.actualizado_en).toLocaleString('es-ES')}${estatutos.actualizado_por?' - '+escapeHtml(socioNombre(estatutos.actualizado_por)):''}</p>` : ''}
+    ${puedeEditar && estatutosEditando ? `
+      <form data-form="edit-estatutos">
+        <textarea name="contenido" rows="18" placeholder="Escribe aquí los estatutos de la peña...">${escapeHtml(estatutos.contenido||'')}</textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn small" type="submit">Guardar</button>
+          <button class="btn ghost small" type="button" data-action="cancelar-edit-estatutos">Cancelar</button>
+        </div>
+      </form>
+    ` : (tieneContenido
+      ? `<div class="meta" style="white-space:pre-wrap; font-size:0.98rem;">${escapeHtml(estatutos.contenido)}</div>`
+      : `<p class="empty">${puedeEditar ? 'Todavía no se han redactado los estatutos.' : 'Todavía no hay estatutos publicados.'}</p>`)}
+
+    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--line);">
+      <div style="font-weight:600; margin-bottom:6px;">Documentos adjuntos</div>
+      ${archivos.length ? archivos.map(a=>renderEstatutosArchivo(a)).join('') : `<p class="empty" style="margin:0 0 8px;">No hay ningún documento adjunto.</p>`}
+      ${puedeEditar ? `
+        <label class="btn ghost small" style="cursor:pointer; font-family:'Work Sans'; margin-top:8px; display:inline-block;">Añadir documento (Word, Excel, JPG, PNG)<input type="file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/jpeg,image/png" data-autoupload-estatutos style="display:none;"></label>
+      ` : ''}
+    </div>
   </div>`;
 }
 
@@ -1930,10 +2055,22 @@ function renderGastoEvento(ev){
 }
 
 /* ============ INVENTARIO ============ */
+function categoriasInventarioNombres(){
+  return (state.categorias_inventario || []).map(c=>c.nombre);
+}
+// Categorías configuradas + cualquier categoría "huérfana" que tenga algún
+// material pero ya no exista en la lista (p.ej. se borró la categoría):
+// así ese material no desaparece sin más de la vista.
+function todasLasCategoriasInventario(){
+  const nombres = categoriasInventarioNombres();
+  const huerfanas = [...new Set(state.inventario.map(i=>i.categoria).filter(c=>c && !nombres.includes(c)))].sort((a,b)=>a.localeCompare(b));
+  return [...nombres, ...huerfanas];
+}
 function renderInventario(){
   const puedeGestionarInventario = can('manage_inventory');
+  const categorias = todasLasCategoriasInventario();
   const porCategoria = {};
-  CAT_INV.forEach(c=>porCategoria[c]=[]);
+  categorias.forEach(c=>porCategoria[c]=[]);
   state.inventario.forEach(i=>{ (porCategoria[i.categoria]||(porCategoria[i.categoria]=[])).push(i); });
   return `
   ${puedeGestionarInventario ? `
@@ -1949,7 +2086,13 @@ function renderInventario(){
 
         <div><label class="f">Nombre</label><input type="text" name="nombre" required placeholder="Ej: Nevera, plancha, mesas..."></div>
 
-        <div><label class="f">Categoría</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div><label class="f">Categoría</label>
+          <div style="display:flex; gap:6px;">
+            <select name="categoria" style="flex:1;">${categoriasInventarioNombres().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</select>
+            <button type="button" class="btn ghost small" data-action="add-categoria-inv-inline" title="Añadir categoría nueva">+</button>
+            <button type="button" class="btn ghost small" data-action="delete-categoria-inv-inline" title="Quitar la categoría seleccionada">&minus;</button>
+          </div>
+        </div>
       </div>
       <div class="form-row">
 
@@ -1962,11 +2105,11 @@ function renderInventario(){
       <button class="btn" type="submit">Añadir al inventario</button>
     </form>
   </div>` : `<div class="card"><p class="readonly-note">Cualquier socio puede editar el material que ya existe. Solo quien gestiona inventario puede añadir material nuevo. <button class="btn accent small" data-action="export-inventario-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button> ${can('export_data') ? `<button class="btn accent small" data-action="export-excel" style="font-family:'Work Sans';">Exportar a Excel</button>` : ''} <label class="btn accent small" style="cursor:pointer; font-family:'Work Sans';">Importar Excel<input type="file" accept=".xlsx" data-import-excel style="display:none;"></label></p></div>`}
-  ${CAT_INV.map(cat=>{
+  ${categorias.map(cat=>{
     const items = porCategoria[cat];
     if(!items || items.length===0) return '';
     return `<div class="card">
-      <h2><span class="pin"></span>${cat}</h2>
+      <h2><span class="pin"></span>${escapeHtml(cat)}</h2>
       ${items.map(i=>renderInventarioItem(i)).join('')}
     </div>`;
   }).join('')}
@@ -1975,11 +2118,12 @@ function renderInventario(){
 }
 
 function renderInventarioItem(i){
+  const nombresCategoria = categoriasInventarioNombres();
   if(editandoInventarioId===i.id){
     return `<form data-form="edit-inventario" data-id="${i.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Nombre</label><input type="text" name="nombre" required value="${escapeHtml(i.nombre)}"></div>
-        <div><label class="f">Categoría</label><select name="categoria">${CAT_INV.map(c=>`<option value="${c}" ${i.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label class="f">Categoría</label><select name="categoria">${nombresCategoria.map(c=>`<option value="${escapeHtml(c)}" ${i.categoria===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}${!nombresCategoria.includes(i.categoria)?`<option value="${escapeHtml(i.categoria)}" selected>${escapeHtml(i.categoria)}</option>`:''}</select></div>
       </div>
       <div class="form-row">
         <div><label class="f">Cantidad</label><input type="number" name="cantidad" value="${i.cantidad}" min="0"></div>
@@ -1992,10 +2136,11 @@ function renderInventarioItem(i){
       </div>
     </form>`;
   }
+  const stockBajo = esCategoriaStockBajo(i.categoria) && Number(i.cantidad) < UMBRAL_STOCK_BAJO;
   return `<div class="list-item" data-id="${i.id}">
     <div>
-      <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta">· ${i.cantidad}</span></div>
-      <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${i.notas?escapeHtml(i.notas):''}</div>
+      <div style="font-weight:600; overflow-wrap:anywhere;">${escapeHtml(i.nombre)} <span class="meta" style="${stockBajo?'color:var(--rust); font-weight:700;':''}">· ${i.cantidad}</span></div>
+      <div class="meta" style="overflow-wrap:anywhere;">${i.estado==='Hay que comprar'?'<span class="tag warn">Hay que comprar</span>':i.estado==='Necesita revision'?'<span class="tag warn">Revisar</span>':'<span class="tag ok">Bien</span>'} ${stockBajo?'<span class="tag warn">Quedan pocas unidades</span>':''} ${i.notas?escapeHtml(i.notas):''}</div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
       <button class="btn ghost small" data-action="editar-inventario" data-id="${i.id}">Editar</button>
@@ -2547,7 +2692,7 @@ function renderBebidaPrecioRow(p, puedeGestionar){
     return `<form data-form="edit-bebida-precio" data-id="${p.id}" class="list-item" style="display:block;">
       <div class="form-row">
         <div><label class="f">Bebida</label><input type="text" name="nombre" required value="${escapeHtml(p.nombre)}"></div>
-        <div><label class="f">Unidad</label><input type="text" name="unidad" required value="${escapeHtml(p.unidad)}"></div>
+        <div><label class="f">Unidad (opcional)</label><input type="text" name="unidad" placeholder="Por unidad consumida" value="${escapeHtml(p.unidad)}"></div>
       </div>
       <div class="form-row">
         <div><label class="f">Precio socio (EUR)</label><input type="number" step="0.01" min="0" name="precio_socio" required value="${p.precio_socio}"></div>
@@ -2565,7 +2710,7 @@ function renderBebidaPrecioRow(p, puedeGestionar){
   return `
       <div class="menu-row" data-id="${p.id}">
 
-        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad)} - socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}${item?` - stock: ${item.cantidad}`:''}</small></span>
+        <span class="label">${escapeHtml(p.nombre)}<small>${escapeHtml(p.unidad || 'por unidad')} - socio ${money(p.precio_socio)} / no socio ${money(p.precio_no_socio)}${item?` - stock: ${item.cantidad}`:''}</small></span>
 
         <span class="dots"></span>
 
@@ -2646,7 +2791,7 @@ function renderBebidasConsumo(){
 
         <div><label class="f">Bebida</label><input type="text" name="nombre" required placeholder="Ej: Caña, agua, refresco"></div>
 
-        <div><label class="f">Unidad</label><input type="text" name="unidad" placeholder="Ej: vaso, botellón" required></div>
+        <div><label class="f">Unidad (opcional)</label><input type="text" name="unidad" placeholder="Por unidad consumida"></div>
       </div>
       <div class="form-row">
 
@@ -2712,7 +2857,14 @@ function renderBebidasConsumo(){
     <p class="readonly-note" style="margin:0 0 10px;">Se paga por transferencia junto con la cuota, del 1 al 5 de cada mes.</p>
     ${misPendientesPorMes.map(g=>`
       <div class="menu-row" style="margin-top:10px;"><span class="label"><strong>${labelMes(g.mes)}</strong></span><span class="dots"></span><span class="value rust"><strong>${money(g.total)}</strong></span></div>
-      ${g.items.map(c=>`<div class="menu-row" style="padding-left:12px; align-items:center;"><span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}<small>${c.cantidad} x - ${fmtDate(c.fecha)}</small></span><span class="dots"></span><span class="value rust">${money(c.importe)}</span><button class="btn ghost small" data-action="toggle-consumo-pagado" data-id="${c.id}">Marcar pagado</button></div>`).join('')}
+      ${g.items.map(c=>editandoConsumoId===c.id ? `
+        <form data-form="edit-consumo" data-id="${c.id}" class="menu-row" style="padding-left:12px; align-items:center; gap:8px;">
+          <span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}</span>
+          <input type="number" name="cantidad" min="1" value="${c.cantidad}" style="width:64px;">
+          <button class="btn ghost small" type="submit">Guardar</button>
+          <button class="btn ghost small" type="button" data-action="cancelar-edit-consumo">Cancelar</button>
+        </form>
+      ` : `<div class="menu-row" style="padding-left:12px; align-items:center;"><span class="label">${escapeHtml(c.bebida_nombre||'Bebida')}<small>${c.cantidad} x - ${fmtDate(c.fecha)}</small></span><span class="dots"></span><span class="value rust">${money(c.importe)}</span><button class="btn ghost small" data-action="toggle-consumo-pagado" data-id="${c.id}">Marcar pagado</button><button class="btn ghost small" data-action="editar-consumo" data-id="${c.id}">Editar</button><button class="btn danger small" data-action="delete-consumo" data-id="${c.id}">Borrar</button></div>`).join('')}
     `).join('')}
     <div class="menu-row" style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px;"><span class="label"><strong>Total pendiente</strong></span><span class="dots"></span><span class="value rust"><strong>${money(misPendientes.reduce((a,c)=>a+Number(c.importe||0),0))}</strong></span></div>
   </div>` : ''}
@@ -3080,6 +3232,18 @@ function renderChatMsg(m){
 }
 
 /* ============ EVENTOS: clicks ============ */
+// El evento "toggle" de <details> no burbujea: se escucha en fase de
+// captura para recordar qué desplegables de asistentes/acta de reuniones
+// dejó el usuario abiertos y que no se cierren solos al re-renderizar.
+document.addEventListener('toggle', (e)=>{
+  const el = e.target;
+  if(el.dataset && el.dataset.asistenciaDetails){
+    reunionesAsistenciaAbierta[el.dataset.asistenciaDetails] = el.open;
+  } else if(el.dataset && el.dataset.actaDetails){
+    reunionesActaAbierta[el.dataset.actaDetails] = el.open;
+  }
+}, true);
+
 document.addEventListener('click', async (e)=>{
   const btn = e.target.closest('[data-action]');
   if(!btn) return;
@@ -3251,6 +3415,23 @@ document.addEventListener('click', async (e)=>{
     else if(action==='toggle-asistencia'){
       await apiPost(`/api/reuniones/${btn.dataset.reunion}/asistencia`, {socio_id: btn.dataset.socio});
       await loadState(); render();
+    }
+    else if(action==='editar-acta'){ editandoActaId = btn.dataset.id; render(); }
+    else if(action==='cancelar-edit-acta'){ editandoActaId = null; render(); }
+    else if(action==='editar-estatutos'){ estatutosEditando = true; render(); }
+    else if(action==='cancelar-edit-estatutos'){ estatutosEditando = false; render(); }
+    else if(action==='borrar-estatutos-contenido'){
+      if(confirm('¿Eliminar el texto de los estatutos? El documento adjunto (si lo hay) no se toca.')){
+        await apiPost('/api/estatutos', {contenido:''});
+        estatutosEditando = false;
+        await loadState(); render();
+      }
+    }
+    else if(action==='quitar-estatutos-archivo'){
+      if(confirm('¿Quitar este documento adjunto de los estatutos?')){ await apiDelete(`/api/estatutos/archivos/${btn.dataset.id}`); await loadState(); render(); }
+    }
+    else if(action==='quitar-acta-archivo'){
+      if(confirm('¿Quitar el archivo adjunto de esta acta?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}/acta-archivo`); await loadState(); render(); }
     }
     else if(action==='ver-evento-cal'){ alert(btn.dataset.detalle); }
     else if(action==='tareas-mes'){ tareasCalFecha.setMonth(tareasCalFecha.getMonth()+Number(btn.dataset.dir)); render(); }
@@ -3732,6 +3913,30 @@ document.addEventListener('click', async (e)=>{
       const sel = document.querySelector('form[data-form="add-movimiento"] [name=categoria]');
       if(sel) sel.value = nombre.trim();
     }
+    else if(action==='add-categoria-inv-inline'){
+      const nombre = prompt('Nueva categoría:');
+      if(!nombre || !nombre.trim()) return;
+      try{
+        await apiPost('/api/categorias-inventario', {nombre: nombre.trim()});
+      }catch(err){ alert(err.message || 'No se pudo añadir la categoría.'); return; }
+      await loadState();
+      render();
+      const sel = document.querySelector('form[data-form="add-inventario"] [name=categoria]');
+      if(sel) sel.value = nombre.trim();
+    }
+    else if(action==='delete-categoria-inv-inline'){
+      const form = btn.closest('form');
+      const sel = form ? form.querySelector('[name=categoria]') : null;
+      if(!sel || !sel.value) return;
+      const categoria = (state.categorias_inventario||[]).find(c=>c.nombre===sel.value);
+      if(!categoria) return;
+      if(!confirm(`¿Borrar la categoría "${sel.value}"? El material que ya tenga esta categoría no se moverá ni se borrará.`)) return;
+      try{
+        await apiDelete(`/api/categorias-inventario/${categoria.id}`);
+      }catch(err){ alert(err.message || 'No se pudo borrar la categoría.'); return; }
+      await loadState();
+      render();
+    }
     else if(action==='delete-categoria-mov-inline'){
       const form = btn.closest('form');
       const sel = form ? form.querySelector('[name=categoria]') : null;
@@ -3748,6 +3953,8 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-consumo'){
       if(confirm('¿Borrar este consumo?')){ await apiDelete(`/api/bebidas/consumos/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='editar-consumo'){ editandoConsumoId = btn.dataset.id; render(); }
+    else if(action==='cancelar-edit-consumo'){ editandoConsumoId = null; render(); }
     else if(action==='toggle-consumo-pagado'){
       await apiPost(`/api/bebidas/consumos/${btn.dataset.id}/pagado`);
       await loadState(); render();
@@ -3998,6 +4205,22 @@ document.addEventListener('change', async (e)=>{
       await loadState(); render();
     }catch(err){ alert(err.message || 'No se pudo subir el ticket o factura'); }
   }
+  if(e.target.matches('[data-autoupload-acta]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      await uploadActaArchivo(e.target.dataset.autouploadActa, file);
+      await loadState(); render();
+    }catch(err){ alert(err.message || 'No se pudo subir el archivo del acta'); }
+  }
+  if(e.target.matches('[data-autoupload-estatutos]')){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      await uploadEstatutosArchivo(file);
+      await loadState(); render();
+    }catch(err){ alert(err.message || 'No se pudo subir el documento'); }
+  }
   if(e.target.matches('[data-import-excel]')){
     const file = e.target.files[0];
     if(!file) return;
@@ -4110,6 +4333,18 @@ document.addEventListener('submit', async (e)=>{
       }
     }
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
+    else if(type==='edit-acta'){
+      await apiPost(`/api/reuniones/${form.dataset.id}/acta`, data);
+      editandoActaId = null;
+    }
+    else if(type==='edit-estatutos'){
+      await apiPost('/api/estatutos', data);
+      estatutosEditando = false;
+    }
+    else if(type==='edit-consumo'){
+      await apiPost(`/api/bebidas/consumos/${form.dataset.id}/editar`, data);
+      editandoConsumoId = null;
+    }
     else if(type==='add-inventario'){ await apiPost('/api/inventario', data); }
     else if(type==='edit-inventario'){
       await apiPost(`/api/inventario/${form.dataset.id}`, data);

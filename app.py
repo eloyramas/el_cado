@@ -53,6 +53,8 @@ DB_PATH = os.path.abspath(os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR,
 AVATARS_DIR = os.path.abspath(os.environ.get("AVATARS_DIR", os.path.join(BASE_DIR, "static", "avatars")))
 TICKETS_DIR = os.path.abspath(os.environ.get("TICKETS_DIR", os.path.join(BASE_DIR, "static", "tickets")))
 CHAT_DIR = os.path.abspath(os.environ.get("CHAT_DIR", os.path.join(BASE_DIR, "static", "chat")))
+ACTAS_DIR = os.path.abspath(os.environ.get("ACTAS_DIR", os.path.join(BASE_DIR, "static", "actas")))
+ESTATUTOS_DIR = os.path.abspath(os.environ.get("ESTATUTOS_DIR", os.path.join(BASE_DIR, "static", "estatutos")))
 
 app = Flask(__name__)
 # En producción, define la variable de entorno SECRET_KEY con un valor propio.
@@ -73,13 +75,14 @@ PERMISSIONS = {
     "manage_events": "Gestionar reuniones y reservas",
     "manage_tasks": "Asignar tareas",
     "export_data": "Exportar datos",
+    "manage_estatutos": "Editar los estatutos",
 }
 ALL_PERMISSIONS = list(PERMISSIONS)
 DEFAULT_ROLES = [
     ("administrador", "Administrador", ALL_PERMISSIONS, 1),
-    ("presidente", "Presidente", ["manage_config", "manage_socios", "view_finances", "manage_events", "manage_tasks", "export_data"], 1),
-    ("vicepresidente", "Vicepresidente", ["view_finances", "manage_events", "manage_tasks", "export_data"], 1),
-    ("tesorero", "Tesorero", ["view_finances", "manage_finances", "manage_cuotas", "manage_bebidas", "export_data"], 1),
+    ("presidente", "Presidente", ["manage_config", "manage_socios", "view_finances", "manage_events", "manage_tasks", "export_data", "manage_estatutos"], 1),
+    ("vicepresidente", "Vicepresidente", ["view_finances", "manage_events", "manage_tasks", "export_data", "manage_estatutos"], 1),
+    ("tesorero", "Tesorero", ["view_finances", "manage_finances", "manage_cuotas", "manage_bebidas", "export_data", "manage_estatutos"], 1),
     ("socio", "Socio", [], 1),
     ("otro", "Otro", [], 1),
 ]
@@ -130,7 +133,23 @@ CREATE TABLE IF NOT EXISTS reuniones (
     socio_id TEXT,
     evento TEXT NOT NULL,
     notas TEXT DEFAULT '',
-    creado_en TEXT
+    creado_en TEXT,
+    acta_texto TEXT DEFAULT '',
+    acta_ext TEXT DEFAULT '',
+    acta_nombre TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS estatutos (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    contenido TEXT NOT NULL DEFAULT '',
+    actualizado_en TEXT,
+    actualizado_por TEXT
+);
+CREATE TABLE IF NOT EXISTS estatutos_archivos (
+    id TEXT PRIMARY KEY,
+    ext TEXT NOT NULL,
+    nombre_original TEXT DEFAULT '',
+    subido_en TEXT,
+    subido_por TEXT
 );
 CREATE TABLE IF NOT EXISTS asistencia (
     reunion_id TEXT NOT NULL,
@@ -158,6 +177,10 @@ CREATE TABLE IF NOT EXISTS movimientos (
     ticket_ext TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS categorias_movimiento (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS categorias_inventario (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE
 );
@@ -447,11 +470,61 @@ def init_db():
             db.execute("ALTER TABLE bebidas_precios ADD COLUMN inventario_id TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE reuniones ADD COLUMN acta_texto TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE reuniones ADD COLUMN acta_ext TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE reuniones ADD COLUMN acta_nombre TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        # Migración: los estatutos pasaron primero a admitir un único archivo adjunto
+        # (columnas archivo_ext/archivo_nombre) y ahora admiten varios (tabla
+        # estatutos_archivos). Si la instalación tenía ya un archivo guardado con el
+        # sistema antiguo, se traslada una sola vez a la nueva tabla sin perderlo.
+        cols_estatutos = [row[1] for row in db.execute("PRAGMA table_info(estatutos)")]
+        if "archivo_ext" in cols_estatutos:
+            row = db.execute(
+                "SELECT archivo_ext, archivo_nombre, actualizado_en, actualizado_por FROM estatutos WHERE id = 1"
+            ).fetchone()
+            if row and row["archivo_ext"]:
+                aid = new_id()
+                origen = os.path.join(ESTATUTOS_DIR, f"estatutos.{row['archivo_ext']}")
+                destino = os.path.join(ESTATUTOS_DIR, f"{aid}.{row['archivo_ext']}")
+                try:
+                    if os.path.exists(origen):
+                        os.makedirs(ESTATUTOS_DIR, exist_ok=True)
+                        os.rename(origen, destino)
+                except OSError:
+                    pass
+                db.execute(
+                    "INSERT INTO estatutos_archivos (id, ext, nombre_original, subido_en, subido_por) VALUES (?,?,?,?,?)",
+                    (aid, row["archivo_ext"], row["archivo_nombre"] or "", row["actualizado_en"], row["actualizado_por"]),
+                )
+                db.execute("UPDATE estatutos SET archivo_ext = '' WHERE id = 1")
         if db.execute("SELECT COUNT(*) AS n FROM categorias_movimiento").fetchone()["n"] == 0:
             for nombre in ("Alquiler", "Luz", "Agua", "Gas", "Mantenimiento", "Otros"):
                 db.execute(
                     "INSERT OR IGNORE INTO categorias_movimiento (id, nombre) VALUES (?, ?)",
                     (new_id(), nombre),
+                )
+        if db.execute("SELECT COUNT(*) AS n FROM categorias_inventario").fetchone()["n"] == 0:
+            for nombre in ("Cocina", "Mobiliario", "Electronica", "Otros"):
+                db.execute(
+                    "INSERT OR IGNORE INTO categorias_inventario (id, nombre) VALUES (?, ?)",
+                    (new_id(), nombre),
+                )
+            # Los materiales ya existentes pueden tener una categoría que no esté en
+            # esta lista por defecto (instalaciones previas a esta versión); se añade
+            # también para que no queden huérfanas de un grupo en el desplegable.
+            for row in db.execute("SELECT DISTINCT categoria FROM inventario WHERE categoria IS NOT NULL AND categoria != ''"):
+                db.execute(
+                    "INSERT OR IGNORE INTO categorias_inventario (id, nombre) VALUES (?, ?)",
+                    (new_id(), row["categoria"]),
                 )
         if db.execute("SELECT COUNT(*) AS n FROM tipos_comida").fetchone()["n"] == 0:
             for nombre in ("Bocadillos", "Hecho por nosotros"):
@@ -496,6 +569,28 @@ def init_db():
                 "INSERT OR IGNORE INTO roles (id, nombre, permisos, es_sistema) VALUES (?, ?, ?, ?)",
                 (role_id, nombre, json.dumps(permisos), es_sistema),
             )
+        # Migración: "manage_estatutos" es un permiso nuevo. En una instalación ya
+        # existente, los roles del sistema se crearon con "INSERT OR IGNORE" antes de
+        # que este permiso existiera, así que no lo tienen aunque el código ya lo
+        # incluya en DEFAULT_ROLES. Se añade aquí a los mismos roles que ya lo traen
+        # de fábrica, sin tocar el resto de permisos que el administrador haya
+        # configurado a mano.
+        for role_id in ("administrador", "presidente", "vicepresidente", "tesorero"):
+            row = db.execute("SELECT permisos FROM roles WHERE id = ?", (role_id,)).fetchone()
+            if not row:
+                continue
+            try:
+                permisos_actuales = json.loads(row["permisos"])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                permisos_actuales = []
+            if "manage_estatutos" not in permisos_actuales:
+                permisos_actuales.append("manage_estatutos")
+                db.execute(
+                    "UPDATE roles SET permisos = ? WHERE id = ?",
+                    (json.dumps(permisos_actuales), role_id),
+                )
+        if db.execute("SELECT COUNT(*) AS n FROM estatutos").fetchone()["n"] == 0:
+            db.execute("INSERT INTO estatutos (id, contenido) VALUES (1, '')")
         # Las instalaciones previas solo tenían is_admin. Se traduce a un rol asignado.
         for socio in db.execute("SELECT id, is_admin FROM socios"):
             default_role = "administrador" if socio["is_admin"] else "socio"
@@ -739,6 +834,11 @@ def state():
     sid = require_login()
 
     config = dict(db.execute("SELECT * FROM config WHERE id = 1").fetchone())
+    estatutos_row = db.execute("SELECT id, contenido, actualizado_en, actualizado_por FROM estatutos WHERE id = 1").fetchone()
+    estatutos = dict(estatutos_row) if estatutos_row else {"contenido": "", "actualizado_en": None, "actualizado_por": None}
+    estatutos["archivos"] = [
+        dict(r) for r in db.execute("SELECT * FROM estatutos_archivos ORDER BY subido_en")
+    ]
 
     socios_rows = db.execute("SELECT * FROM socios ORDER BY nombre").fetchall()
     roles = []
@@ -780,6 +880,7 @@ def state():
         cuotas = []
 
     categorias_movimiento = [dict(r) for r in db.execute("SELECT * FROM categorias_movimiento ORDER BY nombre")]
+    categorias_inventario = [dict(r) for r in db.execute("SELECT * FROM categorias_inventario ORDER BY nombre")]
     tipos_comida = [dict(r) for r in db.execute("SELECT * FROM tipos_comida ORDER BY nombre")]
 
     reuniones = []
@@ -893,6 +994,7 @@ def state():
     return jsonify(
         {
             "config": config,
+            "estatutos": estatutos,
             "roles": roles,
             "permission_labels": PERMISSIONS,
             "permissions": sorted(permissions_for_user(sid)),
@@ -903,6 +1005,7 @@ def state():
             "inventario": inventario,
             "movimientos": movimientos,
             "categorias_movimiento": categorias_movimiento,
+            "categorias_inventario": categorias_inventario,
             "tipos_comida": tipos_comida,
             "bebidas_precios": bebidas_precios,
             "bebidas_consumos": bebidas_consumos,
@@ -937,6 +1040,65 @@ def update_config():
         "UPDATE config SET nombre = ?, cuota_mensual = ?, numero_cuenta = ? WHERE id = 1",
         ((data.get("nombre") or "El Cado").strip(), cuota, (data.get("numero_cuenta") or "").strip()),
     )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- estatutos --
+@app.route("/api/estatutos", methods=["POST"])
+def update_estatutos():
+    sid = require_permission("manage_estatutos")
+    if not sid:
+        return err("No tienes permiso para modificar los estatutos.")
+    data = request.get_json(force=True)
+    contenido = (data.get("contenido") or "").strip()
+    db = get_db()
+    db.execute(
+        "UPDATE estatutos SET contenido = ?, actualizado_en = ?, actualizado_por = ? WHERE id = 1",
+        (contenido, now_iso(), sid),
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/estatutos/archivos", methods=["POST"])
+def upload_estatutos_archivo():
+    sid = require_permission("manage_estatutos")
+    if not sid:
+        return err("No tienes permiso para modificar los estatutos.")
+    archivo = request.files.get("archivo")
+    if not archivo or archivo.filename == "":
+        return err("No se ha recibido ningún archivo.", 400)
+    nombre_original = archivo.filename
+    aid = new_id()
+    ext, error = _guardar_archivo_documento(archivo, ESTATUTOS_DIR, aid)
+    if error:
+        return error
+    db = get_db()
+    db.execute(
+        "INSERT INTO estatutos_archivos (id, ext, nombre_original, subido_en, subido_por) VALUES (?,?,?,?,?)",
+        (aid, ext, nombre_original, now_iso(), sid),
+    )
+    db.commit()
+    return jsonify({"ok": True, "id": aid, "ext": ext})
+
+
+@app.route("/api/estatutos/archivos/<aid>", methods=["DELETE"])
+def delete_estatutos_archivo(aid):
+    sid = require_permission("manage_estatutos")
+    if not sid:
+        return err("No tienes permiso para modificar los estatutos.")
+    db = get_db()
+    row = db.execute("SELECT ext FROM estatutos_archivos WHERE id = ?", (aid,)).fetchone()
+    if not row:
+        return err("Documento no encontrado", 404)
+    ruta = os.path.join(ESTATUTOS_DIR, f"{aid}.{row['ext']}")
+    try:
+        if os.path.exists(ruta):
+            os.remove(ruta)
+    except OSError:
+        pass
+    db.execute("DELETE FROM estatutos_archivos WHERE id = ?", (aid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1310,14 +1472,28 @@ def add_reunion():
     return jsonify({"ok": True, "id": rid})
 
 
+def _borrar_archivo_acta(rid, ext):
+    if not ext:
+        return
+    ruta = os.path.join(ACTAS_DIR, f"{rid}.{ext}")
+    try:
+        if os.path.exists(ruta):
+            os.remove(ruta)
+    except OSError:
+        pass
+
+
 @app.route("/api/reuniones/<rid>", methods=["DELETE"])
 def delete_reunion(rid):
     if not require_permission("manage_events"):
         return err("No tienes permiso para gestionar reuniones.")
     db = get_db()
+    row = db.execute("SELECT acta_ext FROM reuniones WHERE id = ?", (rid,)).fetchone()
     db.execute("DELETE FROM reuniones WHERE id = ?", (rid,))
     db.execute("DELETE FROM asistencia WHERE reunion_id = ?", (rid,))
     db.commit()
+    if row:
+        _borrar_archivo_acta(rid, row["acta_ext"])
     return jsonify({"ok": True})
 
 
@@ -1331,6 +1507,55 @@ def toggle_asistencia(rid):
         db.execute("DELETE FROM asistencia WHERE reunion_id = ? AND socio_id = ?", (rid, socio_id))
     else:
         db.execute("INSERT INTO asistencia (reunion_id, socio_id) VALUES (?, ?)", (rid, socio_id))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/reuniones/<rid>/acta", methods=["POST"])
+def update_acta_reunion(rid):
+    if not require_permission("manage_events"):
+        return err("No tienes permiso para gestionar reuniones.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM reuniones WHERE id = ?", (rid,)).fetchone():
+        return err("Reunión no encontrada", 404)
+    data = request.get_json(force=True)
+    texto = (data.get("texto") or "").strip()
+    db.execute("UPDATE reuniones SET acta_texto = ? WHERE id = ?", (texto, rid))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/reuniones/<rid>/acta-archivo", methods=["POST"])
+def upload_acta_archivo(rid):
+    if not require_permission("manage_events"):
+        return err("No tienes permiso para gestionar reuniones.")
+    db = get_db()
+    row = db.execute("SELECT acta_ext FROM reuniones WHERE id = ?", (rid,)).fetchone()
+    if not row:
+        return err("Reunión no encontrada", 404)
+    archivo = request.files.get("archivo")
+    if not archivo or archivo.filename == "":
+        return err("No se ha recibido ningún archivo.", 400)
+    nombre_original = archivo.filename
+    _borrar_archivo_acta(rid, row["acta_ext"])
+    ext, error = _guardar_archivo_documento(archivo, ACTAS_DIR, rid)
+    if error:
+        return error
+    db.execute("UPDATE reuniones SET acta_ext = ?, acta_nombre = ? WHERE id = ?", (ext, nombre_original, rid))
+    db.commit()
+    return jsonify({"ok": True, "ext": ext})
+
+
+@app.route("/api/reuniones/<rid>/acta-archivo", methods=["DELETE"])
+def delete_acta_archivo(rid):
+    if not require_permission("manage_events"):
+        return err("No tienes permiso para gestionar reuniones.")
+    db = get_db()
+    row = db.execute("SELECT acta_ext FROM reuniones WHERE id = ?", (rid,)).fetchone()
+    if not row:
+        return err("Reunión no encontrada", 404)
+    _borrar_archivo_acta(rid, row["acta_ext"])
+    db.execute("UPDATE reuniones SET acta_ext = '', acta_nombre = '' WHERE id = ?", (rid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1393,6 +1618,36 @@ def delete_inventario(iid):
     db = get_db()
     db.execute("UPDATE bebidas_precios SET inventario_id = NULL WHERE inventario_id = ?", (iid,))
     db.execute("DELETE FROM inventario WHERE id = ?", (iid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# -------------------------------------------------------------- categorías de inventario --
+@app.route("/api/categorias-inventario", methods=["POST"])
+def add_categoria_inventario():
+    if not require_permission("manage_inventory"):
+        return err("No tienes permiso para gestionar inventario.")
+    data = request.get_json(force=True)
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return err("El nombre de la categoría es obligatorio.", 400)
+    db = get_db()
+    if db.execute("SELECT 1 FROM categorias_inventario WHERE nombre = ?", (nombre,)).fetchone():
+        return err("Ya existe una categoría con ese nombre.", 400)
+    cid = new_id()
+    db.execute("INSERT INTO categorias_inventario (id, nombre) VALUES (?, ?)", (cid, nombre))
+    db.commit()
+    return jsonify({"ok": True, "id": cid})
+
+
+@app.route("/api/categorias-inventario/<cid>", methods=["DELETE"])
+def delete_categoria_inventario(cid):
+    if not require_permission("manage_inventory"):
+        return err("No tienes permiso para gestionar inventario.")
+    db = get_db()
+    if db.execute("SELECT COUNT(*) AS n FROM categorias_inventario").fetchone()["n"] <= 1:
+        return err("Tiene que quedar al menos una categoría.", 400)
+    db.execute("DELETE FROM categorias_inventario WHERE id = ?", (cid,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1697,12 +1952,21 @@ def add_consumo():
     return jsonify({"ok": True, "id": cid})
 
 
+def _puede_tocar_consumo_propio(sid, consumo):
+    """Un socio puede editar/borrar su propio consumo mientras no se haya
+    marcado como pagado (una vez liquidado, ya forma parte de las cuentas)."""
+    return bool(consumo) and consumo["socio_id"] == sid and not consumo["pagado"]
+
+
 @app.route("/api/bebidas/consumos/<cid>", methods=["DELETE"])
 def delete_consumo(cid):
-    if not require_permission("manage_bebidas"):
-        return err("No tienes permiso para gestionar bebidas.")
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesión.", 401)
     db = get_db()
     consumo = db.execute("SELECT * FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
+    if not has_permission(sid, "manage_bebidas") and not _puede_tocar_consumo_propio(sid, consumo):
+        return err("No tienes permiso para borrar este consumo.")
     if consumo:
         bebida = db.execute("SELECT inventario_id FROM bebidas_precios WHERE id = ?", (consumo["bebida_id"],)).fetchone()
         if bebida and bebida["inventario_id"]:
@@ -1711,6 +1975,49 @@ def delete_consumo(cid):
                 (consumo["cantidad"], bebida["inventario_id"]),
             )
     db.execute("DELETE FROM bebidas_consumos WHERE id = ?", (cid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/bebidas/consumos/<cid>/editar", methods=["POST"])
+def editar_consumo(cid):
+    sid = require_login()
+    if not sid:
+        return err("No has iniciado sesión.", 401)
+    db = get_db()
+    consumo = db.execute("SELECT * FROM bebidas_consumos WHERE id = ?", (cid,)).fetchone()
+    if not consumo:
+        return err("Consumo no encontrado", 404)
+    if not has_permission(sid, "manage_bebidas") and not _puede_tocar_consumo_propio(sid, consumo):
+        return err("No tienes permiso para editar este consumo.")
+    data = request.get_json(force=True)
+    try:
+        nueva_cantidad = int(data.get("cantidad"))
+    except (TypeError, ValueError):
+        return err("Cantidad no válida.", 400)
+    if nueva_cantidad < 1:
+        return err("La cantidad debe ser al menos 1.", 400)
+
+    diferencia = nueva_cantidad - consumo["cantidad"]
+    bebida = db.execute("SELECT inventario_id FROM bebidas_precios WHERE id = ?", (consumo["bebida_id"],)).fetchone()
+    if diferencia and bebida and bebida["inventario_id"]:
+        item = db.execute("SELECT * FROM inventario WHERE id = ?", (bebida["inventario_id"],)).fetchone()
+        if item:
+            if diferencia > 0 and item["cantidad"] < diferencia:
+                return err(
+                    f"No queda stock suficiente de \"{item['nombre']}\" (quedan {item['cantidad']}).",
+                    409,
+                )
+            nueva_stock = item["cantidad"] - diferencia
+            nuevo_estado = "Hay que comprar" if nueva_stock <= 0 else item["estado"]
+            db.execute("UPDATE inventario SET cantidad = ?, estado = ? WHERE id = ?", (nueva_stock, nuevo_estado, item["id"]))
+
+    precio_unit = consumo["importe"] / consumo["cantidad"] if consumo["cantidad"] else 0
+    nuevo_importe = round(precio_unit * nueva_cantidad, 2)
+    db.execute(
+        "UPDATE bebidas_consumos SET cantidad = ?, importe = ? WHERE id = ?",
+        (nueva_cantidad, nuevo_importe, cid),
+    )
     db.commit()
     return jsonify({"ok": True})
 
@@ -2226,6 +2533,74 @@ def _guardar_ticket_o_factura(file, dest_dir, base_name):
         return None, err(
             "No se pudo leer ese archivo. Sube una imagen (.jpg, .png) o un PDF "
             "(si es una foto de iPhone en formato HEIC, conviértela antes a JPG).",
+            400,
+        )
+    im = ImageOps.exif_transpose(im).convert("RGB")
+    im.thumbnail((1600, 1600), Image.LANCZOS)
+    im.save(os.path.join(dest_dir, f"{base_name}.jpg"), "JPEG", quality=85)
+    return "jpg", None
+
+
+# Extensiones de oficina que se guardan tal cual (sin convertir), con su
+# "magic number" para comprobar que el contenido cuadra con la extensión.
+_OFICINA_MAGIC = {
+    "docx": b"PK\x03\x04",
+    "xlsx": b"PK\x03\x04",
+    "doc": b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
+    "xls": b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
+}
+DOCUMENTO_EXTENSIONES = ("jpg", "jpeg", "png", "pdf", "doc", "docx", "xls", "xlsx")
+
+
+def _guardar_archivo_documento(file, dest_dir, base_name):
+    """Guarda un archivo adjunto (acta de reunión, estatutos...): admite
+    imágenes (se convierten a JPG), PDF y documentos de Word/Excel (se
+    guardan tal cual). Devuelve (extension_guardada, None) o
+    (None, respuesta_de_error)."""
+    filename = (file.filename or "").lower()
+    ext_subida = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    content_type = (file.mimetype or "").lower()
+    raw = file.read()
+    os.makedirs(dest_dir, exist_ok=True)
+    for ext_previa in DOCUMENTO_EXTENSIONES:
+        try:
+            os.remove(os.path.join(dest_dir, f"{base_name}.{ext_previa}"))
+        except OSError:
+            pass
+
+    if ext_subida in _OFICINA_MAGIC:
+        if len(raw) > 20 * 1024 * 1024:
+            return None, err("El archivo es demasiado grande (máximo 20 MB).", 400)
+        if raw[: len(_OFICINA_MAGIC[ext_subida])] != _OFICINA_MAGIC[ext_subida]:
+            return None, err("El archivo no parece ser un documento Word/Excel válido.", 400)
+        with open(os.path.join(dest_dir, f"{base_name}.{ext_subida}"), "wb") as f:
+            f.write(raw)
+        return ext_subida, None
+
+    es_pdf = ext_subida == "pdf" or content_type == "application/pdf"
+    if es_pdf:
+        if raw[:4] != b"%PDF":
+            return None, err("El archivo no parece ser un PDF válido.", 400)
+        if len(raw) > 20 * 1024 * 1024:
+            return None, err("El PDF es demasiado grande (máximo 20 MB).", 400)
+        with open(os.path.join(dest_dir, f"{base_name}.pdf"), "wb") as f:
+            f.write(raw)
+        return "pdf", None
+
+    if not PIL_OK:
+        return None, err(
+            "Falta instalar una dependencia en el servidor: ejecuta "
+            "'pip install -r requirements.txt' (o 'pip install Pillow') "
+            "y reinicia la aplicación.",
+            500,
+        )
+    try:
+        im = Image.open(BytesIO(raw))
+        im.load()
+    except Exception:
+        return None, err(
+            "No se pudo leer ese archivo. Sube una imagen (.jpg, .png), un PDF o un "
+            "documento de Word/Excel (.doc, .docx, .xls, .xlsx).",
             400,
         )
     im = ImageOps.exif_transpose(im).convert("RGB")

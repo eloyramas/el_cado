@@ -13,4 +13,6 @@ server.log
 static/avatars/*.jpg
 !static/avatars/.gitkeep
 static/chat/
+static/actas/
+static/estatutos/
 backups/
