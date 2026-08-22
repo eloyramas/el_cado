@@ -82,7 +82,7 @@ DEFAULT_ROLES = [
     ("administrador", "Administrador", ALL_PERMISSIONS, 1),
     ("presidente", "Presidente", ["manage_config", "manage_socios", "view_finances", "manage_events", "manage_tasks", "export_data", "manage_estatutos"], 1),
     ("vicepresidente", "Vicepresidente", ["view_finances", "manage_events", "manage_tasks", "export_data", "manage_estatutos"], 1),
-    ("tesorero", "Tesorero", ["view_finances", "manage_finances", "manage_cuotas", "manage_bebidas", "export_data", "manage_estatutos"], 1),
+    ("tesorero", "Tesorero", ["view_finances", "manage_finances", "manage_cuotas", "manage_bebidas", "export_data", "manage_estatutos", "manage_events"], 1),
     ("socio", "Socio", [], 1),
     ("otro", "Otro", [], 1),
 ]
@@ -569,13 +569,19 @@ def init_db():
                 "INSERT OR IGNORE INTO roles (id, nombre, permisos, es_sistema) VALUES (?, ?, ?, ?)",
                 (role_id, nombre, json.dumps(permisos), es_sistema),
             )
-        # Migración: "manage_estatutos" es un permiso nuevo. En una instalación ya
-        # existente, los roles del sistema se crearon con "INSERT OR IGNORE" antes de
-        # que este permiso existiera, así que no lo tienen aunque el código ya lo
-        # incluya en DEFAULT_ROLES. Se añade aquí a los mismos roles que ya lo traen
-        # de fábrica, sin tocar el resto de permisos que el administrador haya
-        # configurado a mano.
-        for role_id in ("administrador", "presidente", "vicepresidente", "tesorero"):
+        # Migración: cuando un permiso nuevo se añade a DEFAULT_ROLES, las
+        # instalaciones ya existentes no lo reciben solas (los roles del sistema se
+        # crearon con "INSERT OR IGNORE" antes de que ese permiso existiera). Se
+        # añade aquí explícitamente a los roles que deberían traerlo de fábrica,
+        # sin tocar el resto de permisos que el administrador haya configurado a
+        # mano. PERMISOS_NUEVOS_POR_ROL: {rol_id: [permisos a asegurar]}.
+        PERMISOS_NUEVOS_POR_ROL = {
+            "administrador": ["manage_estatutos"],
+            "presidente": ["manage_estatutos"],
+            "vicepresidente": ["manage_estatutos"],
+            "tesorero": ["manage_estatutos", "manage_events"],
+        }
+        for role_id, permisos_a_asegurar in PERMISOS_NUEVOS_POR_ROL.items():
             row = db.execute("SELECT permisos FROM roles WHERE id = ?", (role_id,)).fetchone()
             if not row:
                 continue
@@ -583,8 +589,9 @@ def init_db():
                 permisos_actuales = json.loads(row["permisos"])
             except (TypeError, ValueError, json.JSONDecodeError):
                 permisos_actuales = []
-            if "manage_estatutos" not in permisos_actuales:
-                permisos_actuales.append("manage_estatutos")
+            faltantes = [p for p in permisos_a_asegurar if p not in permisos_actuales]
+            if faltantes:
+                permisos_actuales.extend(faltantes)
                 db.execute(
                     "UPDATE roles SET permisos = ? WHERE id = ?",
                     (json.dumps(permisos_actuales), role_id),
@@ -1470,6 +1477,29 @@ def add_reunion():
     )
     db.commit()
     return jsonify({"ok": True, "id": rid})
+
+
+@app.route("/api/reuniones/<rid>", methods=["POST"])
+def update_reunion(rid):
+    if not require_permission("manage_events"):
+        return err("No tienes permiso para gestionar reuniones.")
+    db = get_db()
+    if not db.execute("SELECT 1 FROM reuniones WHERE id = ?", (rid,)).fetchone():
+        return err("Reunión no encontrada", 404)
+    data = request.get_json(force=True)
+    db.execute(
+        "UPDATE reuniones SET fecha = ?, hora_inicio = ?, hora_fin = ?, evento = ?, notas = ? WHERE id = ?",
+        (
+            data.get("fecha"),
+            (data.get("hora_inicio") or "").strip(),
+            (data.get("hora_fin") or "").strip(),
+            (data.get("evento") or "").strip(),
+            (data.get("notas") or "").strip(),
+            rid,
+        ),
+    )
+    db.commit()
+    return jsonify({"ok": True})
 
 
 def _borrar_archivo_acta(rid, ext):

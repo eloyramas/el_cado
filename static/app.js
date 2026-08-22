@@ -221,6 +221,8 @@ let reunionesAsistenciaAbierta = {}; // {reunionId: true} -> desplegable de asis
 let reunionesActaAbierta = {}; // {reunionId: true} -> desplegable del acta abierto
 let editandoActaId = null; // id de la reunión cuya acta se está redactando ahora mismo
 let editandoConsumoId = null; // id del consumo de bebida (propio) que se está editando ahora mismo
+let editandoReunionId = null; // id de la reunión que se está editando ahora mismo (fecha, tema, horas, notas)
+let editandoReservaId = null; // id de la reserva que se está editando ahora mismo
 let nuevoEventoParticipantes = [];
 let editandoGastoSocioId = null;
 let filtroSocioLiquidar = ''; // id de socio para filtrar "Gastos e ingresos de socios" (liquidacion del tesorero)
@@ -1714,6 +1716,36 @@ function renderCuotas(){
 }
 
 /* ============ RESERVAS ============ */
+function renderReservaRow(r){
+  const puedeEditar = can('manage_events');
+  if(editandoReservaId === r.id){
+    return `<form data-form="edit-reserva" data-id="${r.id}" class="list-item" style="display:block;">
+      <div class="form-row">
+        <div class="field-fecha"><label class="f">Fecha</label><input type="date" name="fecha" required value="${r.fecha}"></div>
+        <div class="field-ancho"><label class="f">Evento</label><input type="text" name="evento" required value="${escapeHtml(r.evento)}"></div>
+      </div>
+      <div class="form-row">
+        <div><label class="f">Desde las (opcional)</label><input type="time" name="hora_inicio" value="${r.hora_inicio||''}"></div>
+        <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin" value="${r.hora_fin||''}"></div>
+      </div>
+      <div class="form-row"><div><label class="f">Notas</label><input type="text" name="notas" value="${escapeHtml(r.notas||'')}" placeholder="opcional"></div></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" type="submit">Guardar</button>
+        <button class="btn ghost small" type="button" data-action="cancelar-editar-reserva">Cancelar</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="list-item">
+    <div>
+      <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)} - ${fmtHoras(r)}</span></div>
+      <div class="meta">Reservado por ${escapeHtml(socioNombre(r.socio_id))} ${r.notas?'- '+escapeHtml(r.notas):''}</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      ${puedeEditar ? `<button class="btn ghost small" data-action="editar-reserva" data-id="${r.id}">Editar</button>` : ''}
+      ${(r.socio_id===state.current_user || puedeEditar) ? `<button class="btn danger small" data-action="delete-reserva" data-id="${r.id}">Cancelar</button>` : ''}
+    </div>
+  </div>`;
+}
 function renderReservas(){
   const proximas = state.reservas.filter(r=>r.fecha >= todayISO()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const pasadas = state.reservas.filter(r=>r.fecha < todayISO()).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10);
@@ -1743,20 +1775,7 @@ function renderReservas(){
       <span><span class="pin"></span>Próximas reservas</span>
       ${proximas.length ? `<button class="btn accent small" data-action="export-reservas-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
-    ${proximas.length===0 ? '<p class="empty">La peña está libre por ahora.</p>' : proximas.map(r=>`
-      <div class="list-item">
-        
-        <div>
-        
-          <div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)} - ${fmtHoras(r)}</span></div>
-        
-          <div class="meta">Reservado por ${escapeHtml(socioNombre(r.socio_id))} ${r.notas?'- '+escapeHtml(r.notas):''}</div>
-        
-        </div>
-        
-        ${(r.socio_id===state.current_user || can('manage_events')) ? `<button class="btn danger small" data-action="delete-reserva" data-id="${r.id}">Cancelar</button>` : ''}
-      </div>
-    `).join('')}
+    ${proximas.length===0 ? '<p class="empty">La peña está libre por ahora.</p>' : proximas.map(r=>renderReservaRow(r)).join('')}
   </div>
   <div class="card">
     <h2><span class="pin"></span>Calendario de reservas</h2>
@@ -1764,7 +1783,7 @@ function renderReservas(){
   </div>
   ${pasadas.length ? `<div class="card">
     <h2><span class="pin"></span>Historial reciente</h2>
-    ${pasadas.map(r=>`<div class="list-item"><div><div style="font-weight:600;">${escapeHtml(r.evento)} <span class="meta">- ${fmtDate(r.fecha)} - ${fmtHoras(r)}</span></div><div class="meta">${escapeHtml(socioNombre(r.socio_id))}</div></div></div>`).join('')}
+    ${pasadas.map(r=>renderReservaRow(r)).join('')}
   </div>` : ''}
   `;
 }
@@ -1804,6 +1823,23 @@ function renderReuniones(){
       ${ordenadas.length ? `<button class="btn accent small" data-action="export-reuniones-whatsapp" style="font-family:'Work Sans';">Enviar por WhatsApp</button>` : ''}
     </h2>
     ${ordenadas.length===0 ? '<p class="empty">Aún no hay reuniones.</p>' : ordenadas.map(r=>{
+      if(editandoReunionId === r.id){
+        return `<form data-form="edit-reunion" data-id="${r.id}" class="list-item" style="display:block;">
+          <div class="form-row">
+            <div class="field-fecha"><label class="f">Fecha</label><input type="date" name="fecha" required value="${r.fecha}"></div>
+            <div class="field-ancho"><label class="f">Tema</label><input type="text" name="evento" required value="${escapeHtml(r.evento)}"></div>
+          </div>
+          <div class="form-row">
+            <div><label class="f">Desde las (opcional)</label><input type="time" name="hora_inicio" value="${r.hora_inicio||''}"></div>
+            <div><label class="f">Hasta las (opcional)</label><input type="time" name="hora_fin" value="${r.hora_fin||''}"></div>
+          </div>
+          <div class="form-row"><div><label class="f">Notas / orden del día</label><textarea name="notas">${escapeHtml(r.notas||'')}</textarea></div></div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn small" type="submit">Guardar</button>
+            <button class="btn ghost small" type="button" data-action="cancelar-editar-reunion">Cancelar</button>
+          </div>
+        </form>`;
+      }
       const asistentes = r.asistentes || [];
       return `<div class="list-item">
 
@@ -1826,7 +1862,10 @@ function renderReuniones(){
 
         </div>
 
-        ${puedeGestionarEventos ? `<button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>` : ''}
+        ${puedeGestionarEventos ? `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button class="btn ghost small" data-action="editar-reunion" data-id="${r.id}">Editar</button>
+          <button class="btn danger small" data-action="delete-reunion" data-id="${r.id}">Borrar</button>
+        </div>` : ''}
       </div>`;
     }).join('')}
   </div>`;
@@ -3661,6 +3700,8 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-reunion'){
       if(confirm('¿Borrar esta reunión?')){ await apiDelete(`/api/reuniones/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='editar-reunion'){ editandoReunionId = btn.dataset.id; render(); }
+    else if(action==='cancelar-editar-reunion'){ editandoReunionId = null; render(); }
     else if(action==='delete-inventario'){
       if(confirm('¿Borrar este material?')){
         editandoInventarioId = null;
@@ -3962,6 +4003,8 @@ document.addEventListener('click', async (e)=>{
     else if(action==='delete-reserva'){
       if(confirm('¿Cancelar esta reserva?')){ await apiDelete(`/api/reservas/${btn.dataset.id}`); await loadState(); render(); }
     }
+    else if(action==='editar-reserva'){ editandoReservaId = btn.dataset.id; render(); }
+    else if(action==='cancelar-editar-reserva'){ editandoReservaId = null; render(); }
     else if(action==='delete-gasto-evento'){
       if(confirm('¿Borrar este evento y todos sus pagos?')){ await apiDelete(`/api/gastos-eventos/${btn.dataset.id}`); await loadState(); render(); }
     }
@@ -4333,6 +4376,10 @@ document.addEventListener('submit', async (e)=>{
       }
     }
     else if(type==='add-reunion'){ await apiPost('/api/reuniones', data); }
+    else if(type==='edit-reunion'){
+      await apiPost(`/api/reuniones/${form.dataset.id}`, data);
+      editandoReunionId = null;
+    }
     else if(type==='edit-acta'){
       await apiPost(`/api/reuniones/${form.dataset.id}/acta`, data);
       editandoActaId = null;
@@ -4384,6 +4431,10 @@ document.addEventListener('submit', async (e)=>{
       }
     }
     else if(type==='add-reserva'){ await apiPost('/api/reservas', data); }
+    else if(type==='edit-reserva'){
+      await apiPost(`/api/reservas/${form.dataset.id}`, data);
+      editandoReservaId = null;
+    }
     else if(type==='add-lista-compra'){ await apiPost('/api/listas-compra', data); }
     else if(type==='add-item-compra'){
       await apiPost(`/api/listas-compra/${form.dataset.lista}/items`, data);
